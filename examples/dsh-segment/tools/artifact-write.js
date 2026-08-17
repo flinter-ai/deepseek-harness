@@ -17,7 +17,7 @@ export function artifactWriteTool() {
     description: 'Write an artifact with its content hash (stub — local path).',
     parameters: {
       name: { type: 'string', required: true, description: 'Artifact name, e.g. "segments.json"' },
-      data: { oneOf: [{ type: 'object' }, { type: 'array' }, { type: 'string' }, { type: 'number' }, { type: 'boolean' }, { type: 'null' }], required: true, description: 'Artifact payload' },
+      data: { type: 'json', required: true, description: 'Artifact payload' },
       out_dir: { type: 'string', description: 'Output directory', default: '/tmp/dsh-segment-artifacts' },
     },
     output: {
