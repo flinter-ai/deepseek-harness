@@ -18,7 +18,7 @@
  *   node worker-home.mjs --home /tmp/dsh-worker-easy --model easy
  *   node worker-home.mjs --home /tmp/dsh-worker-hard --model hard
  *
- * Optional flags: --dsh-root <harness checkout> (default ~/deepseek-harness),
+ * Optional flags: --dsh-root <harness checkout> (default ~/finter/deepseek-harness),
  * --plugin <dir>, --node <nvm node bin dir>, --creds <file>, --settings <file>.
  */
 import { execFileSync } from 'node:child_process'
@@ -66,7 +66,7 @@ function flag(name, fallback) {
 
 const home = flag('home')
 const model = flag('model', 'easy')
-const dshRoot = flag('dsh-root', join(homedir(), 'deepseek-harness'))
+const dshRoot = flag('dsh-root', join(homedir(), 'finter', 'deepseek-harness'))
 const pluginDir = flag('plugin', join(dshRoot, 'examples', 'dsh-orca'))
 const nodeBin = flag('node', join(homedir(), '.nvm', 'versions', 'node', 'v22.23.2', 'bin'))
 const sourceCreds = flag('creds', join(homedir(), '.dsh', '.credentials.yaml'))

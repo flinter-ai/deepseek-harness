@@ -24,7 +24,7 @@ import { join } from 'node:path'
 import { homedir, tmpdir } from 'node:os'
 import { writeFileSync, readFileSync } from 'node:fs'
 
-const DSH_ROOT = join(homedir(), 'deepseek-harness')
+const DSH_ROOT = join(homedir(), 'finter', 'deepseek-harness')
 const NODE_BIN = join(homedir(), '.nvm', 'versions', 'node', 'v22.23.2', 'bin')
 
 function flag(name, fallback) {
