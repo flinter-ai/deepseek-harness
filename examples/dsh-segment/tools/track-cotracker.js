@@ -22,7 +22,7 @@ export function trackCotrackerTool() {
         type: 'object',
         additionalProperties: false,
         properties: {
-          artifact: { type: 'object', required: true },
+          artifact: { type: 'object', required: true, additionalProperties: true },
           content_hash: { type: 'string', required: true },
         },
       },
