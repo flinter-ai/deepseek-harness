@@ -5,20 +5,29 @@
  * use Foote novelty on self-similarity; this stub proves candidate emission.
  */
 
+import { defineTool } from '@deepseek-ai/dsh-tools'
 import { createHash } from 'node:crypto'
 
 export function boundaryDetectTool() {
-  return {
+  return defineTool({
     name: 'boundary.detect',
     description: 'Detect candidate boundaries from a track (deterministic stub).',
     parameters: {
-      type: 'object',
-      properties: {
-        track_ref: { type: 'string', description: 'Content hash of the track artifact' },
-      },
-      required: ['track_ref'],
+      track_ref: { type: 'string', required: true, description: 'Content hash of the track artifact' },
     },
-    async run(args, ctx) {
+    output: {
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          artifact: { type: 'object', required: true },
+          content_hash: { type: 'string', required: true },
+        },
+      },
+      render: (_args, value) => [{ type: 'text', text: `boundary.detect → ${value.content_hash.slice(0, 12)}` }],
+    },
+    isConcurrencySafe: () => true,
+    async execute(args, exec) {
       const descriptor = {
         track_ref: args.track_ref,
         candidates: [
@@ -30,5 +39,5 @@ export function boundaryDetectTool() {
       const hash = createHash('sha256').update(JSON.stringify(descriptor)).digest('hex')
       return { artifact: descriptor, content_hash: hash }
     },
-  }
+  })
 }

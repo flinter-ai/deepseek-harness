@@ -6,21 +6,30 @@
  * protocol usage.
  */
 
+import { defineTool } from '@deepseek-ai/dsh-tools'
 import { createHash } from 'node:crypto'
 
 export function trackCotrackerTool() {
-  return {
+  return defineTool({
     name: 'track.cotracker',
     description: 'Run CoTracker on a seeded window (deterministic stub).',
     parameters: {
-      type: 'object',
-      properties: {
-        seeds: { type: 'array', items: { type: 'string' }, description: 'Seed frame identifiers' },
-        window: { type: 'string', description: 'Video window identifier' },
-      },
-      required: ['seeds', 'window'],
+      seeds: { type: 'array', items: { type: 'string' }, required: true, description: 'Seed frame identifiers' },
+      window: { type: 'string', required: true, description: 'Video window identifier' },
     },
-    async run(args, ctx) {
+    output: {
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          artifact: { type: 'object', required: true },
+          content_hash: { type: 'string', required: true },
+        },
+      },
+      render: (_args, value) => [{ type: 'text', text: `track.cotracker → ${value.content_hash.slice(0, 12)}` }],
+    },
+    isConcurrencySafe: () => false,
+    async execute(args, exec) {
       const descriptor = {
         window: args.window,
         seeds: args.seeds,
@@ -30,5 +39,5 @@ export function trackCotrackerTool() {
       const hash = createHash('sha256').update(JSON.stringify(descriptor)).digest('hex')
       return { artifact: descriptor, content_hash: hash }
     },
-  }
+  })
 }

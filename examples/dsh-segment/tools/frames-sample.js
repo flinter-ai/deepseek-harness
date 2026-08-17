@@ -6,21 +6,30 @@
  * tool-call → artifact-write path inside the container.
  */
 
+import { defineTool } from '@deepseek-ai/dsh-tools'
 import { createHash } from 'node:crypto'
 
 export function framesSampleTool() {
-  return {
+  return defineTool({
     name: 'frames.sample',
     description: 'Sample frames from a video window (deterministic stub).',
     parameters: {
-      type: 'object',
-      properties: {
-        window: { type: 'string', description: 'Video window identifier, e.g. "t0-t1"' },
-        budget: { type: 'number', description: 'Frame budget', default: 12 },
-      },
-      required: ['window'],
+      window: { type: 'string', required: true, description: 'Video window identifier, e.g. "t0-t1"' },
+      budget: { type: 'number', description: 'Frame budget', default: 12 },
     },
-    async run(args, ctx) {
+    output: {
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          artifact: { type: 'object', required: true },
+          content_hash: { type: 'string', required: true },
+        },
+      },
+      render: (_args, value) => [{ type: 'text', text: `frames.sample → ${value.content_hash.slice(0, 12)}` }],
+    },
+    isConcurrencySafe: () => true,
+    async execute(args, exec) {
       const descriptor = {
         window: args.window,
         budget: args.budget ?? 12,
@@ -30,5 +39,5 @@ export function framesSampleTool() {
       const hash = createHash('sha256').update(JSON.stringify(descriptor)).digest('hex')
       return { artifact: descriptor, content_hash: hash }
     },
-  }
+  })
 }
