@@ -186,7 +186,7 @@ export function buildProvider(spec: ProviderSpec): Provider {
   // Model resolution has already stamped each model's wire protocol. A route
   // with one distinct protocol uses a single API implementation; a route whose
   // models speak mixed protocols hands pi-ai a map keyed by `model.api`.
-  const apis = new Set(spec.models.map(model => model.api ?? spec.api))
+  const apis = new Set(spec.models.map(model => model.api))
   if (apis.size === 0) {
     throw new Error(
       `llm-pi-ai: provider "${spec.provider}" names api "undefined", which this build cannot serve;`
@@ -214,7 +214,6 @@ export function buildProvider(spec: ProviderSpec): Provider {
 
   const apiMap: Partial<Record<string, ProviderStreams>> = {}
   for (const api of apis) {
-    if (api === undefined) continue
     const factory = PROTOCOLS[api]
     if (factory === undefined) {
       throw new Error(
