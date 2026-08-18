@@ -76,6 +76,16 @@ export interface PiAiProviderProfile {
   /** Endpoint for this route's models; defaults to the installed catalog's endpoint. */
   baseURL?: string
   /**
+   * AWS region for `bedrock-converse-stream` routes. Absent defers to the
+   * model ARN, the endpoint URL, `AWS_REGION`, or `AWS_DEFAULT_REGION`.
+   */
+  region?: string
+  /**
+   * AWS profile for `bedrock-converse-stream` routes. Absent defers to
+   * `AWS_PROFILE` or the default credential chain.
+   */
+  profile?: string
+  /**
    * This route's model catalog. Omission serves the installed catalog for the
    * route unchanged; an explicit list replaces it, each entry defaulting its
    * unset fields from the installed model of the same id.
@@ -234,6 +244,8 @@ const profile = z.object({
   displayName: z.string(),
   api: z.union(supportedProtocols()),
   baseURL: z.string(),
+  region: z.string(),
+  profile: z.string(),
   models: z.array(modelProfile),
   modelOverrides: z.dict(modelOverride),
   compat: compatProfile,

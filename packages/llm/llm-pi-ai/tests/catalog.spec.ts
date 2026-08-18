@@ -12,6 +12,7 @@ import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
 import { getBuiltinModels } from '@earendil-works/pi-ai/providers/all'
 import { createModels, getSupportedThinkingLevels } from '@earendil-works/pi-ai'
 import type { Api, Model, OpenAICompletionsCompat, Provider } from '@earendil-works/pi-ai'
+import { catalogProvider } from '../src/catalog.ts'
 import { resolveProfiles } from '../src/config.ts'
 import { buildProvider, supportedProtocols } from '../src/provider.ts'
 import { assemble } from './assemble.ts'
@@ -311,13 +312,13 @@ describe('hand-declared providers', () => {
     })).toThrow(/needs a baseURL/)
   })
 
-  it.each(['bedrock-converse-stream', 'google-vertex', 'azure-openai-responses', 'openai-codex-responses'])(
+  it.each(['google-vertex', 'azure-openai-responses', 'openai-codex-responses'])(
     'refuses %s, whose authentication a profile cannot express',
     (api) => {
-      // These need SigV4 credentials and a region, a project plus ADC, provider
-      // environment and an api-version, or OAuth — none of which a key, an
-      // endpoint, and headers can carry, so a route naming one would be built
-      // unable to authenticate.
+      // Vertex needs a project, a location, and application-default credentials;
+      // Azure needs provider environment plus an api-version; Codex needs OAuth.
+      // None can be expressed with a key, an endpoint, and headers alone, so a
+      // route naming one would be built unable to authenticate.
       expect(supportedProtocols()).not.toContain(api)
       expect(() => buildProvider({ provider: 'acme-gateway', displayName: 'Acme', api, models: [], namesCredential: true }))
         .toThrow(/cannot serve; supported protocols are/)
@@ -967,5 +968,41 @@ describe('configurable-provider directory', () => {
       settingsPath: ['providers', 'openai-codex'],
       declared: false,
     })
+  })
+})
+
+describe('amazon bedrock', () => {
+  it('exposes bedrock-converse-stream as a supported protocol', () => {
+    expect(supportedProtocols()).toContain('bedrock-converse-stream')
+  })
+
+  it('resolves the catalog bedrock route with region and profile from config', () => {
+    const resolved = resolveProfiles({
+      'amazon-bedrock': {
+        region: 'us-west-2',
+        profile: 'dsh-test',
+      },
+    })
+    const profile = resolved.get('amazon-bedrock')
+    expect(profile?.region).toBe('us-west-2')
+    expect(profile?.profile).toBe('dsh-test')
+    expect(profile?.piProvider.id).toBe('amazon-bedrock')
+    expect(profile?.piProvider.getModels().length).toBeGreaterThan(0)
+    expect(profile?.piProvider.getModels().every(model => model.api === 'bedrock-converse-stream')).toBe(true)
+  })
+
+  it('resolves the catalog bedrock route without optional region or profile', () => {
+    const resolved = resolveProfiles({ 'amazon-bedrock': {} })
+    const profile = resolved.get('amazon-bedrock')
+    expect(profile?.region).toBeUndefined()
+    expect(profile?.profile).toBeUndefined()
+    expect(profile?.piProvider.id).toBe('amazon-bedrock')
+  })
+
+  it('reuses the installed catalog provider for a bedrock route keeping its protocol', () => {
+    const resolved = resolveProfiles({ 'amazon-bedrock': {} })
+    const catalog = catalogProvider('amazon-bedrock')
+    expect(resolved.get('amazon-bedrock')?.piProvider).not.toBe(catalog)
+    expect(resolved.get('amazon-bedrock')?.piProvider.stream).toBeDefined()
   })
 })

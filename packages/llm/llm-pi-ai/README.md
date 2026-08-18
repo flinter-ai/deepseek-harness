@@ -99,7 +99,19 @@ Resolution still fails loud, naming the offending route and model, when a route 
 
 `baseURL` sets the endpoint of every model on the route, so private proxies such as `https://proxy.example.com:8443` remain supported; a catalog route that omits it keeps each catalog model's own endpoint. Naming `api` on a catalog route repoints the whole route at that protocol, which is how a deployment moves a provider between, say, Responses and Chat Completions.
 
-`supportedProtocols()` is deliberately narrower than pi-ai's full streaming API set: it holds only the protocols a profile can *completely* describe with a key, an endpoint, and headers. Bedrock signs with SigV4 over AWS credentials and a region, Vertex needs a project, a location, and application-default credentials, Azure needs provider environment plus an api-version, and Codex authenticates through OAuth — offering those would hand back a route that cannot authenticate. Catalog routes still reach them through their own provider; only an explicit override is refused.
+`supportedProtocols()` is deliberately narrower than pi-ai's full streaming API set: it holds only the protocols a profile can *completely* describe with a key, an endpoint, headers, or the standard cloud credential chain. Bedrock resolves AWS credentials through the ambient chain (env vars, profiles, ECS task roles, web identity) and takes its region from config, the model ARN, or `AWS_REGION`; it is included because a deployment running inside AWS authenticates without a stored key. Vertex needs a project, a location, and application-default credentials, Azure needs provider environment plus an api-version, and Codex authenticates through OAuth — offering those would still hand back a route that cannot authenticate. Catalog routes still reach them through their own provider; only an explicit override is refused.
+
+### Amazon Bedrock
+
+A Bedrock route uses `api: bedrock-converse-stream`. The installed catalog ships `amazon-bedrock` with the current Bedrock model list, so a minimal profile is `providers: { amazon-bedrock: {} }` and credentials resolve from the AWS credential chain. `region` and `profile` are optional profile fields: `region` pins the endpoint when the model ARN and environment do not decide it, and `profile` selects an AWS profile when the default chain should not be used. `apiKeyEnv` is not required inside AWS and should only be set for bearer-token deployments (`AWS_BEARER_TOKEN_BEDROCK`).
+
+```yaml
+llm-pi-ai:
+  providers:
+    amazon-bedrock:
+      region: us-west-2
+      profile: production
+```
 
 ## Dynamic configuration (settings + credentials)
 
