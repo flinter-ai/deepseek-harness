@@ -7,12 +7,16 @@
  *   - settings.yaml with the requested agent-default-model + cordis (Creator
  *     mode) preset default
  *
- * Model routing (phase 1):
- *   easy        -> deepseek-official / deepseek-v4-flash (direct DeepSeek API)
- *   opencode    -> opencode-go / deepseek-v4-flash (gateway route)
- *   hard        -> kimi-coding / k3-256k           (Kimi K3-256K)
- *   hard-backup -> opencode-go / glm-5.2           (GLM backup if K3 is 404/out of credit)
- *   opencode alias of easy; kimi alias of hard; glm-backup alias of hard-backup.
+ * Model routing (desired; operational fallback executes when primary is BLOCKED):
+ *   easy          -> opencode-go / gpt-5.6-luna   (BLOCKED: needs openai-responses
+ *                                                  per-model; falls back to easy-backup)
+ *   easy-backup   -> gmi-serving / deepseek-ai/DeepSeek-V4-Flash-0731
+ *   backup        -> alias of easy-backup
+ *   hard          -> kimi-coding / k3-256k         (Kimi K3-256K)
+ *   hard-backup   -> opencode-go / glm-5.3         (backup if K3 unavailable)
+ *   glm-5.3       -> opencode-go / glm-5.3
+ *   kimi          -> alias of hard
+ *   nadirclaw     -> NadirClaw difficulty router (localhost only)
  *
  * Usage:
  *   node worker-home.mjs --home /tmp/dsh-worker-easy --model easy
@@ -27,31 +31,21 @@ import { join } from 'node:path'
 import { homedir } from 'node:os'
 
 const MODELS = {
-  // easy now routes DIRECT to DeepSeek (@deepseek-ai/dsh-llm-deepseek,
-  // api.deepseek.com, DEEPSEEK_API_KEY) rather than through opencode.go,
-  // whose weekly quota exhausted mid-task on 2026-08-16.
-  easy: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
-  // opencode keeps the old gateway route, for when it is wanted explicitly.
-  opencode: { provider: 'opencode-go', model: 'deepseek-v4-flash' },
+  // easy primary: opencode-go / gpt-5.6-luna.
+  // DESIRED routing; OPERATIONALLY BLOCKED because gpt-5.6-luna needs the
+  // OpenAI Responses API while glm-5.3 needs OpenAI chat/completions, and DSH
+  // pi-ai currently selects `api` at provider level. The dsh-agent fallback
+  // classifier runs easy -> easy-backup (GMI) when Luna fails.
+  easy: { provider: 'opencode-go', model: 'gpt-5.6-luna' },
+  'easy-backup': { provider: 'gmi-serving', model: 'deepseek-ai/DeepSeek-V4-Flash-0731' },
+  backup: { provider: 'gmi-serving', model: 'deepseek-ai/DeepSeek-V4-Flash-0731' },
   // hard primary: Kimi K3-256K (api.kimi.com/coding).
   hard: { provider: 'kimi-coding', model: 'k3-256k' },
   kimi: { provider: 'kimi-coding', model: 'k3-256k' },
-  // hard backup (respawn when K3-256K is 404 / out of credit / unresponsive):
-  // GLM-5.3 is offered on opencode.go but absent from the pi-ai catalog; the
-  // explicit models list in settings makes it callable. glm-5.2 remains the
-  // battle-tested fallback tier.
-  'hard-backup': { provider: 'opencode-go', model: 'glm-5.2' },
-  'glm-backup': { provider: 'opencode-go', model: 'glm-5.2' },
+  // hard backup when K3-256K is 404 / out of credit / unresponsive.
+  'hard-backup': { provider: 'opencode-go', model: 'glm-5.3' },
   'glm-5.3': { provider: 'opencode-go', model: 'glm-5.3' },
-  // NadirClaw difficulty router — LOCAL DISPATCHES ONLY. It listens on
-  // http://localhost:8856/v1 (com.flinter.nadirclaw LaunchAgent), so a worker
-  // running in an Orca terminal on this machine can reach it and a
-  // cloud/AgentBox worker cannot. Do NOT set this as a default for cloud work.
-  // `auto` classifies each prompt and routes to the cheapest tier that can
-  // answer, escalating on failure; the fixed tiers are there when you want to
-  // pin one. See skills/dsh-orca-worker SKILL.md for the two caveats that still
-  // stand (the server ignores auth, and routing decisions are not yet logged,
-  // so a misroute degrades quality silently).
+  // NadirClaw difficulty router — LOCAL DISPATCHES ONLY.
   nadirclaw: { provider: 'nadirclaw', model: 'auto' },
   'nadir-auto': { provider: 'nadirclaw', model: 'nadir-auto' },
   'nadir-eco': { provider: 'nadirclaw', model: 'nadir-eco' },
@@ -97,16 +91,34 @@ execFileSync('bash', ['-c',
 // 2. Credentials (same machine; file stays 0600 from the copy).
 copyFileSync(sourceCreds, join(home, '.credentials.yaml'))
 
-// 3. settings.yaml — both routes declared (both keys exist), default = selection.
-// The opencode-go route carries an explicit models list so GLM-5.3 (offered on
-// opencode.go, absent from the pi-ai snapshot catalog) is callable.
+// 3. settings.yaml — declare only the models this worker may actually call.
+// Real card values come from the provider's models.json / GET /v1/models, not
+// invented numbers.
 const OPENCODE_GO_MODELS = [
-  ['deepseek-v4-flash', 'DeepSeek V4 Flash', 1000000, 384000, 'text', 'thinkingFormat: deepseek'],
-  ['deepseek-v4-pro', 'DeepSeek V4 Pro', 1000000, 384000, 'text', 'thinkingFormat: deepseek'],
-  ['glm-5.2', 'GLM-5.2', 1000000, 131072, 'text', null],
+  // BLOCKED pending per-model `api` support: gpt-5.6-luna terminates correctly
+  // only on the OpenAI Responses API, while opencode-go is pinned to
+  // openai-completions so that glm-5.3 and the other explicit models work.
+  // Real card input is text/image/pdf; DSH's modality gate models text/image
+  // today, so pdf is documented here but omitted from the generated entry.
+  ['gpt-5.6-luna', 'GPT-5.6 Luna', 1050000, 128000, 'text, image', null],
   ['glm-5.3', 'GLM-5.3', 1000000, 131072, 'text', null],
   ['kimi-k3', 'Kimi K3 (2x usage)', 1048576, 131072, 'text, image', null],
   ['kimi-k2.7-code', 'Kimi K2.7 Code', 262144, 262144, 'text, image', null],
+].map(([id, name, ctx, maxTok, input, compat]) =>
+  (id === 'gpt-5.6-luna'
+    ? `        # BLOCKED: needs openai-responses per-model; DSH pi-ai selects api at provider level today.\n        - id: ${id}\n          name: ${name}\n          contextWindow: ${ctx}\n          maxTokens: ${maxTok}\n          input: [${input}]`
+    : `        - id: ${id}\n          name: ${name}\n          contextWindow: ${ctx}\n          maxTokens: ${maxTok}\n          input: [${input}]`)
+  + (compat ? `\n          compat:\n            ${compat}` : ''))
+const GMI_SERVING_MODELS = [
+  ['deepseek-ai/DeepSeek-V4-Flash-0731', 'GMI DeepSeek V4 Flash 0731', 1000000, 384000, 'text', null],
+].map(([id, name, ctx, maxTok, input, compat]) =>
+  `        - id: ${id}\n          name: ${name}\n          contextWindow: ${ctx}\n          maxTokens: ${maxTok}\n          input: [${input}]`
+  + (compat ? `\n          compat:\n            ${compat}` : ''))
+const NADIRCLAW_MODELS = [
+  ['nadir-auto', 'NadirClaw Auto', 1000000, 384000, 'text', null],
+  ['nadir-eco', 'NadirClaw Eco', 1000000, 384000, 'text', null],
+  ['nadir-premium', 'NadirClaw Premium', 1000000, 384000, 'text', null],
+  ['nadir-reasoning', 'NadirClaw Reasoning', 1000000, 384000, 'text', null],
 ].map(([id, name, ctx, maxTok, input, compat]) =>
   `        - id: ${id}\n          name: ${name}\n          contextWindow: ${ctx}\n          maxTokens: ${maxTok}\n          input: [${input}]`
   + (compat ? `\n          compat:\n            ${compat}` : ''))
@@ -123,8 +135,20 @@ const settings = [
   '      baseURL: https://opencode.ai/zen/go/v1',
   '      models:',
   ...OPENCODE_GO_MODELS,
+  '    gmi-serving:',
+  '      apiKeyEnv: GMI_SERVING_API_KEY',
+  '      api: openai-completions',
+  '      baseURL: https://api.gmi-serving.com/v1',
+  '      models:',
+  ...GMI_SERVING_MODELS,
   '    kimi-coding:',
   '      apiKeyEnv: KIMI_CODING_API_KEY',
+  '    nadirclaw:',
+  '      apiKeyEnv: NADIRCLAW_API_KEY',
+  '      api: openai-completions',
+  '      baseURL: http://localhost:8856/v1',
+  '      models:',
+  ...NADIRCLAW_MODELS,
   'agent-default-model:',
   `  provider: ${selection.provider}`,
   `  model: ${selection.model}`,
