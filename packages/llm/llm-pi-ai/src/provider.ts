@@ -22,6 +22,7 @@
 import { createProvider } from '@earendil-works/pi-ai'
 import type { Api, ApiKeyAuth, Model, Provider, ProviderStreams } from '@earendil-works/pi-ai'
 import { anthropicMessagesApi } from '@earendil-works/pi-ai/api/anthropic-messages.lazy'
+import { bedrockConverseStreamApi } from '@earendil-works/pi-ai/api/bedrock-converse-stream.lazy'
 import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completions.lazy'
 import { openAIResponsesApi } from '@earendil-works/pi-ai/api/openai-responses.lazy'
 import { catalogProvider } from './catalog.ts'
@@ -33,13 +34,14 @@ import { catalogProvider } from './catalog.ts'
  * catalog route would.
  *
  * The table is deliberately narrow: the protocols a hand-declared route
- * actually reaches for today, each completely describable with a key, an
- * endpoint, and headers. Bedrock signs with SigV4 over AWS credentials and a
- * region, Vertex needs a project, a location, and application-default
- * credentials, Azure needs provider environment plus an api-version, and Codex
- * authenticates through OAuth — none of which this configuration shape can
- * express, so offering them would hand back a provider that cannot
- * authenticate. The remainder are absent for want of a consumer rather than a
+ * actually reaches for today. Bedrock resolves AWS credentials through the
+ * standard credential chain (env vars, profiles, ECS task roles, web identity)
+ * and takes its region from config or the model ARN; it is included because a
+ * deployment running inside AWS can authenticate without a stored key. Vertex
+ * needs a project, a location, and application-default credentials, Azure needs
+ * provider environment plus an api-version, and Codex authenticates through
+ * OAuth — those still cannot be expressed with a key, an endpoint, and headers
+ * alone. The remainder are absent for want of a consumer rather than a
  * blocker: each is one line here once a deployment needs it. Catalog routes
  * still reach every protocol through their own provider; only an explicit
  * override is refused.
@@ -48,6 +50,7 @@ const PROTOCOLS: Readonly<Record<string, () => ProviderStreams>> = {
   'openai-completions': openAICompletionsApi,
   'openai-responses': openAIResponsesApi,
   'anthropic-messages': anthropicMessagesApi,
+  'bedrock-converse-stream': bedrockConverseStreamApi,
 }
 
 /**
