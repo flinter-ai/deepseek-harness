@@ -1,31 +1,34 @@
 /**
- * spawn-dsh-worker.mjs — one-command E2 worker spawn.
+ * spawn-dsh-worker.mjs — one-command DSH worker spawn through Orca.
  *
- * Runs the full Orca orchestration flow and launches a headless DSH worker
- * (with the @flinter/dsh-orca plugin) inside the dispatched terminal:
+ * This is a thin coordinator helper. The actual worker is launched BY ORCA
+ * using `terminal create --command dsh-agent`. The flow is:
  *
- *   run-create -> task-create -> terminal create -> dispatch
- *   -> worker-home (per-model) -> terminal send (headless dsh + DSH_ORCA_* env)
+ *   run-create -> task-create -> terminal create --command dsh-agent -> dispatch
+ *   -> terminal send (JSON payload) -> dsh-agent parses payload and launches DSH
  *
- * Model routing: --model easy -> opencode-go/deepseek-v4-flash (DeepSeek V4
- * Flash); --model hard -> kimi-coding/kimi-for-coding (Kimi K2.7 Code).
- * All workers default to the cordis (Creator mode) agent preset.
+ * DSH (with the @flinter/dsh-orca plugin) then executes the task and calls
+ * worker_done back to the Run.
  *
  * Usage:
  *   node spawn-dsh-worker.mjs --objective "..." --spec "..." \
- *     --model hard --prompt "do X, then call worker_done" [--home /tmp/dsh-worker-x]
- *   node spawn-dsh-worker.mjs ... --dry-run        # print the plan, spawn nothing
+ *     --model hard --prompt "do X, then call worker_done" [--dest <repo>]
+ *   node spawn-dsh-worker.mjs ... --dry-run
  *
  * After spawn, wait with:
  *   orca orchestration check --run <run_id> --wait --types worker_done --timeout-ms 240000 --json
  */
 import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
-import { homedir, tmpdir } from 'node:os'
-import { writeFileSync, readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { readFileSync } from 'node:fs'
+
+function git(dest, ...args) {
+  return execFileSync('git', ['-C', dest, ...args], { encoding: 'utf8' }).trim()
+}
 
 const DSH_ROOT = join(homedir(), 'deepseek-harness')
-const NODE_BIN = join(homedir(), '.nvm', 'versions', 'node', 'v22.23.2', 'bin')
+const DSH_AGENT = join(DSH_ROOT, 'examples', 'dsh-orca', 'dsh-agent.mjs')
 
 function flag(name, fallback) {
   const at = process.argv.indexOf(`--${name}`)
@@ -56,20 +59,66 @@ const dest = flag('dest', process.cwd())
 const home = flag('home', `/tmp/dsh-worker-${model}-${Date.now()}`)
 const dryRun = process.argv.includes('--dry-run')
 
-// nadirclaw/nadir-* route through the LOCAL difficulty router (localhost:8856),
-// so they work only for dispatches running on this machine — a cloud/AgentBox
-// worker cannot reach them.
 if (![
-  'easy', 'hard', 'opencode', 'kimi', 'hard-backup', 'glm-backup', 'glm-5.3',
+  'easy', 'easy-backup', 'backup',
+  'hard', 'kimi', 'hard-backup', 'glm-5.3',
   'nadirclaw', 'nadir-auto', 'nadir-eco', 'nadir-premium', 'nadir-reasoning',
 ].includes(model)) {
   console.error(`spawn-dsh-worker: unknown --model "${model}"`)
   process.exit(1)
 }
 
-console.log(`[spawn-dsh-worker] model=${model} home=${home}`)
+// Preflight: mirror the destination-safety contract from the general
+// orchestration skill. Resolve the exact repo, record HEAD/branch/upstream,
+// fetch origin, and refuse to launch into a dirty or diverged tree.
+let preflight = {}
+try {
+  const gitRoot = git(dest, 'rev-parse', '--show-toplevel')
+  const branch = git(gitRoot, 'branch', '--show-current')
+  const head = git(gitRoot, 'rev-parse', 'HEAD')
+  const status = git(gitRoot, 'status', '--porcelain=v1', '-b')
+  let upstream = null
+  try {
+    upstream = git(gitRoot, 'rev-parse', '--abbrev-ref', '@{upstream}')
+  } catch {
+    upstream = null
+  }
+  const isDirty = status.split('\n').some((line) => line && !line.startsWith('##'))
+
+  console.log(`[preflight] root=${gitRoot}`)
+  console.log(`[preflight] branch=${branch} head=${head} upstream=${upstream ?? 'none'}`)
+  console.log(`[preflight] dirty=${isDirty}`)
+
+  preflight = { gitRoot, branch, head, upstream, isDirty, status }
+
+  // Fetch origin so the comparison is current. This is read-only metadata.
+  try {
+    git(gitRoot, 'fetch', 'origin')
+    const mergeBase = git(gitRoot, 'merge-base', 'HEAD', 'origin/main')
+    const localMerge = git(gitRoot, 'rev-parse', 'HEAD')
+    const remoteMerge = git(gitRoot, 'rev-parse', 'origin/main')
+    console.log(`[preflight] origin/main=${remoteMerge} merge-base=${mergeBase}`)
+    if (mergeBase !== localMerge && mergeBase !== remoteMerge) {
+      console.error('[preflight] ERROR: branch is diverged from origin/main (merge-base differs from both sides)')
+      process.exit(1)
+    }
+  } catch (fetchError) {
+    console.warn(`[preflight] could not compare with origin/main: ${fetchError.message}`)
+  }
+
+  if (isDirty && !process.argv.includes('--allow-dirty')) {
+    console.error('[preflight] ERROR: destination has uncommitted changes. Commit/stash first, or pass --allow-dirty.')
+    process.exit(1)
+  }
+} catch (error) {
+  console.error(`[preflight] ERROR: ${error.message}`)
+  process.exit(1)
+}
+
+console.log(`[spawn-dsh-worker] model=${model} dest=${dest} home=${home}`)
 if (dryRun) {
-  console.log('[dry-run] would: run-create / task-create / terminal create / dispatch / worker-home / terminal send')
+  console.log('[preflight] passed (dry-run)')
+  console.log('[dry-run] would: run-create / task-create / terminal create --command dsh-agent / dispatch / terminal send payload')
   process.exit(0)
 }
 
@@ -84,51 +133,37 @@ const taskResp = orcaOrExit('orchestration', 'task-create', '--spec', spec, '--t
 const taskId = taskResp.result.task.id
 console.log(`  task: ${taskId}`)
 
-// 3. Terminal (current worktree context; the worker is a bare shell).
-const termResp = orcaOrExit('terminal', 'create', '--worktree', `path:${dest}`, '--title', title, '--json')
+// 3. Terminal: Orca launches dsh-agent as the terminal command.
+//    DSH is the worker; Orca owns the terminal lifecycle.
+const command = `node ${JSON.stringify(DSH_AGENT)} --model ${JSON.stringify(model)} --home ${JSON.stringify(home)}`
+const termResp = orcaOrExit('terminal', 'create', '--worktree', `path:${dest}`, '--title', title, '--command', command, '--json')
 const termHandle = termResp.result.terminal.handle
 console.log(`  terminal: ${termHandle}`)
 
-// The PTY may still be initializing right after creation; a send that lands
-// too early gets mis-parsed by the shell. Wait for a settled prompt first.
+// Wait for dsh-agent to start and print its "waiting" line.
 try {
   execFileSync('orca', ['terminal', 'wait', '--terminal', termHandle, '--for', 'tui-idle', '--timeout-ms', '45000'], { stdio: 'inherit' })
 } catch (error) {
   console.warn(`  note: terminal idle wait failed (${error.message}); continuing anyway`)
 }
 
-// 4. Dispatch for tracking (no --inject: DSH is not a recognized agent CLI).
+// 4. Dispatch for tracking (no --inject: DSH is not a recognized Orca agent CLI).
 const dispatchResp = orcaOrExit('orchestration', 'dispatch', '--task', taskId, '--to', termHandle, '--json')
 const dispatchId = dispatchResp.result.dispatch.id
 console.log(`  dispatch: ${dispatchId}`)
 
-// 5. Per-model worker home.
-execFileSync('bash', ['-c',
-  `export PATH="${NODE_BIN}:$PATH" && cd "${DSH_ROOT}" && ` +
-  `node examples/dsh-orca/worker-home.mjs --home "${home}" --model "${model}"`,
-], { stdio: 'inherit' })
-
-// 6. Launch the headless worker inside the dispatched terminal.
-const promptPath = join(tmpdir(), `dsh-prompt-${taskId}.txt`)
-writeFileSync(promptPath, prompt ?? spec, 'utf8')
-
-const launch = [
-  `export PATH="${NODE_BIN}:$PATH"`,
-  `cd ${JSON.stringify(dest)}`,
-  [
-    `TSX_TSCONFIG_PATH=${JSON.stringify(join(DSH_ROOT, 'tsconfig.base.json'))}`,
-    `DSH_HOME=${JSON.stringify(home)}`,
-    `DSH_ORCA_RUN_ID=${JSON.stringify(runId)}`,
-    `DSH_ORCA_TASK_ID=${JSON.stringify(taskId)}`,
-    `DSH_ORCA_DISPATCH_ID=${JSON.stringify(dispatchId)}`,
-    `DSH_ORCA_COORDINATOR=${JSON.stringify(coordHandle)}`,
-    `node --import ${JSON.stringify(join(DSH_ROOT, 'node_modules/tsx/dist/esm/index.mjs'))}`,
-    JSON.stringify(join(DSH_ROOT, 'apps/cli/src/bin.ts')),
-    `--profile headless "$(cat ${JSON.stringify(promptPath)})"`,
-  ].join(' '),
-].join(' && ')
-const sendResp = orcaOrExit('terminal', 'send', '--terminal', termHandle, '--text', launch, '--enter', '--json')
-console.log(`  worker launched in ${termHandle}: bytes=${sendResp.result.send.bytesWritten}`)
+// 5. Send the compact JSON payload that dsh-agent expects.
+const payload = JSON.stringify({
+  orchestration: {
+    runId,
+    taskId,
+    dispatchId,
+    coordinator: coordHandle,
+  },
+  task: prompt ?? spec,
+})
+const sendResp = orcaOrExit('terminal', 'send', '--terminal', termHandle, '--text', payload, '--enter', '--json')
+console.log(`  payload sent: bytes=${sendResp.result.send.bytesWritten}`)
 
 console.log(`\nREADY: run=${runId} task=${taskId} dispatch=${dispatchId} terminal=${termHandle}`)
-console.log(`wait: orca orchestration check --run ${runId} --wait --types worker_done --timeout-ms 240000 --json`)
+console.log(`wait: orca orchestration check --run ${runId} --terminal ${coordHandle} --wait --types worker_done --timeout-ms 240000 --json`)
