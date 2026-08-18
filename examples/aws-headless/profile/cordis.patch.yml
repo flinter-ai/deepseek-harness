@@ -1,0 +1,24 @@
+# aws-headless profile layer: swap the credential store for AWS Secrets Manager
+# and turn on the catalog Bedrock route of the dormant pi-ai adapter.
+#
+# Keyless on purpose: no region, profile, or secret names anywhere. Both AWS
+# providers defer to the default AWS credential chain per request, never at
+# boot, so composing this profile makes zero AWS calls.
+
+# The base bundle mounts the env/.env credential store; this profile replaces
+# it. Two live rows cannot provide the `credentials` service, so the local row
+# is disabled before the AWS row mounts.
+- id: credentials
+  disabled: true
+
+- insert:
+    - id: credentials-aws-secrets-manager
+      name: '@deepseek-ai/dsh-credentials-aws-secrets-manager'
+
+# The base bundle mounts llm-pi-ai dormant (zero routes). Naming the catalog
+# bedrock route with an empty profile registers it; credentials resolve through
+# pi-ai's native AWS chain per request.
+- id: llm-pi-ai
+  config:
+    providers:
+      amazon-bedrock: {}

@@ -482,6 +482,9 @@ importers:
       '@deepseek-ai/dsh-cordis-host-runner':
         specifier: workspace:*
         version: link:../packages/extensions/cordis-host-runner
+      '@deepseek-ai/dsh-credentials-aws-secrets-manager':
+        specifier: workspace:*
+        version: link:../packages/credentials/dsh-credentials-aws-secrets-manager
       '@deepseek-ai/dsh-credentials-local':
         specifier: workspace:*
         version: link:../packages/credentials/credentials-local

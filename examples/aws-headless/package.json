@@ -1,0 +1,7 @@
+{
+  "name": "aws-headless-example",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Keyless structural smoke for the AWS profile composition: Bedrock LLM route + Secrets Manager credentials + Orca worker bridge"
+}

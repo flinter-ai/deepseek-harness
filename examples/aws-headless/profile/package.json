@@ -1,0 +1,12 @@
+{
+  "name": "dsh-profile-aws-headless",
+  "private": true,
+  "dsh": {
+    "profile": {
+      "bundles": [
+        "@deepseek-ai/dsh-base",
+        "@flinter/dsh-orca"
+      ]
+    }
+  }
+}
