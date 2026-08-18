@@ -23,11 +23,11 @@ Status: implemented
 
 `dsh-agent.mjs` 在主模型因 eligible provider 或 transport 错误失败时，会用配置好的 fallback 重试一次。`easy` 回退到 `easy-backup`；`hard` 回退到 `hard-backup`。这次回退不是路由变更，而是主路由不可用时执行的操作措施。
 
-### gpt-5.6-luna 保持为主模型并标记 BLOCKED
+### gpt-5.6-luna 通过按模型 api 选择直接工作
 
-`gpt-5.6-luna` 被配置为 `easy` 主模型，并以真实 card 值列入 `opencode-go` 显式模型目录。`BLOCKED` 注释说明它只在 OpenAI Responses API 上能正常结束，而 `opencode-go` 被固定为 OpenAI chat/completions，以便 `glm-5.3` 和其他显式模型工作。DSH pi-ai 当前在 provider 级别选择 `api`，因此单个 `opencode-go` provider 不能混合两种协议。
+`gpt-5.6-luna` 被配置为 `easy` 主模型，并以真实 card 值和 `api: openai-responses` 列入 `opencode-go` 显式模型目录。路由本身保持 `api: openai-completions`，以便 `glm-5.3` 和其他显式模型继续工作。DSH pi-ai 支持按模型 `api` 选择（`model.api ?? provider.api`），因此单个 `opencode-go` provider 可以托管混合协议模型，而无需捏造第二个 provider 路由。
 
-所以第一次 `easy` 尝试会以 transport/finish-reason 错误失败，fallback classifier 会用 `easy-backup` 重试，任务最终由 GMI-serving 完成。期望路由保持明确；fallback 只是临时措施，直到 DSH 侧能力支持按模型选择协议。
+`easy` worker 因此直接执行 Luna。`easy-backup` fallback 保留，用于真正的 provider 失败，例如配额耗尽、404、未授权或 transport 错误。
 
 ### Fallback 资格 classifier
 

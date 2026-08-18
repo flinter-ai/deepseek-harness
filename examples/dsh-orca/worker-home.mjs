@@ -7,9 +7,8 @@
  *   - settings.yaml with the requested agent-default-model + cordis (Creator
  *     mode) preset default
  *
- * Model routing (desired; operational fallback executes when primary is BLOCKED):
- *   easy          -> opencode-go / gpt-5.6-luna   (BLOCKED: needs openai-responses
- *                                                  per-model; falls back to easy-backup)
+ * Model routing:
+ *   easy          -> opencode-go / gpt-5.6-luna   (OpenAI Responses via per-model api)
  *   easy-backup   -> gmi-serving / deepseek-ai/DeepSeek-V4-Flash-0731
  *   backup        -> alias of easy-backup
  *   hard          -> kimi-coding / k3-256k         (Kimi K3-256K)
@@ -32,10 +31,9 @@ import { homedir } from 'node:os'
 
 const MODELS = {
   // easy primary: opencode-go / gpt-5.6-luna.
-  // DESIRED routing; OPERATIONALLY BLOCKED because gpt-5.6-luna needs the
-  // OpenAI Responses API while glm-5.3 needs OpenAI chat/completions, and DSH
-  // pi-ai currently selects `api` at provider level. The dsh-agent fallback
-  // classifier runs easy -> easy-backup (GMI) when Luna fails.
+  // gpt-5.6-luna needs the OpenAI Responses API while glm-5.3 needs OpenAI
+  // chat/completions; DSH pi-ai supports per-model api, so Luna is declared
+  // with api: openai-responses while the route keeps openai-completions.
   easy: { provider: 'opencode-go', model: 'gpt-5.6-luna' },
   'easy-backup': { provider: 'gmi-serving', model: 'deepseek-ai/DeepSeek-V4-Flash-0731' },
   backup: { provider: 'gmi-serving', model: 'deepseek-ai/DeepSeek-V4-Flash-0731' },
@@ -95,18 +93,18 @@ copyFileSync(sourceCreds, join(home, '.credentials.yaml'))
 // Real card values come from the provider's models.json / GET /v1/models, not
 // invented numbers.
 const OPENCODE_GO_MODELS = [
-  // BLOCKED pending per-model `api` support: gpt-5.6-luna terminates correctly
-  // only on the OpenAI Responses API, while opencode-go is pinned to
-  // openai-completions so that glm-5.3 and the other explicit models work.
+  // gpt-5.6-luna terminates correctly only on the OpenAI Responses API; DSH
+  // supports per-model api, so it is listed with api: openai-responses while
+  // the route keeps openai-completions for the other models.
   // Real card input is text/image/pdf; DSH's modality gate models text/image
   // today, so pdf is documented here but omitted from the generated entry.
-  ['gpt-5.6-luna', 'GPT-5.6 Luna', 1050000, 128000, 'text, image', null],
-  ['glm-5.3', 'GLM-5.3', 1000000, 131072, 'text', null],
-  ['kimi-k3', 'Kimi K3 (2x usage)', 1048576, 131072, 'text, image', null],
-  ['kimi-k2.7-code', 'Kimi K2.7 Code', 262144, 262144, 'text, image', null],
-].map(([id, name, ctx, maxTok, input, compat]) =>
+  ['gpt-5.6-luna', 'GPT-5.6 Luna', 1050000, 128000, 'text, image', null, 'openai-responses'],
+  ['glm-5.3', 'GLM-5.3', 1000000, 131072, 'text', null, null],
+  ['kimi-k3', 'Kimi K3 (2x usage)', 1048576, 131072, 'text, image', null, null],
+  ['kimi-k2.7-code', 'Kimi K2.7 Code', 262144, 262144, 'text, image', null, null],
+].map(([id, name, ctx, maxTok, input, compat, api]) =>
   (id === 'gpt-5.6-luna'
-    ? `        # BLOCKED: needs openai-responses per-model; DSH pi-ai selects api at provider level today.\n        - id: ${id}\n          name: ${name}\n          contextWindow: ${ctx}\n          maxTokens: ${maxTok}\n          input: [${input}]`
+    ? `        # gpt-5.6-luna speaks the OpenAI Responses API, not chat/completions.\n        - id: ${id}\n          name: ${name}\n          api: ${api}\n          contextWindow: ${ctx}\n          maxTokens: ${maxTok}\n          input: [${input}]`
     : `        - id: ${id}\n          name: ${name}\n          contextWindow: ${ctx}\n          maxTokens: ${maxTok}\n          input: [${input}]`)
   + (compat ? `\n          compat:\n            ${compat}` : ''))
 const GMI_SERVING_MODELS = [

@@ -96,23 +96,16 @@ worker home（`worker-home.mjs`）配置 DSH 可以调用的模型。期望路�
 
 | label | provider / model | 用途 |
 |---|---|---|
-| `easy`（默认） | opencode-go / `gpt-5.6-luna` | 快速/低成本工作（BLOCKED，见下文） |
+| `easy`（默认） | opencode-go / `gpt-5.6-luna` | 快速/低成本工作（OpenAI Responses） |
 | `easy-backup`、`backup` | gmi-serving / `deepseek-ai/DeepSeek-V4-Flash-0731` | `easy` 的运营 fallback |
 | `hard` | kimi-coding / `k3-256k` | 强力编程模型 |
 | `hard-backup` | opencode-go / `glm-5.3` | Kimi 失败时的 fallback |
 | `glm-5.3` | opencode-go / `glm-5.3` | 显式 GLM 档位 |
 | `nadirclaw` 等 | NadirClaw localhost router | 本地验证 agent |
 
-### 为什么 `easy` 是 BLOCKED 以及实际发生什么
+### `easy` 如何在单个 provider 上混合协议
 
-`gpt-5.6-luna` 只在 OpenAI **Responses** API 上能正常结束。我们路由经过 `opencode-go` 的其他模型（尤其是 `glm-5.3`）使用 OpenAI **chat/completions** API。DSH `llm-pi-ai` 当前在 **provider** 级别选择 wire protocol，因此单个 `opencode-go` provider 不能混合两种 API。
-
-所以 `easy` 被配置为 **期望** 路由（`opencode-go/gpt-5.6-luna`），但运营上被阻塞：第一次尝试失败并产生 transport/finish-reason 错误，然后 `dsh-agent` 用配置好的 fallback 重试一次：
-
-- `easy` → `easy-backup`（`gmi-serving/deepseek-ai/DeepSeek-V4-Flash-0731`）
-- `hard` → `hard-backup`（`opencode-go/glm-5.3`）
-
-`gpt-5.6-luna` 被保留在 `opencode-go` 模型列表中，附带真实 card（`contextWindow: 1050000`、`maxTokens: 128000`、输入 `text`/`image`/`pdf`）和 `BLOCKED` 注释，这样路由策略保持明确，fallback 只是临时运营措施。需要 DSH 侧的改动来支持按模型 `api` 选择（`model.api ?? provider.api`）。
+`gpt-5.6-luna` 只在 OpenAI **Responses** API 上能正常结束。我们路由经过 `opencode-go` 的其他模型（尤其是 `glm-5.3`）使用 OpenAI **chat/completions** API。DSH `llm-pi-ai` 支持按模型 `api` 选择（`model.api ?? provider.api`），因此 `opencode-go` 路由保持 `api: openai-completions` 作为默认值，并将 `gpt-5.6-luna` 声明为 `api: openai-responses`。单个 provider 因此可以托管混合协议模型，而无需捏造第二个 provider 路由。
 
 `dsh-agent` 只对 provider、配额、404/未授权、not-supported 和 transport 失败（`stream ended`、`finish_reason`、`transport`）重试一次。`NO_ADAPTER` 和本地配置错误 **不会** 触发 fallback。
 

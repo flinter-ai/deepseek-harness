@@ -112,34 +112,22 @@ Desired routing:
 
 | label | provider / model | use |
 |---|---|---|
-| `easy` (default) | opencode-go / `gpt-5.6-luna` | fast/cheap work (BLOCKED, see below) |
+| `easy` (default) | opencode-go / `gpt-5.6-luna` | fast/cheap work (OpenAI Responses) |
 | `easy-backup`, `backup` | gmi-serving / `deepseek-ai/DeepSeek-V4-Flash-0731` | operational fallback for `easy` |
 | `hard` | kimi-coding / `k3-256k` | strong coding model |
 | `hard-backup` | opencode-go / `glm-5.3` | fallback when Kimi fails |
 | `glm-5.3` | opencode-go / `glm-5.3` | explicit GLM tier |
 | `nadirclaw` etc. | NadirClaw localhost router | local verification agents |
 
-### Why `easy` is BLOCKED and what happens instead
+### How `easy` mixes protocols on one provider
 
 `gpt-5.6-luna` terminates correctly only on the OpenAI **Responses** API.
 Every other model we route through `opencode-go` (notably `glm-5.3`) uses the
-OpenAI **chat/completions** API. DSH `llm-pi-ai` currently selects the wire
-protocol at the **provider** level, so a single `opencode-go` provider cannot
-mix the two APIs.
-
-Therefore `easy` is configured for the **desired** route
-(`opencode-go/gpt-5.6-luna`) but is operationally blocked: the first attempt
-fails with a transport/finish-reason error, and `dsh-agent` retries once with
-the configured fallback:
-
-- `easy` → `easy-backup` (`gmi-serving/deepseek-ai/DeepSeek-V4-Flash-0731`)
-- `hard` → `hard-backup` (`opencode-go/glm-5.3`)
-
-`gpt-5.6-luna` is kept in the `opencode-go` model list with its real card
-(`contextWindow: 1050000`, `maxTokens: 128000`, input `text`/`image`/`pdf`)
-and a `BLOCKED` comment, so the routing policy stays explicit and the fallback
-is only a temporary operational measure. A separate DSH-side change is needed
-to support per-model `api` selection (`model.api ?? provider.api`).
+OpenAI **chat/completions** API. DSH `llm-pi-ai` supports per-model `api`
+selection (`model.api ?? provider.api`), so the `opencode-go` route keeps
+`api: openai-completions` as its default and declares `gpt-5.6-luna` with
+`api: openai-responses`. One provider can therefore host mixed-protocol
+models without inventing a second provider route.
 
 `dsh-agent` retries once with the configured fallback only for provider,
 quota, 404/unauthorized, not-supported, and transport failures (`stream ended`,

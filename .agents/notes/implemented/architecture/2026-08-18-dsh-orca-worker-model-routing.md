@@ -23,11 +23,11 @@ At the same time, the routing policy must not invent provider identities or comp
 
 `dsh-agent.mjs` retries once with the configured fallback when the primary model fails with an eligible provider or transport error. `easy` falls back to `easy-backup`; `hard` falls back to `hard-backup`. The fallback is not a routing change: it is an operational measure executed when the primary route is unavailable.
 
-### gpt-5.6-luna is kept as primary and marked BLOCKED
+### gpt-5.6-luna works directly through per-model api selection
 
-`gpt-5.6-luna` is configured as the `easy` primary and is listed in the `opencode-go` explicit model catalog with its real card values. A `BLOCKED` comment records that it terminates correctly only on the OpenAI Responses API, while `opencode-go` is pinned to OpenAI chat/completions so that `glm-5.3` and the other explicit models work. DSH pi-ai currently selects `api` at the provider level, so a single `opencode-go` provider cannot mix the two protocols.
+`gpt-5.6-luna` is configured as the `easy` primary and is listed in the `opencode-go` explicit model catalog with its real card values and `api: openai-responses`. The route itself keeps `api: openai-completions` so that `glm-5.3` and the other explicit models continue to work. DSH pi-ai supports per-model `api` selection (`model.api ?? provider.api`), so a single `opencode-go` provider can host mixed-protocol models without inventing a second provider route.
 
-The first `easy` attempt therefore fails with a transport/finish-reason error, the fallback classifier retries with `easy-backup`, and the task completes against GMI-serving. The desired route stays explicit; the fallback is temporary until a DSH-side capability supports per-model protocol selection.
+The `easy` worker therefore executes Luna directly. The `easy-backup` fallback remains for genuine provider failures such as quota exhaustion, 404, unauthorized, or transport errors.
 
 ### Fallback eligibility classifier
 

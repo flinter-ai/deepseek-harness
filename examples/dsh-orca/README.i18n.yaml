@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write examples/dsh-orca/README.md
-README.md: 75bfdcd24fa92f14bfbf20383bce4d022d88af8f
-README.zh.md: c3d337ad0b546199f72f71dfd0ea81594b0358fd
+README.md: f6ae63aaece95d524033b1769e67abf50b272f60
+README.zh.md: 1d1b568c008d5946a8172a3824d38b858b9cea5d
