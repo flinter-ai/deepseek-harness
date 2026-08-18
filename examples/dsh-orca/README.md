@@ -112,7 +112,7 @@ Current routing:
 
 | label | provider / model | use |
 |---|---|---|
-| `easy` (default) | deepseek-official / `deepseek-v4-flash` | fast/cheap work (direct DeepSeek API) |
+| `easy` (default) | opencode-go / `deepseek-v4-flash` | fast/cheap work (DeepSeek via gateway) |
 | `easy-backup`, `backup` | gmi-serving / `deepseek-ai/DeepSeek-V4-Flash-0731` | operational fallback for `easy` |
 | `hard` | kimi-coding / `k3-256k` | strong coding model |
 | `hard-backup` | opencode-go / `glm-5.3` | fallback when Kimi fails |
@@ -132,6 +132,87 @@ The `opencode-go` route keeps `api: openai-completions` as its default and can
 declare individual models with `api: openai-responses` when needed. This keeps
 provider identity separate from wire protocol and avoids inventing pseudo-provider
 routes.
+
+## Running locally and switching models
+
+### Prerequisites
+
+1. Install dependencies and build DSH:
+
+   ```bash
+   cd ~/deepseek-harness
+   git checkout flinter/dsh-orca-plugin
+   pnpm install
+   pnpm run build
+   ```
+
+2. Store your keys in `~/.dsh/.credentials.yaml`:
+
+   ```yaml
+   DEEPSEEK_API_KEY: sk-…
+   OPENCODE_GO_API_KEY: sk-…
+   GMI_SERVING_API_KEY: sk-…
+   KIMI_CODING_API_KEY: sk-…
+   ```
+
+   GMI also reads `~/.flinter/gmi-env.sh`; `dsh-agent` sources it automatically.
+
+### Run the Web UI
+
+```bash
+pnpm dsh web
+```
+
+Open `http://127.0.0.1:3080`. The model selector shows every configured provider.
+
+### Run headless with a specific model
+
+```bash
+# easy (default): opencode-go / deepseek-v4-flash
+pnpm dsh --profile headless "your task here"
+
+# hard: kimi-coding / k3-256k
+pnpm dsh --profile headless --model hard "your task here"
+
+# explicit GLM tier: opencode-go / glm-5.3
+pnpm dsh --profile headless --model glm-5.3 "your task here"
+```
+
+### Switch models in the Web UI
+
+In the Web UI, open the model selector (`/model` in the TUI, or the model picker in the web sidebar) and choose any configured provider/model pair. The selection is per-session and does not edit `settings.yaml`.
+
+### Switch models by editing settings
+
+Edit `~/.dsh/settings.yaml` and change `agent-default-model`:
+
+```yaml
+agent-default-model:
+  provider: opencode-go
+  model: deepseek-v4-flash
+```
+
+Restart DSH for the change to take effect.
+
+### Verify each key works
+
+Run a one-line headless prompt against each provider:
+
+```bash
+# opencode-go / deepseek-v4-flash
+pnpm dsh --profile headless --model easy "Say OK"
+
+# gmi-serving / deepseek-ai/DeepSeek-V4-Flash-0731
+pnpm dsh --profile headless --model easy-backup "Say OK"
+
+# kimi-coding / k3-256k
+pnpm dsh --profile headless --model hard "Say OK"
+
+# opencode-go / glm-5.3
+pnpm dsh --profile headless --model glm-5.3 "Say OK"
+```
+
+Each should print a short reply. A `QUOTA` or `AUTH` error means the key is missing or exhausted; a `NO_ADAPTER` error means the provider is not declared in `settings.yaml`.
 
 ## Credentials
 

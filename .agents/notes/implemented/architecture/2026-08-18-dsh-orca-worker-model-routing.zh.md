@@ -16,7 +16,7 @@ Status: implemented
 
 `examples/dsh-orca/worker-home.mjs` 声明了一个封闭路由表：
 
-- `easy` 主路由：`deepseek-official / deepseek-v4-flash`（直连 DeepSeek API）。
+- `easy` 主路由：`opencode-go / deepseek-v4-flash`（经 opencode 网关使用 DeepSeek）。
 - `easy-backup` 与 `backup`：`gmi-serving / deepseek-ai/DeepSeek-V4-Flash-0731`。
 - `hard` 与 `kimi`：`kimi-coding / k3-256k`。
 - `hard-backup` 与 `glm-5.3`：`opencode-go / glm-5.3`。

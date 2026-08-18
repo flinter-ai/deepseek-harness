@@ -16,7 +16,7 @@ At the same time, the routing policy must not invent provider identities or comp
 
 `examples/dsh-orca/worker-home.mjs` declares a closed routing table:
 
-- `easy` primary: `deepseek-official / deepseek-v4-flash` (direct DeepSeek API).
+- `easy` primary: `opencode-go / deepseek-v4-flash` (DeepSeek via the opencode gateway).
 - `easy-backup` and `backup`: `gmi-serving / deepseek-ai/DeepSeek-V4-Flash-0731`.
 - `hard` and `kimi`: `kimi-coding / k3-256k`.
 - `hard-backup` and `glm-5.3`: `opencode-go / glm-5.3`.

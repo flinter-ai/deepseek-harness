@@ -96,7 +96,7 @@ worker home（`worker-home.mjs`）配置 DSH 可以调用的模型。当前路�
 
 | label | provider / model | 用途 |
 |---|---|---|
-| `easy`（默认） | deepseek-official / `deepseek-v4-flash` | 快速/低成本工作（直连 DeepSeek API） |
+| `easy`（默认） | opencode-go / `deepseek-v4-flash` | 快速/低成本工作（经网关使用 DeepSeek） |
 | `easy-backup`、`backup` | gmi-serving / `deepseek-ai/DeepSeek-V4-Flash-0731` | `easy` 的运营 fallback |
 | `hard` | kimi-coding / `k3-256k` | 强力编程模型 |
 | `hard-backup` | opencode-go / `glm-5.3` | Kimi 失败时的 fallback |
@@ -108,6 +108,87 @@ worker home（`worker-home.mjs`）配置 DSH 可以调用的模型。当前路�
 ### 混合协议 provider
 
 DSH `llm-pi-ai` 支持按模型 `api` 选择（`model.api ?? provider.api`），因此单个 provider 路由可以托管使用不同 wire protocol 的模型。`opencode-go` 路由保持 `api: openai-completions` 作为默认值，并可在需要时将单个模型声明为 `api: openai-responses`。这使 provider 身份与 wire protocol 保持分离，无需捏造伪 provider 路由。
+
+## 本地运行与切换模型
+
+### 前置条件
+
+1. 安装依赖并构建 DSH：
+
+   ```bash
+   cd ~/deepseek-harness
+   git checkout flinter/dsh-orca-plugin
+   pnpm install
+   pnpm run build
+   ```
+
+2. 将密钥存入 `~/.dsh/.credentials.yaml`：
+
+   ```yaml
+   DEEPSEEK_API_KEY: sk-…
+   OPENCODE_GO_API_KEY: sk-…
+   GMI_SERVING_API_KEY: sk-…
+   KIMI_CODING_API_KEY: sk-…
+   ```
+
+   GMI 也会读取 `~/.flinter/gmi-env.sh`；`dsh-agent` 会自动 source 它。
+
+### 运行 Web UI
+
+```bash
+pnpm dsh web
+```
+
+打开 `http://127.0.0.1:3080`。模型选择器会显示所有已配置的 provider。
+
+### 以指定模型运行 headless
+
+```bash
+# easy (default): opencode-go / deepseek-v4-flash
+pnpm dsh --profile headless "your task here"
+
+# hard: kimi-coding / k3-256k
+pnpm dsh --profile headless --model hard "your task here"
+
+# explicit GLM tier: opencode-go / glm-5.3
+pnpm dsh --profile headless --model glm-5.3 "your task here"
+```
+
+### 在 Web UI 中切换模型
+
+在 Web UI 中打开模型选择器（TUI 中的 `/model`，或 Web 侧边栏的模型选择器），选择任意已配置的 provider/model 组合。该选择是按会话的，不会修改 `settings.yaml`。
+
+### 通过编辑 settings 切换模型
+
+编辑 `~/.dsh/settings.yaml` 并修改 `agent-default-model`：
+
+```yaml
+agent-default-model:
+  provider: opencode-go
+  model: deepseek-v4-flash
+```
+
+重启 DSH 后生效。
+
+### 验证每个密钥可用
+
+对每个 provider 运行一行 headless prompt：
+
+```bash
+# opencode-go / deepseek-v4-flash
+pnpm dsh --profile headless --model easy "Say OK"
+
+# gmi-serving / deepseek-ai/DeepSeek-V4-Flash-0731
+pnpm dsh --profile headless --model easy-backup "Say OK"
+
+# kimi-coding / k3-256k
+pnpm dsh --profile headless --model hard "Say OK"
+
+# opencode-go / glm-5.3
+pnpm dsh --profile headless --model glm-5.3 "Say OK"
+```
+
+每个都应打印简短回复。`QUOTA` 或 `AUTH` 错误表示密钥缺失或已耗尽；`NO_ADAPTER` 错误表示 `settings.yaml` 中未声明该 provider。
 
 ## Credentials
 

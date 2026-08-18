@@ -8,7 +8,7 @@
  *     mode) preset default
  *
  * Model routing:
- *   easy          -> deepseek-official / deepseek-v4-flash (direct DeepSeek API)
+ *   easy          -> opencode-go / deepseek-v4-flash (DeepSeek via opencode gateway)
  *   easy-backup   -> gmi-serving / deepseek-ai/DeepSeek-V4-Flash-0731
  *   backup        -> alias of easy-backup
  *   hard          -> kimi-coding / k3-256k         (Kimi K3-256K)
@@ -30,8 +30,8 @@ import { join } from 'node:path'
 import { homedir } from 'node:os'
 
 const MODELS = {
-  // easy primary: direct DeepSeek API (dsh-llm-deepseek, deepseek-official).
-  easy: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+  // easy primary: DeepSeek V4 Flash via the opencode-go gateway.
+  easy: { provider: 'opencode-go', model: 'deepseek-v4-flash' },
   'easy-backup': { provider: 'gmi-serving', model: 'deepseek-ai/DeepSeek-V4-Flash-0731' },
   backup: { provider: 'gmi-serving', model: 'deepseek-ai/DeepSeek-V4-Flash-0731' },
   // hard primary: Kimi K3-256K (api.kimi.com/coding).
@@ -90,6 +90,7 @@ copyFileSync(sourceCreds, join(home, '.credentials.yaml'))
 // Real card values come from the provider's models.json / GET /v1/models, not
 // invented numbers.
 const OPENCODE_GO_MODELS = [
+  ['deepseek-v4-flash', 'DeepSeek V4 Flash', 1000000, 384000, 'text', 'thinkingFormat: deepseek', null],
   // gpt-5.6-luna terminates correctly only on the OpenAI Responses API; DSH
   // supports per-model api, so it is listed with api: openai-responses while
   // the route keeps openai-completions for the other models.
