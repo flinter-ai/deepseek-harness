@@ -174,15 +174,55 @@ export function buildProvider(spec: ProviderSpec): Provider {
   // different wire format, which only the protocol table can serve.
   if (catalog !== undefined && spec.api === undefined) return reuseCatalogProvider(catalog, spec)
 
-  // Every model on this path carries the route's protocol: model resolution
-  // requires one for a route the catalog cannot default, and an explicit one
-  // replaces each catalog model's own. So the route has a single API.
-  const factory = spec.api === undefined ? undefined : PROTOCOLS[spec.api]
-  if (factory === undefined) {
+  // Validate the route-level protocol first so an explicit one that this build
+  // cannot serve fails with the same diagnostic as before per-model overrides.
+  if (spec.api !== undefined && PROTOCOLS[spec.api] === undefined) {
     throw new Error(
       `llm-pi-ai: provider "${spec.provider}" names api "${spec.api}", which this build cannot serve;`
       + ` supported protocols are ${supportedProtocols().join(', ')}`,
     )
+  }
+
+  // Model resolution has already stamped each model's wire protocol. A route
+  // with one distinct protocol uses a single API implementation; a route whose
+  // models speak mixed protocols hands pi-ai a map keyed by `model.api`.
+  const apis = new Set(spec.models.map(model => model.api ?? spec.api))
+  if (apis.size === 0) {
+    throw new Error(
+      `llm-pi-ai: provider "${spec.provider}" names api "undefined", which this build cannot serve;`
+      + ` supported protocols are ${supportedProtocols().join(', ')}`,
+    )
+  }
+  if (apis.size === 1) {
+    const [api] = apis
+    const factory = api === undefined ? undefined : PROTOCOLS[api]
+    if (factory === undefined) {
+      throw new Error(
+        `llm-pi-ai: provider "${spec.provider}" names api "${api}", which this build cannot serve;`
+        + ` supported protocols are ${supportedProtocols().join(', ')}`,
+      )
+    }
+    return createProvider({
+      id: spec.provider,
+      name: spec.displayName,
+      ...spec.baseURL === undefined ? {} : { baseUrl: spec.baseURL },
+      auth: routeAuth(spec, catalog),
+      models: spec.models,
+      api: factory(),
+    })
+  }
+
+  const apiMap: Partial<Record<string, ProviderStreams>> = {}
+  for (const api of apis) {
+    if (api === undefined) continue
+    const factory = PROTOCOLS[api]
+    if (factory === undefined) {
+      throw new Error(
+        `llm-pi-ai: provider "${spec.provider}" names api "${api}", which this build cannot serve;`
+        + ` supported protocols are ${supportedProtocols().join(', ')}`,
+      )
+    }
+    apiMap[api] = factory()
   }
   return createProvider({
     id: spec.provider,
@@ -190,6 +230,6 @@ export function buildProvider(spec: ProviderSpec): Provider {
     ...spec.baseURL === undefined ? {} : { baseUrl: spec.baseURL },
     auth: routeAuth(spec, catalog),
     models: spec.models,
-    api: factory(),
+    api: apiMap,
   })
 }
