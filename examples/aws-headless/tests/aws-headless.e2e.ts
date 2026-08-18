@@ -1,8 +1,7 @@
 import { spawn } from 'node:child_process'
-import { copyFile, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { boot, healProfilesModuleFallback, loadProfile } from '@deepseek-ai/dsh-app-boot'
 import { provideCmdline } from '@deepseek-ai/dsh-cmdline'
@@ -10,36 +9,9 @@ import type { PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 import type {} from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-tools'
-
-const REPO_ROOT = fileURLToPath(new URL('../../..', import.meta.url))
-/** The checked-in profile template the smoke materializes into a temp DSH_HOME. */
-const PROFILE_TEMPLATE = fileURLToPath(new URL('../profile/', import.meta.url))
-const INSTALL_ANCHOR = join(REPO_ROOT, 'apps/cli/package.json')
-const CLI_BIN = join(REPO_ROOT, 'apps/cli/src/bin.ts')
-const TSCONFIG = join(REPO_ROOT, 'tsconfig.json')
+import { CLI_BIN, INSTALL_ANCHOR, REPO_ROOT, TSCONFIG, materializeProfile, sanitizeAwsEnv } from './profile.ts'
 
 const ORCA_TOOL_NAMES = ['worker_done', 'orca_check_inbox', 'orca_ask', 'orca_heartbeat', 'agentbox_launch']
-
-/**
- * Copy the template into `<home>/profiles/aws-headless` and link the two
- * packages that sit outside the app/bundle dependency closure — the same
- * mechanism `dsh plugin --profile aws-headless add <path>` uses.
- */
-async function materializeProfile(home: string): Promise<string> {
-  const profileDir = join(home, 'profiles', 'aws-headless')
-  await mkdir(join(profileDir, 'node_modules', '@flinter'), { recursive: true })
-  await mkdir(join(profileDir, 'node_modules', '@deepseek-ai'), { recursive: true })
-  await copyFile(join(PROFILE_TEMPLATE, 'package.json'), join(profileDir, 'package.json'))
-  await copyFile(join(PROFILE_TEMPLATE, 'cordis.patch.yml'), join(profileDir, 'cordis.patch.yml'))
-  await symlink(join(REPO_ROOT, 'examples/dsh-orca'), join(profileDir, 'node_modules', '@flinter', 'dsh-orca'), 'dir')
-  await symlink(
-    join(REPO_ROOT, 'packages/credentials/dsh-credentials-aws-secrets-manager'),
-    join(profileDir, 'node_modules', '@deepseek-ai', 'dsh-credentials-aws-secrets-manager'),
-    'dir',
-  )
-  await writeFile(join(profileDir, 'cordis.yml'), '[]\n')
-  return profileDir
-}
 
 function occurrences(text: string, needle: string): number {
   return text.split(needle).length - 1
@@ -84,17 +56,9 @@ describe('aws-headless profile structural smoke', () => {
 
   it('activates all three capabilities with zero AWS calls and disposes cleanly (boot gate)', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-aws-headless-'))
-    const savedEnv = { ...process.env }
+    const restoreEnv = sanitizeAwsEnv(home)
     try {
       const profileDir = await materializeProfile(home)
-      // Prove activation needs nothing from AWS: strip every credential/region
-      // source and disable IMDS, so any Secrets Manager call during boot would
-      // fail loud instead of borrowing the developer's credential chain.
-      for (const key of Object.keys(process.env)) {
-        if (key.startsWith('AWS_')) Reflect.deleteProperty(process.env, key)
-      }
-      process.env.AWS_EC2_METADATA_DISABLED = 'true'
-      process.env.DSH_HOME = home
       healProfilesModuleFallback(INSTALL_ANCHOR, home)
       const profile = loadProfile('dsh-test', 'aws-headless', INSTALL_ANCHOR, home)
       const patches: PatchOptions[] = [
@@ -120,8 +84,7 @@ describe('aws-headless profile structural smoke', () => {
         await ctx.fiber.dispose()
       }
     } finally {
-      for (const key of Object.keys(process.env)) Reflect.deleteProperty(process.env, key)
-      Object.assign(process.env, savedEnv)
+      restoreEnv()
       await rm(home, { recursive: true, force: true })
     }
   }, 60_000)
