@@ -200,8 +200,8 @@ export class AwsSecretsManagerCredentialProvider extends CredentialProvider {
     }
   }
 
-  async* [Service.init](): AsyncGenerator<() => Promise<void> | void, void, void> {
-    yield async () => {
+  * [Service.init](): Generator<() => void, void, void> {
+    yield () => {
       this.client.destroy()
     }
   }

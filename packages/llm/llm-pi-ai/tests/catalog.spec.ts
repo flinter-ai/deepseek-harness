@@ -1003,7 +1003,7 @@ describe('amazon bedrock', () => {
     const resolved = resolveProfiles({ 'amazon-bedrock': {} })
     const catalog = catalogProvider('amazon-bedrock')
     expect(resolved.get('amazon-bedrock')?.piProvider).not.toBe(catalog)
-    expect(resolved.get('amazon-bedrock')?.piProvider.stream).toBeDefined()
+    expect(typeof resolved.get('amazon-bedrock')?.piProvider.stream).toBe('function')
   })
 })
 
