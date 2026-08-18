@@ -1,0 +1,7 @@
+# @flinter/dsh-orca bundle layer
+# Applied when a profile lists this bundle in dsh.profile.bundles.
+# The row `name` resolves the module (exports name/inject/apply) through the
+# profile's node_modules, where `dsh plugin add` links this package.
+- insert:
+    - id: dsh-orca
+      name: '@flinter/dsh-orca'

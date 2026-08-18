@@ -1006,3 +1006,50 @@ describe('amazon bedrock', () => {
     expect(resolved.get('amazon-bedrock')?.piProvider.stream).toBeDefined()
   })
 })
+
+describe('per-model wire protocol', () => {
+  it('lets a hand-declared route mix protocols with model-level api overrides', async () => {
+    const server = await mockServer([
+      { events: textEvents },
+      { status: 500, body: '{"error":"intentional test failure"}' },
+    ])
+    const ctx = await harness({
+      providers: {
+        'mixed-gateway': {
+          apiKeyEnv: KEY_ENV,
+          api: 'openai-completions',
+          baseURL: `${server.url}/v1`,
+          models: [
+            { id: 'completions-model', contextWindow: 100_000, maxTokens: 4096 },
+            { id: 'responses-model', api: 'openai-responses', contextWindow: 100_000, maxTokens: 4096 },
+          ],
+        },
+      },
+    })
+
+    const completions = await assemble(ctx, { provider: 'mixed-gateway', model: 'completions-model', messages: [] })
+    expect(completions.finish).toMatchObject({ kind: 'stop' })
+
+    // The responses model is expected to fail against this chat-completions
+    // mock; what matters is that it reached the Responses endpoint.
+    const responses = await assemble(ctx, { provider: 'mixed-gateway', model: 'responses-model', messages: [] })
+    expect(responses.finish).toMatchObject({ kind: 'error' })
+    expect(server.paths).toEqual(['/v1/chat/completions', '/v1/responses'])
+  })
+
+  it('keeps the route api as the default when a model names none', () => {
+    const resolved = resolveProfiles({
+      'mixed-gateway': {
+        api: 'openai-completions',
+        baseURL: 'https://acme.test/v1',
+        models: [
+          { id: 'default-model', contextWindow: 100_000, maxTokens: 4096 },
+          { id: 'overridden-model', api: 'openai-responses', contextWindow: 100_000, maxTokens: 4096 },
+        ],
+      },
+    })
+    const models = resolved.get('mixed-gateway')?.piProvider.getModels() ?? []
+    expect(models.find(model => model.id === 'default-model')?.api).toBe('openai-completions')
+    expect(models.find(model => model.id === 'overridden-model')?.api).toBe('openai-responses')
+  })
+})

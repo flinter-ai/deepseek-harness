@@ -23,6 +23,8 @@ tmp/
 .claude/settings.json
 .vscode/
 .DS_Store
+._*
+*.bak
 .idea
 mise.toml
 dist-exe/
