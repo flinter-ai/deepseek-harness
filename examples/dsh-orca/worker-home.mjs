@@ -8,7 +8,7 @@
  *     mode) preset default
  *
  * Model routing:
- *   easy          -> opencode-go / gpt-5.6-luna   (OpenAI Responses via per-model api)
+ *   easy          -> deepseek-official / deepseek-v4-flash (direct DeepSeek API)
  *   easy-backup   -> gmi-serving / deepseek-ai/DeepSeek-V4-Flash-0731
  *   backup        -> alias of easy-backup
  *   hard          -> kimi-coding / k3-256k         (Kimi K3-256K)
@@ -30,11 +30,8 @@ import { join } from 'node:path'
 import { homedir } from 'node:os'
 
 const MODELS = {
-  // easy primary: opencode-go / gpt-5.6-luna.
-  // gpt-5.6-luna needs the OpenAI Responses API while glm-5.3 needs OpenAI
-  // chat/completions; DSH pi-ai supports per-model api, so Luna is declared
-  // with api: openai-responses while the route keeps openai-completions.
-  easy: { provider: 'opencode-go', model: 'gpt-5.6-luna' },
+  // easy primary: direct DeepSeek API (dsh-llm-deepseek, deepseek-official).
+  easy: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
   'easy-backup': { provider: 'gmi-serving', model: 'deepseek-ai/DeepSeek-V4-Flash-0731' },
   backup: { provider: 'gmi-serving', model: 'deepseek-ai/DeepSeek-V4-Flash-0731' },
   // hard primary: Kimi K3-256K (api.kimi.com/coding).
@@ -66,7 +63,7 @@ const sourceSettings = flag('settings', join(homedir(), '.dsh', 'settings.yaml')
 
 const selection = MODELS[model]
 if (selection === undefined) {
-  console.error(`worker-home: unknown --model "${model}" (use easy|hard|opencode|kimi)`)
+  console.error(`worker-home: unknown --model "${model}" (use easy|easy-backup|backup|hard|kimi|hard-backup|glm-5.3|nadirclaw|nadir-auto|nadir-eco|nadir-premium|nadir-reasoning)`)
   process.exit(1)
 }
 if (!home) {

@@ -92,22 +92,22 @@ orca orchestration check --run <run_id> --wait --types worker_done --timeout-ms 
 
 ## 模型路由
 
-worker home（`worker-home.mjs`）配置 DSH 可以调用的模型。期望路由：
+worker home（`worker-home.mjs`）配置 DSH 可以调用的模型。当前路由：
 
 | label | provider / model | 用途 |
 |---|---|---|
-| `easy`（默认） | opencode-go / `gpt-5.6-luna` | 快速/低成本工作（OpenAI Responses） |
+| `easy`（默认） | deepseek-official / `deepseek-v4-flash` | 快速/低成本工作（直连 DeepSeek API） |
 | `easy-backup`、`backup` | gmi-serving / `deepseek-ai/DeepSeek-V4-Flash-0731` | `easy` 的运营 fallback |
 | `hard` | kimi-coding / `k3-256k` | 强力编程模型 |
 | `hard-backup` | opencode-go / `glm-5.3` | Kimi 失败时的 fallback |
 | `glm-5.3` | opencode-go / `glm-5.3` | 显式 GLM 档位 |
 | `nadirclaw` 等 | NadirClaw localhost router | 本地验证 agent |
 
-### `easy` 如何在单个 provider 上混合协议
-
-`gpt-5.6-luna` 只在 OpenAI **Responses** API 上能正常结束。我们路由经过 `opencode-go` 的其他模型（尤其是 `glm-5.3`）使用 OpenAI **chat/completions** API。DSH `llm-pi-ai` 支持按模型 `api` 选择（`model.api ?? provider.api`），因此 `opencode-go` 路由保持 `api: openai-completions` 作为默认值，并将 `gpt-5.6-luna` 声明为 `api: openai-responses`。单个 provider 因此可以托管混合协议模型，而无需捏造第二个 provider 路由。
-
 `dsh-agent` 只对 provider、配额、404/未授权、not-supported 和 transport 失败（`stream ended`、`finish_reason`、`transport`）重试一次。`NO_ADAPTER` 和本地配置错误 **不会** 触发 fallback。
+
+### 混合协议 provider
+
+DSH `llm-pi-ai` 支持按模型 `api` 选择（`model.api ?? provider.api`），因此单个 provider 路由可以托管使用不同 wire protocol 的模型。`opencode-go` 路由保持 `api: openai-completions` 作为默认值，并可在需要时将单个模型声明为 `api: openai-responses`。这使 provider 身份与 wire protocol 保持分离，无需捏造伪 provider 路由。
 
 ## Credentials
 

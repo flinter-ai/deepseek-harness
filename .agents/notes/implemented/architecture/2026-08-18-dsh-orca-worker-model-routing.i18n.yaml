@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-18-dsh-orca-worker-model-routing.md
-2026-08-18-dsh-orca-worker-model-routing.md: 13abde8105412815e4e87dae2675b0e552668c34
-2026-08-18-dsh-orca-worker-model-routing.zh.md: a5a738f521ea96a61f39d68517b0f6a421887483
+2026-08-18-dsh-orca-worker-model-routing.md: f963eb750f58e9c8ccbd28bde64817c9ef80e817
+2026-08-18-dsh-orca-worker-model-routing.zh.md: 48685a42070bef694fb2772d6e73323ff6fa6ada

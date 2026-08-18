@@ -108,31 +108,30 @@ The script never auto-commits, auto-stashes, or resets the destination tree.
 ## Model routing
 
 The worker home (`worker-home.mjs`) configures the models DSH can call.
-Desired routing:
+Current routing:
 
 | label | provider / model | use |
 |---|---|---|
-| `easy` (default) | opencode-go / `gpt-5.6-luna` | fast/cheap work (OpenAI Responses) |
+| `easy` (default) | deepseek-official / `deepseek-v4-flash` | fast/cheap work (direct DeepSeek API) |
 | `easy-backup`, `backup` | gmi-serving / `deepseek-ai/DeepSeek-V4-Flash-0731` | operational fallback for `easy` |
 | `hard` | kimi-coding / `k3-256k` | strong coding model |
 | `hard-backup` | opencode-go / `glm-5.3` | fallback when Kimi fails |
 | `glm-5.3` | opencode-go / `glm-5.3` | explicit GLM tier |
 | `nadirclaw` etc. | NadirClaw localhost router | local verification agents |
 
-### How `easy` mixes protocols on one provider
-
-`gpt-5.6-luna` terminates correctly only on the OpenAI **Responses** API.
-Every other model we route through `opencode-go` (notably `glm-5.3`) uses the
-OpenAI **chat/completions** API. DSH `llm-pi-ai` supports per-model `api`
-selection (`model.api ?? provider.api`), so the `opencode-go` route keeps
-`api: openai-completions` as its default and declares `gpt-5.6-luna` with
-`api: openai-responses`. One provider can therefore host mixed-protocol
-models without inventing a second provider route.
-
 `dsh-agent` retries once with the configured fallback only for provider,
 quota, 404/unauthorized, not-supported, and transport failures (`stream ended`,
 `finish_reason`, `transport`). `NO_ADAPTER` and local configuration errors do
 NOT trigger a fallback.
+
+### Mixed-protocol providers
+
+DSH `llm-pi-ai` supports per-model `api` selection (`model.api ?? provider.api`),
+so a single provider route can host models that speak different wire protocols.
+The `opencode-go` route keeps `api: openai-completions` as its default and can
+declare individual models with `api: openai-responses` when needed. This keeps
+provider identity separate from wire protocol and avoids inventing pseudo-provider
+routes.
 
 ## Credentials
 

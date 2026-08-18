@@ -12,22 +12,20 @@ At the same time, the routing policy must not invent provider identities or comp
 
 ## Decision
 
-### Fixed desired routing with operational fallback
+### Fixed routing with operational fallback
 
 `examples/dsh-orca/worker-home.mjs` declares a closed routing table:
 
-- `easy` primary: `opencode-go / gpt-5.6-luna`.
+- `easy` primary: `deepseek-official / deepseek-v4-flash` (direct DeepSeek API).
 - `easy-backup` and `backup`: `gmi-serving / deepseek-ai/DeepSeek-V4-Flash-0731`.
 - `hard` and `kimi`: `kimi-coding / k3-256k`.
 - `hard-backup` and `glm-5.3`: `opencode-go / glm-5.3`.
 
 `dsh-agent.mjs` retries once with the configured fallback when the primary model fails with an eligible provider or transport error. `easy` falls back to `easy-backup`; `hard` falls back to `hard-backup`. The fallback is not a routing change: it is an operational measure executed when the primary route is unavailable.
 
-### gpt-5.6-luna works directly through per-model api selection
+### Mixed-protocol providers
 
-`gpt-5.6-luna` is configured as the `easy` primary and is listed in the `opencode-go` explicit model catalog with its real card values and `api: openai-responses`. The route itself keeps `api: openai-completions` so that `glm-5.3` and the other explicit models continue to work. DSH pi-ai supports per-model `api` selection (`model.api ?? provider.api`), so a single `opencode-go` provider can host mixed-protocol models without inventing a second provider route.
-
-The `easy` worker therefore executes Luna directly. The `easy-backup` fallback remains for genuine provider failures such as quota exhaustion, 404, unauthorized, or transport errors.
+DSH `llm-pi-ai` supports per-model `api` selection (`model.api ?? provider.api`), so a single provider route can host models that speak different wire protocols. The `opencode-go` route keeps `api: openai-completions` as its default and can declare individual models with `api: openai-responses` when needed. This keeps provider identity separate from wire protocol and avoids inventing pseudo-provider routes.
 
 ### Fallback eligibility classifier
 

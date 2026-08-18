@@ -12,22 +12,20 @@ Status: implemented
 
 ## Decision
 
-### 固定期望路由并保留运营 fallback
+### 固定路由并保留运营 fallback
 
 `examples/dsh-orca/worker-home.mjs` 声明了一个封闭路由表：
 
-- `easy` 主路由：`opencode-go / gpt-5.6-luna`。
+- `easy` 主路由：`deepseek-official / deepseek-v4-flash`（直连 DeepSeek API）。
 - `easy-backup` 与 `backup`：`gmi-serving / deepseek-ai/DeepSeek-V4-Flash-0731`。
 - `hard` 与 `kimi`：`kimi-coding / k3-256k`。
 - `hard-backup` 与 `glm-5.3`：`opencode-go / glm-5.3`。
 
 `dsh-agent.mjs` 在主模型因 eligible provider 或 transport 错误失败时，会用配置好的 fallback 重试一次。`easy` 回退到 `easy-backup`；`hard` 回退到 `hard-backup`。这次回退不是路由变更，而是主路由不可用时执行的操作措施。
 
-### gpt-5.6-luna 通过按模型 api 选择直接工作
+### 混合协议 provider
 
-`gpt-5.6-luna` 被配置为 `easy` 主模型，并以真实 card 值和 `api: openai-responses` 列入 `opencode-go` 显式模型目录。路由本身保持 `api: openai-completions`，以便 `glm-5.3` 和其他显式模型继续工作。DSH pi-ai 支持按模型 `api` 选择（`model.api ?? provider.api`），因此单个 `opencode-go` provider 可以托管混合协议模型，而无需捏造第二个 provider 路由。
-
-`easy` worker 因此直接执行 Luna。`easy-backup` fallback 保留，用于真正的 provider 失败，例如配额耗尽、404、未授权或 transport 错误。
+DSH `llm-pi-ai` 支持按模型 `api` 选择（`model.api ?? provider.api`），因此单个 provider 路由可以托管使用不同 wire protocol 的模型。`opencode-go` 路由保持 `api: openai-completions` 作为默认值，并可在需要时将单个模型声明为 `api: openai-responses`。这使 provider 身份与 wire protocol 保持分离，无需捏造伪 provider 路由。
 
 ### Fallback 资格 classifier
 
