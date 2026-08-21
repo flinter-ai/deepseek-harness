@@ -1,5 +1,7 @@
 # @flinter/dsh-segment
 
+English | [中文](README.zh.md)
+
 **S0 prototype / reference skeleton** — NOT a production scientific
 implementation. This is the first milestone of the FLINTER segment plugin for
 DeepSeek Harness: it exists to prove the container boot → tool call → artifact
