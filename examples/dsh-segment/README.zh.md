@@ -46,3 +46,11 @@ DSH_EXAMPLE_MODE=lib pnpm exec vitest run --config vitest.e2e.config.ts examples
 - 随着适配器落地再注册更多语义能力。
 - 用 B2 capability-URL 写入替换 `writeArtifact` stub。
 - 在 teardown 时将会话日志上送 B2。
+
+## Design invariants (read before changing)
+
+- 只注册已实现的能力：工具名单恰为 `[RUN_BASELINE_PHYSICS]`；绝不宣传尚未实现的名字。
+- 原型原语是内部实现：S0 的五个工具（`frames.sample`、`track.cotracker`、`boundary.detect`、`vlm.ask`、`artifact.write`）是适配器驱动的普通函数，不是公开表面。
+- stub 结果永远显式 abstained：`abstention: 'prototype_stub'` + provenance + `content_hash` —— stub 绝不能被当作实测物理输出消费。
+- 能力今天以**模型可见的 TOOL** 暴露：DSH 拥有调查权，控制面不选择科学能力。只有当运行时必须在模型启动前强制执行 baseline 时才切换到内部 service 接缝 —— 那是 S2/runtime-contract 轨道，不是本插件的 S1。
+- 合并门槛：只有语义契约检查点通过后，才允许建立把本线与 `flinter/aws-runtime` 结合的 integration 分支（届时才更新 `DSH_COMMIT`）。

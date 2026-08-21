@@ -77,3 +77,11 @@ DSH_EXAMPLE_MODE=lib pnpm exec vitest run --config vitest.e2e.config.ts examples
 - Register further semantic capabilities as their adapters land.
 - Replace the `writeArtifact` stub with B2 capability-URL write.
 - Add session-log shipping to B2 at teardown.
+
+## Design invariants (read before changing)
+
+- Register only implemented capabilities: the tool roster is exactly `[RUN_BASELINE_PHYSICS]`; never advertise a not-yet-implemented name.
+- Prototype primitives are internal implementation: the five S0 tools (`frames.sample`, `track.cotracker`, `boundary.detect`, `vlm.ask`, `artifact.write`) are plain functions driven by the adapter, not a public surface.
+- Stub results are always explicitly abstained: `abstention: 'prototype_stub'` plus provenance and `content_hash` — a stub can never be consumed as measured physics output.
+- Capabilities are model-visible TOOLS today: DSH owns investigation, and the control plane does not select scientific capability. Switch to an internal service seam only when a runtime must enforce baseline before the model starts — that is the S2/runtime-contract track, not this plugin's S1.
+- Merge gate: an integration branch combining this line with `flinter/aws-runtime` (and then updating `DSH_COMMIT`) happens only after the semantic contract checkpoint.

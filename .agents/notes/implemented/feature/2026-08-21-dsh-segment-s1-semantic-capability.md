@@ -23,7 +23,11 @@ S1 does not add `InvestigationRun`/`dshSessionId` persistence, Postgres stores, 
 
 ## Alternatives considered
 
-**Expose the semantic capability as a Cordis service beside the tools surface.** Rejected: the plugin's only invocation seam is the tools executor, and the future aws-runtime orchestrator will drive the capability the same way the contract test does; a parallel service would duplicate schema validation and execution machinery for one caller.
+**Expose the semantic capability as a Cordis service beside the tools surface.** Rejected for S1: DSH owns investigation (the control plane does not select scientific capability), so the capability is deliberately model-visible; no runtime dispatch/service contract exists until the CP2–CP10 track, and a parallel service would introduce a second invocation path and duplicate schema/execution machinery for one caller. The choice is conscious, not an accident — see `## Deferred`.
+
+## Deferred
+
+A service seam for runtime-enforced capability invocation is deferred to the S2/runtime-contract track (CP lane). Until that track lands, semantic capabilities in this plugin remain model-visible tools per the decision above; switch to the service seam only when a runtime must enforce baseline before the model starts, not merely to hide the capability from the tool roster.
 
 **Keep the five prototype tools registered alongside the semantic capability.** Rejected: they would still look callable, and a stub primitive remains a prototype trap regardless of how prominently the capability is advertised.
 

@@ -23,7 +23,11 @@ S1 不增加 `InvestigationRun`/`dshSessionId` 持久化、Postgres 存储、lea
 
 ## Alternatives considered
 
-**在 tools 表面之外把语义能力暴露为 Cordis service。** 已否决：插件的唯一调用缝是 tools executor，未来的 aws-runtime 编排方将像契约测试一样驱动该能力；平行 service 只会为一个调用方重复 schema 校验与执行机制。
+**在 tools 表面之外把语义能力暴露为 Cordis service。** 已否决（S1 阶段）：DSH 拥有调查权（控制面不选择科学能力），因此能力刻意保持模型可见；CP2–CP10 轨道落地前不存在运行时派发/service 契约，平行 service 会引入第二条调用路径并为单一调用方重复 schema 校验与执行机制。这是一个有意识的选择，不是偶然——见 `## Deferred`。
+
+## Deferred
+
+供运行时强制调用能力的 service 接缝推迟到 S2/runtime-contract 轨道（CP lane）。在该轨道落地前，本插件的语义能力按上述决定保持为模型可见的工具；只有当下一个运行时必须在模型启动前强制执行 baseline 时才切换到 service 接缝，而不是单纯为了把它从工具名单里藏起来。
 
 **把五个原型工具与语义能力一起继续注册。** 已否决：它们仍然看起来可调用，无论能力宣传得多么显眼，stub 原语都依然是原型陷阱。
 
