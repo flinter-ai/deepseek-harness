@@ -2,42 +2,54 @@
 
 English | [中文](README.zh.md)
 
-**S0 prototype / reference skeleton** — NOT a production scientific
-implementation. This is the first milestone of the FLINTER segment plugin for
-DeepSeek Harness: it exists to prove the container boot → tool call → artifact
-write path with deterministic stubs, and to freeze the tool-name/schema contract
-that later milestones implement behind.
+**S1 semantic-capability layer** — still a prototype/reference
+implementation, not production scientific capability. S1 supersedes the S0
+prototype tool surface with ONE registered semantic capability,
+`RUN_BASELINE_PHYSICS`; the five S0 prototype primitives (`frames.sample`,
+`track.cotracker`, `boundary.detect`, `vlm.ask`, `artifact.write`) are now
+internal functions the capability adapter drives and no external tools.
+Every result is explicitly abstained (`abstention: 'prototype_stub'`) and
+carries provenance, so it can never be mistaken for real TowerH physics
+output.
 
 The plugin is a bundle (`dsh.bundle.patch` → `cordis.patch.yml`) that the
 headless profile discovers and mounts as one row beside its other bundles.
 No TowerH/TowerT, VLM, DINOv2, Foote, CoTracker, B2, session persistence,
-retries, or control-plane wiring is present in this milestone — those are later
-tracks, not S0.
+retries, or control-plane wiring is present in this milestone.
 
-## Scope: S0 (what this skeleton proves)
+## Scope: S1 (what this layer proves)
 
-- The package loads from a clean checkout (a dedicated worktree).
-- The headless profile discovers the plugin through `cordis.patch.yml`.
-- All five prototype tools register and accept valid input:
-  | Tool | Input | Deterministic stub output |
-  |---|---|---|
-  | `frames.sample` | `window`, optional `budget` | fixed frame list + artifact descriptor |
-  | `track.cotracker` | `window`, `seeds[]` | fixed track descriptor |
-  | `boundary.detect` | `track_ref` | fixed candidate list |
-  | `vlm.ask` | `frames_ref`, `question` | fixed canned answer |
-  | `artifact.write` | `name`, `data`, optional `out_dir` | writes the payload to disk |
-- Every tool returns a schema-valid deterministic stub result with a SHA-256
-  content hash of its own artifact payload (`artifact` + `content_hash`).
-- The worker boot / tool-call path is smoke-tested **keyless** — no TowerH,
-  TowerT, VLM, B2, or live provider is contacted by the tests.
+- A typed semantic request/result envelope: the input schema (`window`, and
+  optional `budget` / `out_dir`) and the output schema (provenance +
+  abstention + `content_hash`) are enforced by the tools registry and pinned
+  by tests.
+- A minimal capability registry (id → adapter) with exactly one registered
+  capability; unknown ids fail loud and no phantom capability name is
+  advertised.
+- Abstention semantics: every result carries `abstention: 'prototype_stub'`
+  plus provenance listing each internal stage's content hash, so a stub can
+  never be consumed as real physics output.
+- Keyless worker boot → semantic capability → artifact write path: no
+  TowerH, TowerT, VLM, B2, or live provider is contacted by the tests.
 
-## Not in S0 (later milestone / CP tracks)
+The adapter chains the frozen S0 primitives `sampleFrames` → `trackWindow` →
+`detectBoundaries` → `writeArtifact` and wraps the deterministic stub
+artifact in the typed envelope:
+
+| Surface | Role | Result |
+|---|---|---|
+| `RUN_BASELINE_PHYSICS` | the one registered semantic capability | typed envelope with provenance + `abstention` + `content_hash` |
+| frames.sample, track.cotracker, boundary.detect, vlm.ask, artifact.write | internal functions, not registered as tools | staged stub artifacts with sha256 hashes |
+
+## Not in S1 (later milestone / CP tracks)
 
 - Real CoTracker / VLM / DINOv2 / Foote / TowerH integration.
 - `InvestigationRun` / `dshSessionId` persistence, Postgres, leases/fencing,
   retries, Fargate launch or callbacks, shared session roots / checkpoints,
   cross-Fargate resume, B2 writes, session-log shipping.
-- Semantic capability registry or renaming the prototype tools (separate task).
+- Further semantic capabilities (`INSPECT_TRACE_GAP` and the rest of the
+  future list) — not registered; the registry registers only what is
+  implemented.
 - Merging this branch into `flinter/aws-runtime` or `flinter/dsh-segment`.
 
 ## Loading and tests
@@ -45,18 +57,23 @@ tracks, not S0.
 The headless profile stacks bundles in `dsh.profile.bundles` order; adding
 `@flinter/dsh-segment` to that list (as the worker image does) mounts the
 plugin through `cordis.patch.yml`. In this repository the composition is
-verified against the real bundle patches by `tests/loader.spec.ts` and the
-plugin is booted end-to-end by `tests/keyless-smoke.e2e.ts`.
+verified against the real bundle patches by `tests/loader.spec.ts`, the
+semantic contract is pinned by `tests/contract.spec.ts`, and the plugin is
+booted end-to-end by `tests/keyless-smoke.e2e.ts`.
 
 ```sh
 # From the worktree, after pnpm install:
-pnpm exec vitest run examples/dsh-segment/tests/loader.spec.ts
+pnpm exec vitest run examples/dsh-segment/tests/loader.spec.ts examples/dsh-segment/tests/contract.spec.ts
 pnpm exec vitest run --config vitest.e2e.config.ts examples/dsh-segment/tests/keyless-smoke.e2e.ts
+# The same suites against built lib/ (as CI runs them):
+DSH_EXAMPLE_MODE=lib pnpm exec vitest run examples/dsh-segment/tests/loader.spec.ts examples/dsh-segment/tests/contract.spec.ts
+DSH_EXAMPLE_MODE=lib pnpm exec vitest run --config vitest.e2e.config.ts examples/dsh-segment/tests/keyless-smoke.e2e.ts
 ```
 
-## Next steps (not S0)
+## Next steps (not S1)
 
-- Wire real samplers/trackers/detectors behind the frozen schemas.
-- Replace `artifact.write` stub with B2 capability-URL write.
-- Add `ctx.userQuestions` adapter for Trigger.dev waitpoints.
+- Wire real samplers/trackers/detectors behind the capability adapter and
+  replace the abstained stub with a real output envelope.
+- Register further semantic capabilities as their adapters land.
+- Replace the `writeArtifact` stub with B2 capability-URL write.
 - Add session-log shipping to B2 at teardown.

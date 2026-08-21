@@ -1,11 +1,12 @@
 /**
- * Headless-profile discovery test for the @flinter/dsh-segment S0 bundle: the
+ * Headless-profile discovery test for the @flinter/dsh-segment S1 bundle: the
  * profile launcher composes its entry list by applying each bundle's patch
  * layer (base, headless, then the segment bundle) over an empty root. This
  * spec drives the real `composeEntries` machinery with the checked-in bundle
  * patch files and asserts the composed entry list contains the `dsh-segment`
  * row — proving the headless profile discovers the plugin the same way a `dsh
- * --profile headless` boot would.
+ * --profile headless` boot would. The registration shape itself (one semantic
+ * capability) is covered by contract.spec.ts and keyless-smoke.e2e.ts.
  *
  * Pure function test over patch files: no Loader boot, no provider, no
  * network. Mirrors the app-boot `config-dump.spec.ts` import style.
@@ -21,7 +22,7 @@ const basePatchPath = new URL('../../../packages/bundle/base/cordis.patch.yml', 
 const headlessPatchPath = new URL('../../../packages/bundle/headless/cordis.patch.yml', import.meta.url)
 const segmentPatchPath = new URL('../cordis.patch.yml', import.meta.url)
 
-describe('dsh-segment S0 headless-profile discovery', () => {
+describe('dsh-segment S1 headless-profile discovery', () => {
   it('composes the dsh-segment row into the headless bundle entry list', () => {
     const baseLayer = loadOverlayPatches(NAME, fileURLToPath(basePatchPath))
     const headlessLayer = loadOverlayPatches(NAME, fileURLToPath(headlessPatchPath))
