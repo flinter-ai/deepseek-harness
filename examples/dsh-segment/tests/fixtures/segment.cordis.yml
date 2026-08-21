@@ -1,0 +1,13 @@
+# Keyless S0 segment smoke composition: the same service rows the headless
+# profile mounts (tools service + system prompt) plus the @flinter/dsh-segment
+# bundle, booted through the real Cordis Loader. No TowerH, TowerT, VLM, B2,
+# or live provider is referenced; the driver below only calls the stub tools.
+
+- id: system-prompt
+  name: '@deepseek-ai/dsh-system-prompt'
+
+- id: tools
+  name: '@deepseek-ai/dsh-tools'
+
+- id: dsh-segment
+  name: '@flinter/dsh-segment'
