@@ -19,6 +19,9 @@ import type { Context } from '@deepseek-ai/cordis'
 import { boot, installFailLoud, resolveConfigPath } from '@deepseek-ai/dsh-app-boot'
 import { validateJsonSchemaValue, valueSchemaSpecToJsonSchema } from '@deepseek-ai/dsh-tools'
 import { CallId } from '@deepseek-ai/dsh-llm'
+import { existsSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import {
   RUN_BASELINE_PHYSICS,
   runBaselinePhysicsResult,
@@ -33,7 +36,6 @@ if (configPath === undefined) {
 const VALID_REQUEST: Record<string, unknown> = {
   window: 't0-t1',
   budget: 12,
-  out_dir: process.env.SEGMENT_OUT_DIR ?? '/tmp/dsh-segment-smoke',
 }
 
 const uninstallFailLoud = installFailLoud(NAME)
@@ -94,6 +96,24 @@ try {
   })
   if (!invalid.isError) throw new Error(`${NAME}: input missing the required field was not rejected`)
   process.stdout.write(`${JSON.stringify({ event: 'semantic/invalid', name: RUN_BASELINE_PHYSICS, isError: invalid.isError })}\n`)
+
+  // Ownership proof: a model-supplied out_dir must NOT move the artifact.
+  // The call still succeeds (the extra key is ignored), but the artifact must
+  // land at the runtime/config-owned path, never at the model-chosen one.
+  const modelChosen = join(tmpdir(), 'model-chosen-path')
+  const withOutDir = await ctx.tools.execute({
+    signal,
+    callId: CallId('smoke-baseline-physics-outdir'),
+    name: RUN_BASELINE_PHYSICS,
+    arguments: { window: 't0-t1', out_dir: modelChosen },
+  })
+  if (withOutDir.isError) throw new Error(`${NAME}: out_dir-supplied call should still succeed (key is ignored, path is runtime-owned)`)
+  if (existsSync(modelChosen)) throw new Error(`${NAME}: model-supplied out_dir moved the artifact; path must stay runtime/config-owned`)
+  const ownedDir = process.env.SEGMENT_OUT_DIR ?? '/tmp/dsh-segment-smoke'
+  if (!existsSync(join(ownedDir, 'baseline-physics.json'))) {
+    throw new Error(`${NAME}: artifact missing at runtime-owned path ${ownedDir}`)
+  }
+  process.stdout.write(`${JSON.stringify({ event: 'semantic/out_dir-ignored', name: RUN_BASELINE_PHYSICS, runtimeOwnsPath: true })}\n`)
 
   const phantom = await ctx.tools.execute({
     signal,

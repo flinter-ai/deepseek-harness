@@ -24,6 +24,7 @@ import {
   createRunBaselinePhysicsAdapter,
   runBaselinePhysicsInput,
   runBaselinePhysicsResult,
+  DEFAULT_ARTIFACT_OUT_DIR,
 } from './capabilities/run-baseline-physics.js'
 
 export function apply(ctx, config = {}) {
@@ -33,7 +34,9 @@ export function apply(ctx, config = {}) {
   const registry = createCapabilityRegistry()
   const unregisterCapability = registry.register(
     RUN_BASELINE_PHYSICS,
-    createRunBaselinePhysicsAdapter({ outDir: config.out_dir }),
+    createRunBaselinePhysicsAdapter({
+      outDir: config.out_dir ?? process.env.SEGMENT_OUT_DIR ?? DEFAULT_ARTIFACT_OUT_DIR,
+    }),
   )
   const unregisterTool = ctx.tools.register(defineTool({
     name: RUN_BASELINE_PHYSICS,

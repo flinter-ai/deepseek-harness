@@ -20,7 +20,7 @@ retries, or control-plane wiring is present in this milestone.
 ## Scope: S1 (what this layer proves)
 
 - A typed semantic request/result envelope: the input schema (`window`, and
-  optional `budget` / `out_dir`) and the output schema (provenance +
+  optional `budget`) and the output schema (provenance +
   abstention + `content_hash`) are enforced by the tools registry and pinned
   by tests.
 - A minimal capability registry (id → adapter) with exactly one registered
@@ -50,7 +50,10 @@ artifact in the typed envelope:
 - Further semantic capabilities (`INSPECT_TRACE_GAP` and the rest of the
   future list) — not registered; the registry registers only what is
   implemented.
-- Merging this branch into `flinter/aws-runtime` or `flinter/dsh-segment`.
+- Directly merging this branch into `flinter/aws-runtime`, or updating
+  `DSH_COMMIT` from this branch. (This S1 line itself lands on
+  `flinter/dsh-segment` via a normal PR — that is the intended target, not a
+  forbidden merge.)
 
 ## Loading and tests
 

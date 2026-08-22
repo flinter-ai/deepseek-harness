@@ -10,8 +10,8 @@
  *
  * The input schema doubles as the registered tool's parameter schema and the
  * result schema as its output schema; both are honored end-to-end by the tools
- * registry. Default resolution is explicit: the request wins, then the plugin
- * config, then the module constant.
+ * registry. The artifact path is runtime-owned: plugin config wins, then the
+ * runtime env, then the module constant — never a model-visible request knob.
  */
 
 import { createHash } from 'node:crypto'
@@ -27,11 +27,13 @@ export const DEFAULT_ARTIFACT_NAME = 'baseline-physics.json'
 export const DEFAULT_ARTIFACT_OUT_DIR = '/tmp/dsh-segment-artifacts'
 export const DEFAULT_FRAME_BUDGET = 12
 
-/** Typed semantic request: the knobs the adapter honors, nothing else. */
+/** Typed semantic request: model-visible knobs only. The artifact path is
+ *  runtime/config-owned (plugin config -> env -> module default) and is never
+ *  a request parameter; a model-supplied `out_dir` is ignored (see the
+ *  keyless smoke's ownership assertion). */
 export const runBaselinePhysicsInput = {
   window: { type: 'string', required: true, description: 'Video window identifier, e.g. "t0-t1"' },
   budget: { type: 'number', description: 'Frame sample budget', default: DEFAULT_FRAME_BUDGET },
-  out_dir: { type: 'string', description: 'Artifact output directory', default: DEFAULT_ARTIFACT_OUT_DIR },
 }
 
 /** Typed semantic result: provenance + abstention + content_hash envelope. */
@@ -102,7 +104,7 @@ export function createRunBaselinePhysicsAdapter({ outDir } = {}) {
 function runBaselinePhysics(request, configOutDir) {
   const window = request.window
   const budget = request.budget ?? DEFAULT_FRAME_BUDGET
-  const outDir = request.out_dir ?? configOutDir ?? DEFAULT_ARTIFACT_OUT_DIR
+  const outDir = configOutDir ?? DEFAULT_ARTIFACT_OUT_DIR
 
   const frames = sampleFrames(window, budget)
   const track = trackWindow(window, frames.artifact.frames)

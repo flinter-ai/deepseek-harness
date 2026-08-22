@@ -8,7 +8,7 @@
 
 ## Scope: S1 (what this layer proves)
 
-- 类型化的语义请求/结果信封：输入 schema（`window`，以及可选的 `budget` / `out_dir`）与输出 schema（provenance + abstention + `content_hash`）由 tools registry 强制校验并由测试钉住。
+- 类型化的语义请求/结果信封：输入 schema（`window`，以及可选的 `budget`）与输出 schema（provenance + abstention + `content_hash`）由 tools registry 强制校验并由测试钉住。
 - 最小能力注册表（id → adapter），只注册一个能力；未知 id 立即失败，不宣传任何幻影能力名。
 - 弃权语义：每个结果都携带 `abstention: 'prototype_stub'` 以及列出每个内部阶段内容哈希的 provenance，stub 永远不能当作真实物理输出来消费。
 - 无凭据的 worker 启动 → 语义能力 → 产物写入路径：测试不接触 TowerH、TowerT、VLM、B2 或任何真实 provider。
@@ -25,7 +25,7 @@
 - 真实的 CoTracker / VLM / DINOv2 / Foote / TowerH 集成。
 - `InvestigationRun` / `dshSessionId` 持久化、Postgres、lease/fencing、重试、Fargate 启动或回调、共享会话根 / 检查点、跨 Fargate 恢复、B2 写入、会话日志上送。
 - 更多语义能力（`INSPECT_TRACE_GAP` 及其余未来列表）——不注册；注册表只注册已实现的能力。
-- 把本分支合并进 `flinter/aws-runtime` 或 `flinter/dsh-segment`。
+- 把本分支直接合并进 `flinter/aws-runtime`，或在本分支上更新 `DSH_COMMIT`。（S1 这条线本身通过普通 PR 合入 `flinter/dsh-segment` —— 那是预期目标，不是被禁止的合并。）
 
 ## Loading and tests
 
