@@ -1,44 +1,24 @@
 /**
- * vlm.ask — VLM state-question stub.
+ * askVlm — VLM state-question stub (internal, not yet reached by any S1
+ * capability).
  *
- * Returns a canned answer and a content hash. Real implementation will call
- * ARK/doubao with frames and a state question; this stub proves the model tool
- * surface without external network dependency.
+ * S0's vlm.ask tool, internalized for S1: no external tool registers it, and
+ * the RUN_BASELINE_PHYSICS adapter does not call it — baseline physics does
+ * not ask state questions. It stays as the frozen primitive later semantic
+ * capabilities (state-verification tracks) will drive. Real implementation
+ * will call ARK/doubao with frames and a state question.
  */
 
-import { defineTool } from '@deepseek-ai/dsh-tools'
 import { createHash } from 'node:crypto'
 
-export function vlmAskTool() {
-  return defineTool({
-    name: 'vlm.ask',
-    description: 'Ask a VLM a state question about frames (stub).',
-    parameters: {
-      frames_ref: { type: 'string', required: true, description: 'Content hash of the frames artifact' },
-      question: { type: 'string', required: true, description: 'State question, e.g. "which gripper holds X"' },
-    },
-    output: {
-      schema: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          artifact: { type: 'object', required: true, additionalProperties: true },
-          content_hash: { type: 'string', required: true },
-        },
-      },
-      render: (_args, value) => [{ type: 'text', text: `vlm.ask → ${value.content_hash.slice(0, 12)}` }],
-    },
-    isConcurrencySafe: () => false,
-    async execute(args, exec) {
-      const descriptor = {
-        frames_ref: args.frames_ref,
-        question: args.question,
-        answer: 'unknown — stub VLM',
-        reasoning_effort: 'low',
-        note: 'stub — real VLM not wired',
-      }
-      const hash = createHash('sha256').update(JSON.stringify(descriptor)).digest('hex')
-      return { artifact: descriptor, content_hash: hash }
-    },
-  })
+export function askVlm(framesRef, question) {
+  const artifact = {
+    frames_ref: framesRef,
+    question,
+    answer: 'unknown — stub VLM',
+    reasoning_effort: 'low',
+    note: 'stub — real VLM not wired',
+  }
+  const contentHash = createHash('sha256').update(JSON.stringify(artifact)).digest('hex')
+  return { artifact, content_hash: contentHash }
 }

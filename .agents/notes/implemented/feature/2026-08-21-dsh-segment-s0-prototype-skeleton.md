@@ -15,7 +15,7 @@ Ship an S0 prototype/reference skeleton of the `dsh-segment` plugin on branch `f
 - `cordis.patch.yml` now inserts a real bundle patch registering `id: dsh-segment, name: '@flinter/dsh-segment'`, so a headless profile discovers and loads the plugin.
 - `index.js` entrypoint injects only `['tools']` — the plugin never uses `jobs`, so an unused inject would hold activation hostage to an unrelated service.
 - `examples/package.json` declares the `@flinter/dsh-segment` link dependency, required both for runtime resolution and by `verify-cordis-config`'s reference check.
-- The five prototype tools (`frames.sample`, `track.cotracker`, `boundary.detect`, `vlm.ask`, `artifact.write`) keep their stable schemas unchanged; new tests pin them. Deterministic stub artifacts carry sha256 `content_hash` values that match the written bytes.
+- The five prototype tools (`frames.sample`, `track.cotracker`, `boundary.detect`, `vlm.ask`, `artifact.write`) shipped with stable schemas, registered as external tools, pinned by new tests; deterministic stub artifacts carry sha256 `content_hash` values that match the written bytes. S1 internalizes these tools as plain functions and stops registering them ([S1 note](2026-08-21-dsh-segment-s1-semantic-capability.md)).
 - `tests/loader.spec.ts` proves headless-profile discovery via composition; `tests/keyless-smoke.e2e.ts` proves a keyless real-loader boot in both source and built-`lib/` modes.
 - `README.md` states explicitly this is an S0 prototype/reference skeleton with no production scientific capability claim.
 
@@ -31,4 +31,4 @@ S0 does not include `InvestigationRun`/`dshSessionId` persistence, Postgres stor
 
 ## Consequences
 
-S0 is a frozen prototype checkpoint: nothing in it claims production scientific capability, and its worker-image smoke is external integration evidence only. The next separate DSH task is a semantic capability adapter plus a minimal capability registry and contract tests; only after that semantic checkpoint may an integration branch combine the DSH line with `aws-runtime` and its AWS extras, at which point `DSH_COMMIT` may be updated. This note must be kept current with the shipped S0 facts (paths, schemas, mechanisms) in the same change that alters them.
+S0 is a frozen prototype checkpoint: nothing in it claims production scientific capability, and its worker-image smoke is external integration evidence only. The semantic checkpoint S0 names as the next step shipped as [S1](2026-08-21-dsh-segment-s1-semantic-capability.md): a semantic capability adapter, a minimal capability registry, and contract tests; only after that semantic checkpoint may an integration branch combine the DSH line with `aws-runtime` and its AWS extras, at which point `DSH_COMMIT` may be updated. This note must be kept current with the shipped S0 facts (paths, schemas, mechanisms) in the same change that alters them.
