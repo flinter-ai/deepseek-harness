@@ -14,7 +14,7 @@ S0 原型（[2026-08-21-dsh-segment-s0-prototype-skeleton](2026-08-21-dsh-segmen
 
 - `examples/dsh-segment/index.js` 只注册 ONE 个工具 `RUN_BASELINE_PHYSICS`——唯一注册的语义能力。五个 S0 原语变成 `tools/` 下的普通内部函数（`sampleFrames`、`trackWindow`、`detectBoundaries`、`askVlm`、`writeArtifact`）；没有一个被注册，因此任何原语都不可被外部调用，也不宣传任何幻影能力名。
 - 最小能力注册表（`capabilities/registry.js`）把 id 映射到 adapter，只列出已注册 id，未知 id 立即失败，`register()` 返回 disposer。工具的 `execute` 经由它分发。
-- `capabilities/run-baseline-physics.js` 拥有类型化请求/结果 schema 与适配器。适配器显式解析默认值（`request.out_dir ?? config.out_dir ?? default`），串联 `sampleFrames → trackWindow → detectBoundaries → writeArtifact`，并把确定性 stub 产物包装成携带 `capability_id`、`schema_version`、`status`、`abstention: 'prototype_stub'`、provenance（每个内部阶段的内容哈希）、产物引用与信封 `content_hash`（对其它所有字段的规范化 JSON 求 sha256）的类型化信封。写入磁盘的产物字节哈希等于产物引用的 `content_hash`。
+- `capabilities/run-baseline-physics.js` 拥有类型化请求/结果 schema 与适配器。适配器按运行时/配置所有权解析产物路径（`config.out_dir ?? SEGMENT_OUT_DIR 环境变量 ?? 默认`）——绝不取自模型请求——并串联 `sampleFrames → trackWindow → detectBoundaries → writeArtifact`，并把确定性 stub 产物包装成携带 `capability_id`、`schema_version`、`status`、`abstention: 'prototype_stub'`、provenance（每个内部阶段的内容哈希）、产物引用与信封 `content_hash`（对其它所有字段的规范化 JSON 求 sha256）的类型化信封。写入磁盘的产物字节哈希等于产物引用的 `content_hash`。
 - 弃权是硬性标记而不是偶然：stub 结果永远不会被当作实测物理输出来消费（MISS 保持 MISS）。`askVlm` 仍是 S1 尚无能力触达的内部原语。
 - 测试：新增 `tests/contract.spec.ts`——模拟只使用语义表面的 aws-runtime 风格调用方：启动真实 Loader 组合，断言类型化结果、provenance、弃权标记与内容哈希一致性（信封哈希、阶段哈希、磁盘字节）。`tests/keyless-smoke.e2e.ts` 及其 driver 在 src 与构建后的 `lib/` 两种模式下断言新注册形态（恰好 `[RUN_BASELINE_PHYSICS]`）、确定性与产物写入路径。`tests/loader.spec.ts` 继续证明 bundle 发现。
 - `README.md` / `README.zh.md` 描述 S1：一个语义能力、内部原型原语、弃权语义。`package.json` 的 `files` 增加 `capabilities/`，使打包后的消费者能解析入口 import。
@@ -37,4 +37,4 @@ S1 不增加 `InvestigationRun`/`dshSessionId` 持久化、Postgres 存储、lea
 
 ## Consequences
 
-公开表面现在是一个语义能力，因此 S0 的 loader/keyless smoke 形态改变（调整而非删除），五个原语名不再可被外部调用。信封 `content_hash` 跨运行保持确定性，因为机器相关状态（产物路径）被排除在哈希之外；产物引用记录 name + hash，调用方由 `out_dir` 推导路径。`askVlm` 作为冻结的内部原语留给后续状态核验能力。S0 笔记中"下一项任务"的句子被本笔记取代，S0 笔记现已交叉链接到本笔记。集成合并门槛仍然成立：只有在该语义检查点之后，才允许建立 integration 分支把 DSH 线与 `aws-runtime` 结合，届时才可更新 `DSH_COMMIT`——该集成仍是未来工作。
+公开表面现在是一个语义能力，因此 S0 的 loader/keyless smoke 形态改变（调整而非删除），五个原语名不再可被外部调用。信封 `content_hash` 跨运行保持确定性，因为机器相关状态（产物路径）被排除在哈希之外；产物引用记录 name + hash，产物路径由运行时/配置所有（plugin config → 运行环境 → 默认），绝不是模型可见的请求旋钮。`askVlm` 作为冻结的内部原语留给后续状态核验能力。S0 笔记中"下一项任务"的句子被本笔记取代，S0 笔记现已交叉链接到本笔记。集成合并门槛仍然成立：只有在该语义检查点之后，才允许建立 integration 分支把 DSH 线与 `aws-runtime` 结合，届时才可更新 `DSH_COMMIT`——该集成仍是未来工作。

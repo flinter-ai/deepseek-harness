@@ -16,7 +16,6 @@ export const DEFAULT_FRAME_BUDGET: 12
 export interface RunBaselinePhysicsRequest {
   window: string
   budget?: number
-  out_dir?: string
 }
 
 export interface RunBaselinePhysicsStage {
