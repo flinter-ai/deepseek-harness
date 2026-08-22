@@ -1,20 +1,24 @@
 /**
- * @flinter/dsh-segment — production segment plugin for DeepSeek Harness.
+ * @flinter/dsh-segment — S0 prototype segment plugin for DeepSeek Harness.
  *
- * Registered inside the GMI container by the flinter-dsh-worker image.
- * Provides deterministic instruments and judgement tools for episode
- * segmentation. The agent loop runs inside DSH; FLINTER supplies the
+ * Registered as a bundle inside the GMI container by the flinter-dsh-worker
+ * image. Provides deterministic stub instruments and judgement tools for
+ * episode segmentation. The agent loop runs inside DSH; FLINTER supplies the
  * instruments and the judgement policy.
  *
- * This is a skeleton: each tool returns a stub artifact with a content hash so
- * the container boot → tool call → artifact write path can be proven without
- * TowerH/TowerT integration.
+ * S0 scope is a prototype/reference skeleton only: each tool returns a stub
+ * artifact with a content hash so the container boot → tool call → artifact
+ * write path can be proven without TowerH/TowerT integration. No sampler,
+ * tracker, detector, VLM, or B2 integration is wired; no production
+ * scientific capability is claimed.
+ *
+ * The S0 acceptance contract is: the plugin loads from a clean checkout, the
+ * headless profile discovers it, and every registered tool accepts valid
+ * input and returns a schema-valid deterministic stub result.
  */
 
 export const name = 'dsh-segment'
-export const inject = ['tools', 'jobs']
-
-export const Config = null
+export const inject = ['tools']
 
 import { framesSampleTool } from './tools/frames-sample.js'
 import { trackCotrackerTool } from './tools/track-cotracker.js'

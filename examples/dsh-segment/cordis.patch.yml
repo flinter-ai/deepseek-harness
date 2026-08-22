@@ -1,2 +1,8 @@
-# Cordis patch for the headless segment profile.
-# Adds the FLINTER segment plugin to the headless bundle.
+# The @flinter/dsh-segment bundle patch. A profile that lists
+# @flinter/dsh-segment in dsh.profile.bundles applies this layer and mounts
+# the segment plugin beside its other rows. The headless profile in the
+# flinter-dsh-worker image adds this bundle so the container boots with the
+# S0 prototype instruments available.
+- insert:
+    - id: dsh-segment
+      name: '@flinter/dsh-segment'
