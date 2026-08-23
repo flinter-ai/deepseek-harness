@@ -19,16 +19,16 @@
  *   orca orchestration check --run <run_id> --wait --types worker_done --timeout-ms 240000 --json
  */
 import { execFileSync } from 'node:child_process'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { homedir } from 'node:os'
 import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 
 function git(dest, ...args) {
   return execFileSync('git', ['-C', dest, ...args], { encoding: 'utf8' }).trim()
 }
 
-const DSH_ROOT = join(homedir(), 'deepseek-harness')
-const DSH_AGENT = join(DSH_ROOT, 'examples', 'dsh-orca', 'dsh-agent.mjs')
+const DSH_AGENT = join(dirname(fileURLToPath(import.meta.url)), 'dsh-agent.mjs')
 
 function flag(name, fallback) {
   const at = process.argv.indexOf(`--${name}`)
