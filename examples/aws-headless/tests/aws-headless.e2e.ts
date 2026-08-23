@@ -47,6 +47,12 @@ describe('aws-headless profile structural smoke', () => {
       expect(occurrences(stdout, "name: '@flinter/dsh-orca'")).toBe(1)
       expect(occurrences(stdout, "name: '@deepseek-ai/dsh-credentials-aws-secrets-manager'")).toBe(1)
       expect(occurrences(stdout, 'amazon-bedrock')).toBe(1)
+      // The S1 segment and searchable-trace plugin mount beside the existing
+      // AWS rows; the dsh-pes row is pinned to the immutable engine producer
+      // SHA, so the pin shows up exactly once in the composed config.
+      expect(occurrences(stdout, "name: '@flinter/dsh-segment'")).toBe(1)
+      expect(occurrences(stdout, "name: '@flinter/dsh-pes'")).toBe(1)
+      expect(occurrences(stdout, 'c05c3fc747f0aa0fcb9d0603009add71c59e091b')).toBe(1)
       // The replaced local credential store stays in the tree, disabled.
       expect(stdout).toMatch(/- id: credentials\n {2}name: '@deepseek-ai\/dsh-credentials-local'\n {2}disabled: true/)
     } finally {
@@ -80,6 +86,11 @@ describe('aws-headless profile structural smoke', () => {
         expect(ctx.llm.listProviders().map(provider => provider.id)).toContain('amazon-bedrock')
         const tools = ctx.tools.schemas().map(schema => schema.name)
         for (const tool of ORCA_TOOL_NAMES) expect(tools).toContain(tool)
+        // The integrated S1 segment + searchable-trace surface registers
+        // beside the AWS rows; tool registration is boot-time proof.
+        for (const tool of ['RUN_BASELINE_PHYSICS', 'search_events', 'find_similar_states', 'find_counterfactuals', 'zoom']) {
+          expect(tools).toContain(tool)
+        }
       } finally {
         await ctx.fiber.dispose()
       }
