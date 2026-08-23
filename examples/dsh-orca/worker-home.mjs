@@ -8,7 +8,8 @@
  *     mode) preset default
  *
  * Model routing:
- *   easy          -> opencode-go / deepseek-v4-flash (DeepSeek via opencode gateway)
+ *   easy          -> deepseek / deepseek-v4-flash   (DeepSeek V4 Flash DIRECT, api.deepseek.com via DEEPSEEK_API_KEY)
+ *   opencode      -> opencode-go / deepseek-v4-flash (explicit gateway fallback, OPENCODE_GO_API_KEY)
  *   easy-backup   -> gmi-serving / deepseek-ai/DeepSeek-V4-Flash-0731
  *   backup        -> alias of easy-backup
  *   hard          -> kimi-coding / k3-256k         (Kimi K3-256K)
@@ -30,8 +31,10 @@ import { join } from 'node:path'
 import { homedir } from 'node:os'
 
 const MODELS = {
-  // easy primary: DeepSeek V4 Flash via the opencode-go gateway.
-  easy: { provider: 'opencode-go', model: 'deepseek-v4-flash' },
+  // easy primary: DeepSeek V4 Flash DIRECT (api.deepseek.com, DEEPSEEK_API_KEY; builtin pi-ai `deepseek` route).
+  easy: { provider: 'deepseek', model: 'deepseek-v4-flash' },
+  // opencode: explicit gateway fallback (opencode.ai/zen/go/v1, OPENCODE_GO_API_KEY).
+  opencode: { provider: 'opencode-go', model: 'deepseek-v4-flash' },
   'easy-backup': { provider: 'gmi-serving', model: 'deepseek-ai/DeepSeek-V4-Flash-0731' },
   backup: { provider: 'gmi-serving', model: 'deepseek-ai/DeepSeek-V4-Flash-0731' },
   // hard primary: Kimi K3-256K (api.kimi.com/coding).
@@ -63,7 +66,7 @@ const sourceSettings = flag('settings', join(homedir(), '.dsh', 'settings.yaml')
 
 const selection = MODELS[model]
 if (selection === undefined) {
-  console.error(`worker-home: unknown --model "${model}" (use easy|easy-backup|backup|hard|kimi|hard-backup|glm-5.3|nadirclaw|nadir-auto|nadir-eco|nadir-premium|nadir-reasoning)`)
+  console.error(`worker-home: unknown --model "${model}" (use easy|opencode|easy-backup|backup|hard|kimi|hard-backup|glm-5.3|nadirclaw|nadir-auto|nadir-eco|nadir-premium|nadir-reasoning)`)
   process.exit(1)
 }
 if (!home) {
