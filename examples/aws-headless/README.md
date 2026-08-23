@@ -36,8 +36,8 @@ one bounded machine-readable JSON summary on stdout:
 - `RUN_BASELINE_PHYSICS` as an **interface check only**: the driver requires
   the honest `abstention: 'prototype_stub'` marker and reports the result as a
   stub-interface check. It is never presented as scientific TowerH success.
-- `search_events` with a deterministic query (`$PES_SEARCH_QUERY`, else the
-  packaged default) against the runtime corpus (`$PES_EVENTS_ENRICHED_JSONL`)
+- `search_events` with deterministic arguments from `$PES_TRACE_TASK_ARGS`
+  (`["--query", "...", "--n", "..."]`, else the packaged defaults) against the runtime corpus (`$PES_EVENTS_ENRICHED_JSONL`)
   and the runtime engine (`$PES_QUERY_COMMAND`, else
   `python3 -m event_index.query`). The driver requires `status: completed`,
   `abstained: false`, bounded results (`count` in `[1, requested_n]` with
@@ -55,17 +55,18 @@ the summary states so (`"scientific_proof": false`).
 ### Entrypoint (the invocation the data-infra runtime supplies)
 
 ```sh
-node --import tsx/esm examples/aws-headless/runtime-driver.js [profile-name]
+node --import tsx/esm examples/aws-headless/runtime-driver.js
 ```
 
-`profile-name` defaults to `aws-headless`. The runtime must supply:
+`PES_TRACE_AWS_PROFILE` selects the profile and defaults to `aws-headless`. The runtime must supply:
 
 | variable | meaning |
 |---|---|
 | `DSH_HOME` | a home whose `profiles/aws-headless` is the materialized assembled profile |
 | `PES_EVENTS_ENRICHED_JSONL` | the events index the engine reads as `--events` (required) |
 | `PES_QUERY_COMMAND` | engine argv as a JSON array; omit for `python3 -m event_index.query` |
-| `PES_SEARCH_QUERY` | deterministic search query (default `cup acquisition`) |
+| `PES_TRACE_TASK_ARGS` | JSON string array accepting `--query` and `--n` once each; defaults to `cup acquisition` and `3` |
+| `PES_TRACE_AWS_PROFILE` | assembled profile name (default `aws-headless`) |
 | `PES_ARTIFACTS_ROOT` | optional artifact root for `source_path` verification |
 | `PES_TRACE_*` | optional trace transport + ancestry; when configured, emission must be `accepted` |
 

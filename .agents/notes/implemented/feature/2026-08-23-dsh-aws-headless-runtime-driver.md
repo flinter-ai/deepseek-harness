@@ -81,7 +81,7 @@ own destination; the driver requires the emitter's runtime-reported
   `x-webhook-signature`, matching the CP webhook-verify convention), and the
   aws-headless line now has a deterministic runtime semantic/trace E2E with a
   documented entrypoint
-  (`node --import tsx/esm examples/aws-headless/runtime-driver.js [profile-name]`)
+  (`node --import tsx/esm examples/aws-headless/runtime-driver.js`) reads the runtime-owned profile and deterministic query arguments from `PES_TRACE_AWS_PROFILE` and `PES_TRACE_TASK_ARGS`.
   and an exit-code contract the data-infra G3/G4 runtime can invoke.
 - The driver makes no AWS/provider call and no LLM call; `DSH_COMMIT`,
   control-plane code, credentials, and the dsh-pes/dsh-segment tool semantics

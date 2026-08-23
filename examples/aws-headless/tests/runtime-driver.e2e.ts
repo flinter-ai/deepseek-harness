@@ -151,6 +151,8 @@ function traceEnv(receiver: TraceReceiver): Record<string, string> {
     PES_TRACE_JOB_OUTPUT_ID: TRACE_CONTEXT.jobOutputId,
     PES_TRACE_ARTIFACT_ID: TRACE_CONTEXT.artifactId,
     PES_TRACE_RUN_ORDINAL_BASE: '0',
+    PES_TRACE_AWS_PROFILE: 'aws-headless',
+    PES_TRACE_TASK_ARGS: '["--query","cup acquisition","--n","2"]',
   }
 }
 
@@ -164,7 +166,7 @@ describe('aws-headless runtime semantic/trace E2E driver', () => {
         binScript: driverBin,
         libBinScript: driverBin,
         configPath: driverBin,
-        binArgs: ['aws-headless'],
+        binArgs: [],
         tsconfigPath,
         prepare: async (cwd) => { await materializeProfile(join(cwd, '.dsh')) },
         env: {
@@ -172,7 +174,6 @@ describe('aws-headless runtime semantic/trace E2E driver', () => {
           PES_QUERY_COMMAND: JSON.stringify([process.execPath, stubEngine]),
           PES_EVENTS_ENRICHED_JSONL: eventsPath,
           PES_ARTIFACTS_ROOT: artifactsRoot,
-          PES_SEARCH_QUERY: 'cup acquisition',
           ...traceEnv(receiver),
         },
       })
@@ -196,6 +197,7 @@ describe('aws-headless runtime semantic/trace E2E driver', () => {
           bounded: true,
           artifact_verification: 'verified',
           engine_pin: ENGINE_PIN,
+          requested_n: 2,
         },
         trace_emission: { configured: true, status: 'accepted' },
         exit_code: 0,
@@ -285,6 +287,16 @@ describe('aws-headless runtime semantic/trace E2E driver', () => {
           },
           reason: /accepted/,
         },
+        {
+          name: 'invalid-task-args',
+          expectedExit: 1,
+          env: {
+            PES_QUERY_COMMAND: JSON.stringify([process.execPath, stubEngine]),
+            PES_EVENTS_ENRICHED_JSONL: eventsPath,
+            PES_TRACE_TASK_ARGS: '["--unknown","value"]',
+          },
+          reason: /PES_TRACE_TASK_ARGS/,
+        },
       ]
 
       for (const failure of cases) {
@@ -302,7 +314,6 @@ describe('aws-headless runtime semantic/trace E2E driver', () => {
           },
           env: {
             AWS_EC2_METADATA_DISABLED: 'true',
-            PES_SEARCH_QUERY: 'cup acquisition',
             ...failure.env,
           },
         })

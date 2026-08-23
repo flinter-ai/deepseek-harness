@@ -16,24 +16,25 @@
 `runtime-driver.js` 是云 worker 针对**真实组装后的 profile**（绝不是缩水的 fixture 配置）调用的可复用运行时任务。它只驱动两个工具，不做任何 LLM/模型决策，并在 stdout 上恰好输出一行有界、机器可读的 JSON 摘要：
 
 - `RUN_BASELINE_PHYSICS` 仅作为**接口检查**：驱动要求诚实的 `abstention: 'prototype_stub'` 标记，并把结果报告为 stub 接口检查——绝不呈现为科学的 TowerH 成功。
-- `search_events` 使用确定性查询（`$PES_SEARCH_QUERY`，否则用打包默认值）针对运行时语料（`$PES_EVENTS_ENRICHED_JSONL`）与运行时引擎（`$PES_QUERY_COMMAND`，否则 `python3 -m event_index.query`）。驱动要求 `status: completed`、`abstained: false`、有界结果（`count` 在 `[1, requested_n]` 且数组一致）、`provenance.engine_pin` 中固定的 producer 引擎 `c05c3fc747f0aa0fcb9d0603009add71c59e091b`，并且当配置了 `$PES_TRACE_*` 传输时，completed 结果的自动 trace 发射必须为 `accepted`。
+- `search_events` 使用 `$PES_TRACE_TASK_ARGS` 中的确定性参数（`["--query", "...", "--n", "..."]`，否则用打包默认值）针对运行时语料（`$PES_EVENTS_ENRICHED_JSONL`）与运行时引擎（`$PES_QUERY_COMMAND`，否则 `python3 -m event_index.query`）。驱动要求 `status: completed`、`abstained: false`、有界结果（`count` 在 `[1, requested_n]` 且数组一致）、`provenance.engine_pin` 中固定的 producer 引擎 `c05c3fc747f0aa0fcb9d0603009add71c59e091b`，并且当配置了 `$PES_TRACE_*` 传输时，completed 结果的自动 trace 发射必须为 `accepted`。
 
 生产模式绝不回退到测试 fixture 引擎：引擎接缝只解析 `$PES_QUERY_COMMAND` 或打包默认命令，不可用的引擎会以结构化 `engine-*` 失败浮出并使本次运行失败。这是 runtime semantic/trace E2E——不是科学的 TowerH 证明——摘要也明确声明（`"scientific_proof": false`）。
 
 ### 入口（data-infra 运行时需提供的调用）
 
 ```sh
-node --import tsx/esm examples/aws-headless/runtime-driver.js [profile-name]
+node --import tsx/esm examples/aws-headless/runtime-driver.js
 ```
 
-`profile-name` 默认为 `aws-headless`。运行时必须提供：
+`PES_TRACE_AWS_PROFILE` 选择 profile，默认为 `aws-headless`。运行时必须提供：
 
 | 变量 | 含义 |
 |---|---|
 | `DSH_HOME` | 其 `profiles/aws-headless` 为已组装 profile 的 home |
 | `PES_EVENTS_ENRICHED_JSONL` | 引擎以 `--events` 读取的事件索引（必需） |
 | `PES_QUERY_COMMAND` | JSON 数组形式的引擎 argv；省略则用 `python3 -m event_index.query` |
-| `PES_SEARCH_QUERY` | 确定性搜索查询（默认 `cup acquisition`） |
+| `PES_TRACE_TASK_ARGS` | JSON 字符串数组；`--query` 和 `--n` 各最多一次，默认值为 `cup acquisition` 与 `3` |
+| `PES_TRACE_AWS_PROFILE` | 组装后的 profile 名称（默认 `aws-headless`） |
 | `PES_ARTIFACTS_ROOT` | 可选的 artifact 根，用于 `source_path` 校验 |
 | `PES_TRACE_*` | 可选的 trace 传输与 ancestry；配置后发射必须为 `accepted` |
 

@@ -55,7 +55,7 @@ loud，而不是通过缩水配置；fixture 仅限测试。
 - double-prime 分支携带已评审的签名修复（头部现为 `x-webhook-signature`，与 CP
   webhook-verify 约定一致），aws-headless 线现在拥有确定性的 runtime semantic/trace E2E，
   并带文档化的入口
-  （`node --import tsx/esm examples/aws-headless/runtime-driver.js [profile-name]`）
+  （`node --import tsx/esm examples/aws-headless/runtime-driver.js`）从运行时所有的 `PES_TRACE_AWS_PROFILE` 与 `PES_TRACE_TASK_ARGS` 读取 profile 和确定性查询参数。
   与 data-infra G3/G4 运行时可以调用的退出码契约。
 - 驱动不做任何 AWS/provider 调用，也不做任何 LLM 调用；`DSH_COMMIT`、控制平面代码、
   凭据以及 dsh-pes/dsh-segment 工具语义均不变。

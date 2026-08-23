@@ -9,8 +9,9 @@
  * - `RUN_BASELINE_PHYSICS` as an INTERFACE CHECK ONLY: the driver requires the
  *   honest `abstention: 'prototype_stub'` marker and reports the result as a
  *   stub-interface check. It is never presented as scientific TowerH success.
- * - `search_events` with a deterministic query (`$PES_SEARCH_QUERY`, else the
- *   packaged default) against the runtime-provided corpus
+ * - `search_events` with deterministic arguments from
+ *   `$PES_TRACE_TASK_ARGS` (`["--query", "...", "--n", "..."]`, else the
+ *   packaged defaults) against the runtime-provided corpus
  *   (`$PES_EVENTS_ENRICHED_JSONL`, passed to the engine as `--events`) and the
  *   runtime engine command (`$PES_QUERY_COMMAND`, else
  *   `python3 -m event_index.query`). The driver requires `status: completed`,
@@ -40,14 +41,14 @@
  * Entrypoint (the invocation the data-infra runtime must supply):
  *
  * ```sh
- * node --import tsx/esm examples/aws-headless/runtime-driver.js [profile-name]
+ * node --import tsx/esm examples/aws-headless/runtime-driver.js
  * ```
  *
  * with `DSH_HOME` pointing at a home whose `profiles/aws-headless` is
  * materialized (the assembled profile), plus the runtime environment:
  * `PES_EVENTS_ENRICHED_JSONL` (corpus), `PES_QUERY_COMMAND` (engine; omit for
- * the packaged default), `PES_SEARCH_QUERY` (deterministic query), and the
- * optional `PES_TRACE_*` transport/ancestry variables.
+ * the packaged default), and the `PES_TRACE_*` profile, deterministic task
+ * arguments, transport, and ancestry variables.
  */
 
 import { existsSync } from 'node:fs'
@@ -60,7 +61,7 @@ import { CallId } from '@deepseek-ai/dsh-llm'
 
 const NAME = 'aws-headless-runtime-driver'
 const [profileNameArg] = process.argv.slice(2)
-const profileName = profileNameArg ?? 'aws-headless'
+const profileName = process.env.PES_TRACE_AWS_PROFILE ?? profileNameArg ?? 'aws-headless'
 const INSTALL_ANCHOR = fileURLToPath(new URL('../../apps/cli/package.json', import.meta.url))
 
 const RUN_BASELINE_PHYSICS = 'RUN_BASELINE_PHYSICS'
@@ -68,7 +69,7 @@ const SEARCH_EVENTS = 'search_events'
 const EXPECTED_ENGINE_PIN = 'c05c3fc747f0aa0fcb9d0603009add71c59e091b'
 const EXPECTED_PES_PLUGIN = '@flinter/dsh-pes'
 const DEFAULT_SEARCH_QUERY = 'cup acquisition'
-const SEARCH_N = 3
+const DEFAULT_SEARCH_N = 3
 const REQUESTED_BUDGET = 12
 
 const SUMMARY_SCHEMA = 'aws-headless-runtime-semantic-trace-e2e.v1'
@@ -104,6 +105,39 @@ function boundedReason(error) {
     : singleLine
 }
 
+/** Parse the control-plane-owned deterministic search arguments. */
+function parseTaskArgs(raw) {
+  if (raw === undefined || raw === '') {
+    return { query: DEFAULT_SEARCH_QUERY, searchN: DEFAULT_SEARCH_N }
+  }
+  const args = JSON.parse(raw)
+  if (!Array.isArray(args) || !args.every(argument => typeof argument === 'string')) {
+    throw new Error('PES_TRACE_TASK_ARGS must be a JSON array of strings')
+  }
+  let query = DEFAULT_SEARCH_QUERY
+  let searchN = DEFAULT_SEARCH_N
+  const seen = new Set()
+  for (let index = 0; index < args.length; index += 2) {
+    const flag = args[index]
+    const value = args[index + 1]
+    if ((flag !== '--query' && flag !== '--n') || value === undefined || seen.has(flag)) {
+      throw new Error('PES_TRACE_TASK_ARGS accepts each of --query and --n at most once')
+    }
+    seen.add(flag)
+    if (flag === '--query') {
+      if (value.trim() === '') throw new Error('PES_TRACE_TASK_ARGS --query must not be empty')
+      query = value
+    } else {
+      const parsed = Number(value)
+      if (!Number.isInteger(parsed) || parsed < 1 || parsed > 20) {
+        throw new Error('PES_TRACE_TASK_ARGS --n must be an integer from 1 to 20')
+      }
+      searchN = parsed
+    }
+  }
+  return { query, searchN }
+}
+
 const uninstallFailLoud = installFailLoud(NAME)
 let ctx
 let outcome = { code: EXIT.boot, reason: 'driver did not run' }
@@ -122,7 +156,7 @@ try {
     }
   } else {
     const traceConfigured = process.env.PES_TRACE_CALLBACK_URL !== undefined
-    const query = process.env.PES_SEARCH_QUERY ?? DEFAULT_SEARCH_QUERY
+    const { query, searchN } = parseTaskArgs(process.env.PES_TRACE_TASK_ARGS)
 
     // Trace emission outcomes reported by the plugin's runtime-owned emitter,
     // captured through the root logger exporter (status + deterministic id;
@@ -190,7 +224,7 @@ try {
           signal,
           callId: CallId('runtime-driver-search-events'),
           name: SEARCH_EVENTS,
-          arguments: { query, n: SEARCH_N },
+          arguments: { query, n: searchN },
         })
         if (search.isError) {
           outcome = { code: EXIT.boot, reason: `${SEARCH_EVENTS} returned an error result on the surface` }
@@ -227,13 +261,13 @@ try {
               const bounded = value.bounded === true
                 && Number.isInteger(value.count)
                 && value.count >= 1
-                && value.count <= SEARCH_N
+                && value.count <= searchN
                 && Array.isArray(eventIds)
                 && Array.isArray(events)
                 && eventIds.length === value.count
                 && events.length === value.count
               if (!bounded) {
-                outcome = { code: EXIT.boot, reason: `${SEARCH_EVENTS} result is not bounded (count/arrays inconsistent with n=${SEARCH_N})` }
+                outcome = { code: EXIT.boot, reason: `${SEARCH_EVENTS} result is not bounded (count/arrays inconsistent with n=${searchN})` }
               } else {
                 const traceOutcome = traceOutcomes[traceOutcomes.length - 1]
                 if (traceConfigured && (traceOutcome === undefined || traceOutcome.status !== 'accepted')) {
@@ -252,7 +286,7 @@ try {
                       scientific_proof: false,
                       profile: profileName,
                       corpus: basename(eventsPath),
-                      run: { query, requested_n: SEARCH_N },
+                      run: { query, requested_n: searchN },
                       baseline_physics: {
                         status: baselineValue.status,
                         abstention: baselineValue.abstention,
@@ -262,7 +296,7 @@ try {
                         status: value.status,
                         abstained: value.abstained,
                         count: value.count,
-                        requested_n: SEARCH_N,
+                        requested_n: searchN,
                         bounded: true,
                         artifact_verification: value.artifact_verification,
                         engine_pin: provenance.engine_pin,
