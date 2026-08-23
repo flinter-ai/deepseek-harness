@@ -6,7 +6,7 @@
 import type { PesResult } from './query.js'
 import type { TraceAncestryContext } from './trace-record.js'
 
-export const SIGNATURE_HEADER: 'x-dsh-signature'
+export const SIGNATURE_HEADER: 'x-webhook-signature'
 export const TRACE_POST_CONTENT_TYPE: 'application/json'
 export const TRACE_USER_AGENT: string
 export const DEFAULT_TRACE_POST_TIMEOUT_MS: 10_000

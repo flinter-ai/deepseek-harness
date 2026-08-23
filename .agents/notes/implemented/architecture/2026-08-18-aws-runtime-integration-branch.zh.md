@@ -28,3 +28,9 @@
 **用一个简单 prompt 启动 headless profile。** headless bundle 是一次性运行器：loader 就绪后会创建 agent 并调用默认模型，把结构检查变成真实的 Bedrock 调用。因此冒烟只基于 `dsh-base` 组合，且不创建任何 agent。
 
 **对凭证 provider 使用 `instanceof`。** 测试通过 tsconfig `paths` 门面导入包的源码，而 Loader 通过 package exports 解析到 `lib/`；两个平面的类对象不同，因此断言使用 `constructor.name`。
+
+## Consequences
+
+- `flinter/aws-runtime` 是唯一组装三条能力分支的主干；兄弟特性分支与 `master` 从不携带该组合。
+- 无密钥结构性冒烟以零 AWS 调用、零凭据证明该组合：组合与启动闸门断言组装后的行与干净释放，且环境被剥去所有 `AWS_*` 变量并禁用 IMDS，使启动时的云调用会立即失败。
+- 需要真实凭证的 live 冒烟与任何真实 AWS 请求仍是单独的、更靠后、受控的测试。

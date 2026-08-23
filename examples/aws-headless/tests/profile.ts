@@ -5,7 +5,7 @@
  * `dsh plugin --profile aws-headless add <path>` uses.
  */
 
-import { copyFile, mkdir, symlink, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, readFile, symlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -20,14 +20,29 @@ export const TSCONFIG = join(REPO_ROOT, 'tsconfig.json')
  * Copy the template into `<home>/profiles/aws-headless` and link the two
  * profile packages outside the dependency closure.
  * @param home - the temporary DSH_HOME.
+ * @param options - `enginePin: false` rewrites the user patch so the dsh-pes
+ *   row mounts WITHOUT the engine_pin block — a failure-classification
+ *   fixture proving the runtime driver exits nonzero for malformed provenance
+ *   (production always pins the immutable producer SHA).
  * @returns the materialized profile directory.
  */
-export async function materializeProfile(home: string): Promise<string> {
+export async function materializeProfile(home: string, options: { enginePin?: boolean } = {}): Promise<string> {
+  const { enginePin = true } = options
   const profileDir = join(home, 'profiles', 'aws-headless')
   await mkdir(join(profileDir, 'node_modules', '@flinter'), { recursive: true })
   await mkdir(join(profileDir, 'node_modules', '@deepseek-ai'), { recursive: true })
   await copyFile(join(PROFILE_TEMPLATE, 'package.json'), join(profileDir, 'package.json'))
-  await copyFile(join(PROFILE_TEMPLATE, 'cordis.patch.yml'), join(profileDir, 'cordis.patch.yml'))
+  let patchText = await readFile(join(PROFILE_TEMPLATE, 'cordis.patch.yml'), 'utf8')
+  if (!enginePin) {
+    patchText = patchText.replace(
+      /# The dsh-pes bundle mounts the searchable-trace plugin[\s\S]*?engine_pin: '[0-9a-f]{40}'\n/,
+      '# Failure-classification fixture: the dsh-pes row mounts WITHOUT the\n'
+      + '# engine_pin pin, so the runtime driver must exit nonzero for malformed\n'
+      + '# provenance (production always pins the immutable producer SHA).\n'
+      + '- id: dsh-pes\n',
+    )
+  }
+  await writeFile(join(profileDir, 'cordis.patch.yml'), patchText)
   await symlink(join(REPO_ROOT, 'examples/dsh-orca'), join(profileDir, 'node_modules', '@flinter', 'dsh-orca'), 'dir')
   await linkProfilePackage(profileDir, '@flinter', 'dsh-segment', join(REPO_ROOT, 'examples/dsh-segment'))
   await linkProfilePackage(profileDir, '@flinter', 'dsh-pes', join(REPO_ROOT, 'examples/dsh-pes'))

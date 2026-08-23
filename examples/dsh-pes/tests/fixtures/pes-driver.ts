@@ -17,7 +17,7 @@
  * localhost receiver, points $PES_TRACE_* at it (callback + HMAC secret +
  * ancestry), and after driving the tools asserts exactly one CP searchable
  * trace record per DISTINCT completed result — canonical compact bytes in the
- * committed key order, HMAC-SHA256 `x-dsh-signature` over the exact body,
+ * committed key order, HMAC-SHA256 `x-webhook-signature` over the exact body,
  * deterministic ids, and run ordinals 0..3. The identical second call of each
  * tool is deduplicated in-process (at-most-once), and the malformed/error and
  * registry-rejected calls emit nothing.
@@ -48,6 +48,7 @@ import {
   DEFAULT_PRODUCER_SHA,
   TRACE_RECORD_KEYS,
 } from '../../trace-record.js'
+import { SIGNATURE_HEADER } from '../../trace.js'
 
 const NAME = 'pes-driver'
 const [configPath] = process.argv.slice(2)
@@ -118,9 +119,9 @@ function assertTraceEmission(receiver: TraceReceiver): void {
     if (record.method !== 'POST') {
       throw new Error(`${NAME}: trace record ${index} used method ${String(record.method)} instead of POST`)
     }
-    const signature = record.headers['x-dsh-signature']
+    const signature = record.headers[SIGNATURE_HEADER]
     if (typeof signature !== 'string' || signature === '') {
-      throw new Error(`${NAME}: trace record ${index} is missing the x-dsh-signature header`)
+      throw new Error(`${NAME}: trace record ${index} is missing the ${SIGNATURE_HEADER} header`)
     }
     const expectedSignature = createHmac('sha256', TRACE_SECRET).update(record.body).digest('hex')
     if (signature !== expectedSignature) {

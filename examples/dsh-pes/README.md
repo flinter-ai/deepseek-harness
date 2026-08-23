@@ -98,10 +98,10 @@ and can never select or observe its own destination.
   transport without the ancestry fields, fails loud at load; absent both keeps
   the emitter disabled.
 - **Signature.** HMAC-SHA256 over the exact JSON body bytes, header
-  `x-dsh-signature` lowercase hex (the convention selected by the T1 CP
-  producer seam). The serializer/signer are pure functions, so T1/T2 byte
-  equivalence is testable without importing control-plane packages or sibling
-  repositories.
+  `x-webhook-signature` lowercase hex (the CP webhook-verify convention the
+  T1 producer seam reads). The serializer/signer are pure functions, so T1/T2
+  byte equivalence is testable without importing control-plane packages or
+  sibling repositories.
 - **Honest semantics.** Emission is at-most-once per distinct completed result
   in-process (an identical repeat reports `duplicate` and never re-POSTs), and
   abstained/error results never emit — the committed trace contract defines no
@@ -142,8 +142,10 @@ and can never select or observe its own destination.
   remain NOT_RUN (see the producer roadmap).
 - **AWS-headless composition**: the aws-headless profile mounts this plugin
   beside dsh-segment S0+S1 and pins `config.engine_pin` to the producer SHA
-  above. `DSH_COMMIT`, control-plane code, and credentials remain separate
-  from the plugin composition.
+  above (completed by the aws-runtime integration); the runtime driver
+  (`examples/aws-headless/runtime-driver.js`) boots the real assembled profile
+  and runs the semantic/trace E2E against it. `DSH_COMMIT`, control-plane
+  code, and credentials remain separate from the plugin composition.
 - **Real CP route**: posting to the actual `/webhooks/dsh-worker/trace` route
   (the T1 producer seam), real Postgres FK ancestry, and any cloud resource
   remain NOT_RUN in this plugin's tests; the emitter's localhost receiver and
