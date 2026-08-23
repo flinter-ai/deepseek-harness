@@ -1,0 +1,388 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`aws-headless assembled profile snapshot > records the keyless provider and tool composition 1`] = `
+{
+  "credentials": "AwsSecretsManagerCredentialProvider",
+  "providers": [
+    "amazon-bedrock",
+    "deepseek-official",
+  ],
+  "tools": [
+    {
+      "name": "agentbox_launch",
+      "properties": [
+        "action",
+        "deployment",
+        "endpoint",
+        "task_id",
+        "template",
+      ],
+      "required": [
+        "action",
+      ],
+    },
+    {
+      "name": "bash",
+      "properties": [
+        "command",
+        "description",
+        "justification",
+        "run_in_background",
+        "sandbox_permissions",
+        "timeoutMs",
+        "workdir",
+      ],
+      "required": [
+        "command",
+        "description",
+      ],
+    },
+    {
+      "name": "create_goal",
+      "properties": [
+        "max_goal_rounds",
+        "objective",
+      ],
+      "required": [
+        "objective",
+      ],
+    },
+    {
+      "name": "edit",
+      "properties": [
+        "file_path",
+        "justification",
+        "new_string",
+        "old_string",
+        "replace_all",
+        "sandbox_permissions",
+      ],
+      "required": [
+        "file_path",
+        "new_string",
+        "old_string",
+      ],
+    },
+    {
+      "name": "exit_plan_mode",
+      "properties": [
+        "plan",
+      ],
+      "required": [
+        "plan",
+      ],
+    },
+    {
+      "name": "find_counterfactuals",
+      "properties": [
+        "holding",
+        "n",
+        "on_surface",
+        "outcome",
+      ],
+      "required": [
+        "outcome",
+      ],
+    },
+    {
+      "name": "find_similar_states",
+      "properties": [
+        "holding",
+        "n",
+        "on_surface",
+      ],
+      "required": [],
+    },
+    {
+      "name": "get_goal",
+      "properties": [],
+      "required": [],
+    },
+    {
+      "name": "glob",
+      "properties": [
+        "path",
+        "pattern",
+      ],
+      "required": [
+        "pattern",
+      ],
+    },
+    {
+      "name": "grep",
+      "properties": [
+        "include",
+        "path",
+        "pattern",
+      ],
+      "required": [
+        "pattern",
+      ],
+    },
+    {
+      "name": "interrupt_agent",
+      "properties": [
+        "agent_id",
+      ],
+      "required": [
+        "agent_id",
+      ],
+    },
+    {
+      "name": "job_kill",
+      "properties": [
+        "job_id",
+        "reason",
+      ],
+      "required": [
+        "job_id",
+      ],
+    },
+    {
+      "name": "job_list",
+      "properties": [],
+      "required": [],
+    },
+    {
+      "name": "job_output",
+      "properties": [
+        "job_id",
+        "timeout_ms",
+        "wait",
+      ],
+      "required": [
+        "job_id",
+      ],
+    },
+    {
+      "name": "list_agents",
+      "properties": [
+        "scope",
+      ],
+      "required": [],
+    },
+    {
+      "name": "orca_ask",
+      "properties": [
+        "block",
+        "options",
+        "question",
+        "timeout_ms",
+      ],
+      "required": [
+        "question",
+      ],
+    },
+    {
+      "name": "orca_check_inbox",
+      "properties": [
+        "ack_delivery_id",
+      ],
+      "required": [],
+    },
+    {
+      "name": "orca_heartbeat",
+      "properties": [],
+      "required": [],
+    },
+    {
+      "name": "ralph",
+      "properties": [
+        "maxRounds",
+        "objective",
+      ],
+      "required": [
+        "objective",
+      ],
+    },
+    {
+      "name": "read",
+      "properties": [
+        "file_path",
+        "limit",
+        "offset",
+      ],
+      "required": [
+        "file_path",
+      ],
+    },
+    {
+      "name": "read_image",
+      "properties": [
+        "file_path",
+      ],
+      "required": [
+        "file_path",
+      ],
+    },
+    {
+      "name": "RUN_BASELINE_PHYSICS",
+      "properties": [
+        "budget",
+        "window",
+      ],
+      "required": [
+        "window",
+      ],
+    },
+    {
+      "name": "search_events",
+      "properties": [
+        "n",
+        "query",
+      ],
+      "required": [
+        "query",
+      ],
+    },
+    {
+      "name": "send_message",
+      "properties": [
+        "message",
+        "subagent_id",
+      ],
+      "required": [
+        "message",
+        "subagent_id",
+      ],
+    },
+    {
+      "name": "skill",
+      "properties": [
+        "name",
+      ],
+      "required": [
+        "name",
+      ],
+    },
+    {
+      "name": "str_replace_editor",
+      "properties": [
+        "command",
+        "file_text",
+        "insert_line",
+        "new_str",
+        "old_str",
+        "path",
+        "view_range",
+      ],
+      "required": [
+        "command",
+        "path",
+      ],
+    },
+    {
+      "name": "subagent",
+      "properties": [
+        "description",
+        "prompt",
+        "run_in_background",
+      ],
+      "required": [
+        "description",
+        "prompt",
+      ],
+    },
+    {
+      "name": "subagent_fork",
+      "properties": [
+        "description",
+        "prompt",
+        "run_in_background",
+      ],
+      "required": [
+        "description",
+        "prompt",
+      ],
+    },
+    {
+      "name": "todo_write",
+      "properties": [
+        "todos",
+      ],
+      "required": [
+        "todos",
+      ],
+    },
+    {
+      "name": "update_goal",
+      "properties": [
+        "action",
+        "blocked_reason",
+        "goal_id",
+        "max_goal_rounds",
+        "objective",
+        "revision",
+      ],
+      "required": [
+        "action",
+        "goal_id",
+        "revision",
+      ],
+    },
+    {
+      "name": "web_search",
+      "properties": [
+        "query",
+      ],
+      "required": [
+        "query",
+      ],
+    },
+    {
+      "name": "worker_done",
+      "properties": [
+        "dependencies",
+        "files_modified",
+        "gates",
+        "outcome",
+        "report_path",
+        "summary",
+        "tests",
+      ],
+      "required": [
+        "outcome",
+        "summary",
+      ],
+    },
+    {
+      "name": "workflow",
+      "properties": [
+        "args",
+        "meta",
+        "script",
+      ],
+      "required": [
+        "meta",
+        "script",
+      ],
+    },
+    {
+      "name": "write",
+      "properties": [
+        "content",
+        "file_path",
+        "justification",
+        "sandbox_permissions",
+      ],
+      "required": [
+        "content",
+        "file_path",
+      ],
+    },
+    {
+      "name": "zoom",
+      "properties": [
+        "episode",
+        "t_end",
+        "t_start",
+      ],
+      "required": [
+        "episode",
+        "t_end",
+        "t_start",
+      ],
+    },
+  ],
+}
+`;

@@ -1,0 +1,24 @@
+{
+  "uid": "u_TEST0002",
+  "n_frames": 12,
+  "canon_map": {},
+  "_fixture_note": "SYNTHETIC — hand-written to the documented scanner contract. Failed episode: the cup leaves the surface without ever being held (support loss at frame 6); heuristic outcome must derive 'failure'.",
+  "states": {
+    "0":  {"holding": [], "on_surface": ["cup"]},
+    "1":  {"holding": [], "on_surface": ["cup"]},
+    "2":  {"holding": [], "on_surface": ["cup"]},
+    "3":  {"holding": [], "on_surface": ["cup"]},
+    "4":  {"holding": [], "on_surface": ["cup"]},
+    "5":  {"holding": [], "on_surface": ["cup"]},
+    "6":  {"holding": [], "on_surface": []},
+    "7":  {"holding": [], "on_surface": []},
+    "8":  {"holding": [], "on_surface": []},
+    "9":  {"holding": [], "on_surface": []},
+    "10": {"holding": [], "on_surface": []},
+    "11": {"holding": [], "on_surface": []}
+  },
+  "delta": {"0": 0, "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 1, "7": 0, "8": 0, "9": 0, "10": 0, "11": 0},
+  "cps": [
+    {"frame": 6, "d": 1, "family_hint": "support", "hold_before": [], "hold_after": [], "surf_before": ["cup"], "surf_after": []}
+  ]
+}

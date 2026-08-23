@@ -5,7 +5,9 @@
     "profile": {
       "bundles": [
         "@deepseek-ai/dsh-base",
-        "@flinter/dsh-orca"
+        "@flinter/dsh-orca",
+        "@flinter/dsh-segment",
+        "@flinter/dsh-pes"
       ]
     }
   }

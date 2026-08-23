@@ -29,6 +29,8 @@ export async function materializeProfile(home: string): Promise<string> {
   await copyFile(join(PROFILE_TEMPLATE, 'package.json'), join(profileDir, 'package.json'))
   await copyFile(join(PROFILE_TEMPLATE, 'cordis.patch.yml'), join(profileDir, 'cordis.patch.yml'))
   await symlink(join(REPO_ROOT, 'examples/dsh-orca'), join(profileDir, 'node_modules', '@flinter', 'dsh-orca'), 'dir')
+  await linkProfilePackage(profileDir, '@flinter', 'dsh-segment', join(REPO_ROOT, 'examples/dsh-segment'))
+  await linkProfilePackage(profileDir, '@flinter', 'dsh-pes', join(REPO_ROOT, 'examples/dsh-pes'))
   await linkProfilePackage(
     profileDir,
     '@deepseek-ai',

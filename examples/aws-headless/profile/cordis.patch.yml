@@ -22,3 +22,11 @@
   config:
     providers:
       amazon-bedrock: {}
+
+# The dsh-pes bundle mounts the searchable-trace plugin; this profile pins its
+# engine to the immutable producer SHA so every tool result carries the pin in
+# provenance.engine_pin. The engine itself is spawned through the configured
+# command seam at call time, never bundled here.
+- id: dsh-pes
+  config:
+    engine_pin: 'c05c3fc747f0aa0fcb9d0603009add71c59e091b'
