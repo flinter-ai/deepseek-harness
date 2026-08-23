@@ -168,7 +168,8 @@ export function serializeTraceRecord(record) {
 
 /**
  * HMAC-SHA256 signature over the EXACT JSON body bytes, lowercase hex — the
- * `x-dsh-signature` header convention selected by the T1 producer seam.
+ * `x-webhook-signature` header convention (the CP webhook-verify convention
+ * the T1 producer seam reads).
  * Pure over the bytes: same body + secret always yield the same signature.
  * @param body - the exact UTF-8 JSON bytes to sign.
  * @param secret - the runtime-owned HMAC secret.

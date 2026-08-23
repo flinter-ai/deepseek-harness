@@ -28,3 +28,14 @@ Neither gate requires credentials, and neither dispatches an AWS request. A cred
 **Boot the headless profile with a trivial prompt.** The headless bundle is a one-shot runner: once the loader settles it creates an agent and calls the default model, turning a structural check into a live Bedrock call. The smoke therefore composes over `dsh-base` only and never creates an agent.
 
 **`instanceof` on the credentials provider.** The test imports package sources through the tsconfig `paths` facade while the Loader resolves package exports to `lib/`; the two class objects differ across planes, so the assertion uses `constructor.name`.
+
+## Consequences
+
+- `flinter/aws-runtime` is the only trunk that composes the three capability
+  branches; sibling feature branches and `master` never carry the composition.
+- The keyless structural smoke proves the composition with zero AWS calls and
+  no credentials: the composition and boot gates assert the composed rows and
+  clean disposal, and the environment is stripped of every `AWS_*` variable
+  with IMDS disabled, so a boot-time cloud call would fail loud.
+- A credential-aware live smoke and any real AWS request remain separate,
+  later, gated tests.

@@ -54,7 +54,7 @@ config: {
 
 - **线上记录（`trace-record.js`，纯接缝）。** 规范键序 `organizationId, projectId, episodeId, jobId, irId, jobOutputId, artifactId, runOrdinal, traceKind, summaryText, producerSha, schemaVersion, id`，紧凑 JSON。`traceKind` 是被调用的工具名；`summaryText` 是有界（≤ 2000 字符）的确定性投影；`producerSha` 是 `config.engine_pin`，否则是已提交的引擎 commit `c05c3fc…`（永远是**引擎** commit，绝不是 AWS 运行时修订）；`id` 是 `tr_<sha256(organizationId:irId:runOrdinal)>` 的前 24 个十六进制字符，与已提交的 CP 推导一致，因此 CP 重放是幂等的。
 - **传输归属。** 回调 URL 与 HMAC 密钥只通过经过校验的插件配置或 `PES_TRACE_*` 环境到达——绝不通过工具/模型请求字段。只配置 URL/密钥中的任一个，或在未配置 ancestry 字段时开启传输，都会在加载时 fail loud；两者都缺则发射器保持禁用。
-- **签名。** 对精确 JSON 请求体字节做 HMAC-SHA256，头部 `x-dsh-signature` 小写十六进制（T1 CP producer 接缝选定的约定）。序列化器/签名器是纯函数，因此 T1/T2 字节等价性可以在不导入控制平面包或兄弟仓库的情况下测试。
+- **签名。** 对精确 JSON 请求体字节做 HMAC-SHA256，头部 `x-webhook-signature` 小写十六进制（CP webhook-verify 约定，T1 producer 接缝读取该头部）。序列化器/签名器是纯函数，因此 T1/T2 字节等价性可以在不导入控制平面包或兄弟仓库的情况下测试。
 - **诚实的语义。** 发射在进程内对每个不同的 completed 结果至多一次（相同重复报告 `duplicate`，绝不重复 POST）；abstained/error 结果绝不发射——已提交的 trace 契约没有为它们定义 traceKind。传输失败被分类——accepted（2xx）、validation-rejected（400）、unauthorized（401）、conflict（409）、rejected（其它 4xx）、unavailable（5xx/503）、unreachable（网络）、unexpected——并且绝不改变或失败科学结果。密钥与签名永不打印或持久化。
 
 | config | env | 默认 | 含义 |
@@ -76,7 +76,7 @@ config: {
 - **运行时引擎打包**：让 `python3 -m event_index.query` 在部署时可导入（包含 `event_index` 包及其数据文件的 wheel/镜像层）属于部署工作，不是本插件 PR。在此之前，无法导入的引擎会以结构化 `engine-nonzero-exit` / `engine-unavailable` 结果呈现——绝不是一个静默的空答案。
 - **不可变 producer 钉扎**：引擎 producer SHA `c05c3fc747f0aa0fcb9d0603009add71c59e091b` 在此作为 provenance 文档记录；部署通过 `config.engine_pin` 钉扎，它会流入每个结果的 `provenance.engine_pin`。钉扎由打包环节落实，不由本 PR。
 - **真实后端**：真实 TowerH 扫描、真实结局标签、RDS `005_experience_events`、Octen embeddings，以及任何 AWS/provider 资源仍为 NOT_RUN（见 producer roadmap）。
-- **AWS-headless 组合**：aws-headless profile 会在 dsh-segment S0+S1 旁挂载本插件，并把 `config.engine_pin` 钉扎为上面的 producer SHA。`DSH_COMMIT`、控制平面代码与凭据和插件组合保持分离。
+- **AWS-headless 组合**：aws-headless profile 在 dsh-segment S0+S1 旁挂载本插件，并把 `config.engine_pin` 钉扎为上面的 producer SHA（已由 aws-runtime 集成完成）；运行时驱动（`examples/aws-headless/runtime-driver.js`）启动真实组装后的 profile 并针对它运行 semantic/trace E2E。`DSH_COMMIT`、控制平面代码与凭据和插件组合保持分离。
 - **真实 CP 路由**：本插件测试不向真实 `/webhooks/dsh-worker/trace` 路由（T1 producer 接缝）或真实 Postgres FK ancestry 投递，任何云资源也仍为 NOT_RUN；发射器的 localhost receiver 与分类状态仅属于本地证据。此组合不更新 `DSH_COMMIT`、控制平面代码或凭据。
 
 ## 加载与测试

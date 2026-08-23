@@ -197,10 +197,10 @@ describe('dsh-pes trace record seam (trace-record.js)', () => {
     expect(signTraceBody(body, 'test-secret-0')).toBe(signTraceBody(body, 'test-secret-0'))
   })
 
-  it('signs the exact bytes with HMAC-SHA256 lowercase hex (x-dsh-signature fixture)', () => {
+  it('signs the exact bytes with HMAC-SHA256 lowercase hex (x-webhook-signature fixture)', () => {
     const record = traceRecordFor({ context: { ...CONTEXT, runOrdinal: 0 }, result: completedResult() })
     const body = serializeTraceRecord(record)
-    expect(SIGNATURE_HEADER).toBe('x-dsh-signature')
+    expect(SIGNATURE_HEADER).toBe('x-webhook-signature')
     expect(signTraceBody(body, 'test-secret-0'))
       .toBe('36f5c51497e33af758d4a9ec0f7dd859748026ae6c232302f07c3ed57298c1a3')
   })
