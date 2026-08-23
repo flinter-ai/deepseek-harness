@@ -113,6 +113,7 @@
     "@deepseek-ai/dsh-web-fetch-http": "workspace:*",
     "@deepseek-ai/dsh-workflow-worker-thread": "workspace:*",
     "@deepseek-ai/dsh-agent-instructions": "workspace:*",
+    "@flinter/dsh-pes": "link:./dsh-pes",
     "@flinter/dsh-segment": "link:./dsh-segment"
   }
 }
