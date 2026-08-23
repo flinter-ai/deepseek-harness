@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-23-dsh-orca-literal-task-launch.md
+2026-08-23-dsh-orca-literal-task-launch.md: 176337007f8097d15bad5f69bdc1dfc4e0d38778
+2026-08-23-dsh-orca-literal-task-launch.zh.md: f8319111338b1864394e4d684a65386048273de7
