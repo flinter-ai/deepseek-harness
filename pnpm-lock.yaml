@@ -746,6 +746,9 @@ importers:
       '@deepseek-ai/dsh-workflow-worker-thread':
         specifier: workspace:*
         version: link:../packages/workflow/workflow-worker-thread
+      '@flinter/dsh-segment':
+        specifier: link:./dsh-segment
+        version: link:dsh-segment
 
   native/landlock-run:
     devDependencies:

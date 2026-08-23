@@ -1,0 +1,23 @@
+{
+  "name": "@flinter/dsh-segment",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FLINTER segment plugin for DeepSeek Harness: deterministic instruments and judgement tools for episode segmentation inside a container.",
+  "type": "module",
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "capabilities/",
+    "tools/",
+    "cordis.patch.yml"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=0.1.0-rc.0",
+    "@deepseek-ai/dsh-tools": ">=0.1.0-rc.0"
+  }
+}

@@ -1,0 +1,8 @@
+# The @flinter/dsh-segment bundle patch. A profile that lists
+# @flinter/dsh-segment in dsh.profile.bundles applies this layer and mounts
+# the segment plugin beside its other rows. The headless profile in the
+# flinter-dsh-worker image adds this bundle so the container boots with the
+# S1 semantic capability (RUN_BASELINE_PHYSICS) available.
+- insert:
+    - id: dsh-segment
+      name: '@flinter/dsh-segment'
