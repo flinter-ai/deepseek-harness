@@ -41,7 +41,7 @@ import {
   traceRecordFor,
 } from './trace-record.js'
 
-export const SIGNATURE_HEADER = 'x-dsh-signature'
+export const SIGNATURE_HEADER = 'x-webhook-signature'
 export const TRACE_POST_CONTENT_TYPE = 'application/json'
 export const TRACE_USER_AGENT = 'dsh-pes-trace-emitter/0.1.0'
 export const DEFAULT_TRACE_POST_TIMEOUT_MS = 10_000
@@ -275,7 +275,7 @@ export function resultFingerprint(result, enginePin) {
 
 /**
  * Default transport: POST the exact signed body to the callback URL with the
- * `x-dsh-signature` header convention selected by the T1 producer seam
+ * `x-webhook-signature` header convention (the CP webhook-verify convention; T1 producer seam reads this header)
  * (lowercase hex HMAC-SHA256 over the raw bytes), bounded by an abort
  * timeout. Network-level failures reject out of the promise.
  * @param callbackUrl - runtime-configured callback URL.
