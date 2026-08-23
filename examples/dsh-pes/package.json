@@ -2,7 +2,7 @@
   "name": "@flinter/dsh-pes",
   "version": "0.1.0",
   "private": true,
-  "description": "Searchable-trace plugin for DeepSeek Harness: four bounded agent tools (search_events, find_similar_states, find_counterfactuals, zoom) over the event_index.query engine CLI spawned through an explicit configured command seam.",
+  "description": "Searchable-trace plugin for DeepSeek Harness: four bounded agent tools (search_events, find_similar_states, find_counterfactuals, zoom) over the event_index.query engine CLI spawned through an explicit configured command seam, plus a runtime-owned automatic searchable-trace emitter (HMAC-signed CP record POST) after completed results.",
   "type": "module",
   "main": "index.js",
   "files": [
@@ -10,6 +10,8 @@
     "engine.js",
     "query.js",
     "render.js",
+    "trace.js",
+    "trace-record.js",
     "cordis.patch.yml"
   ],
   "dsh": {

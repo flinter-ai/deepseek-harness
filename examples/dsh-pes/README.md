@@ -55,6 +55,10 @@ the headless profile discovers and mounts as one row beside its other bundles.
 - Keyless worker boot → Loader → tools surface → engine command seam path:
   no engine package, no live provider, no network is contacted by the tests
   (the fixture stub re-implements the documented protocol).
+- Runtime-owned automatic emission: after every COMPLETED (non-abstained)
+  result the plugin maps the result/provenance into the committed CP
+  searchable-trace wire record and POSTs the exact signed bytes to the
+  runtime-configured callback URL — a producer side effect, never a tool.
 
 ## Engine seam (read before wiring a deployment)
 
@@ -69,6 +73,57 @@ config: {
   engine_pin: 'c05c3fc747f0aa0fcb9d0603009add71c59e091b', // optional producer pin
 }
 ```
+
+## Runtime-owned searchable-trace emitter (read before changing)
+
+The plugin is also an automatic producer for the committed CP searchable-trace
+projection (`trace.js` + `trace-record.js`): after a completed (non-abstained)
+dsh-pes result it deterministically maps the result and its provenance into
+the CP wire record and POSTs the exact bytes to the runtime-configured
+callback URL. It is explicitly NOT a tool, registers nothing model-visible,
+and can never select or observe its own destination.
+
+- **Wire record (`trace-record.js`, pure seam).** Canonical key order
+  `organizationId, projectId, episodeId, jobId, irId, jobOutputId, artifactId,
+  runOrdinal, traceKind, summaryText, producerSha, schemaVersion, id`, compact
+  JSON. `traceKind` is the invoked tool name; `summaryText` is a bounded
+  (≤ 2000 chars) deterministic projection; `producerSha` is
+  `config.engine_pin`, else the committed engine commit `c05c3fc…` (always
+  the ENGINE commit, never the AWS runtime revision); `id` is
+  `tr_<sha256(organizationId:irId:runOrdinal)>`'s first 24 hex chars, matching
+  the committed CP derivation so CP replay is idempotent.
+- **Transport ownership.** Callback URL and HMAC secret arrive ONLY through
+  validated plugin config or the `PES_TRACE_*` environment — never through
+  tool/model request fields. Setting exactly one of URL/secret, or enabling
+  transport without the ancestry fields, fails loud at load; absent both keeps
+  the emitter disabled.
+- **Signature.** HMAC-SHA256 over the exact JSON body bytes, header
+  `x-dsh-signature` lowercase hex (the convention selected by the T1 CP
+  producer seam). The serializer/signer are pure functions, so T1/T2 byte
+  equivalence is testable without importing control-plane packages or sibling
+  repositories.
+- **Honest semantics.** Emission is at-most-once per distinct completed result
+  in-process (an identical repeat reports `duplicate` and never re-POSTs), and
+  abstained/error results never emit — the committed trace contract defines no
+  traceKind for them. Transport failures are classified — accepted (2xx),
+  validation-rejected (400), unauthorized (401), conflict (409), rejected
+  (other 4xx), unavailable (5xx/503), unreachable (network), unexpected — and
+  never alter or fail the scientific result. Secrets and signatures are never
+  printed or persisted.
+
+| config | env | default | meaning |
+|---|---|---|---|
+| `trace_callback_url` | `PES_TRACE_CALLBACK_URL` | — | callback URL (http/https only) |
+| `trace_hmac_secret` | `PES_TRACE_HMAC_SECRET` | — | HMAC secret (never printed/persisted) |
+| `trace_organization_id` | `PES_TRACE_ORGANIZATION_ID` | — | ancestry: organization |
+| `trace_project_id` | `PES_TRACE_PROJECT_ID` | — | ancestry: project |
+| `trace_episode_id` | `PES_TRACE_EPISODE_ID` | — | ancestry: episode |
+| `trace_job_id` | `PES_TRACE_JOB_ID` | — | ancestry: job |
+| `trace_ir_id` | `PES_TRACE_IR_ID` | — | ancestry: investigation run |
+| `trace_job_output_id` | `PES_TRACE_JOB_OUTPUT_ID` | — | ancestry: job output (result authority) |
+| `trace_artifact_id` | `PES_TRACE_ARTIFACT_ID` | — | ancestry: artifact holding the full payload |
+| `trace_run_ordinal_base` | `PES_TRACE_RUN_ORDINAL_BASE` | `0` | first emitted run ordinal |
+| `trace_post_timeout_ms` | `PES_TRACE_POST_TIMEOUT_MS` | `10000` | POST deadline (validated int in [1, 60000]) |
 
 ## Integration gates (NOT_RUN — not completed by this PR)
 
@@ -85,8 +140,11 @@ config: {
 - **Real backends**: real TowerH scans, real outcome labels, RDS
   `005_experience_events`, Octen embeddings, and any AWS/provider resource
   remain NOT_RUN (see the producer roadmap).
-- No changes to `flinter/aws-runtime`, `DSH_COMMIT`, control-plane code, or
-  credentials; no merge of this line into aws-runtime.
+- **Real CP route**: posting to the actual `/webhooks/dsh-worker/trace` route
+  (the T1 producer seam), real Postgres FK ancestry, and any cloud resource
+  remain NOT_RUN here; the emitter's localhost receiver and classified
+  statuses are the local evidence. `flinter/aws-runtime`, `DSH_COMMIT`,
+  control-plane code, and credentials are untouched by this line.
 
 ## Loading and tests
 
@@ -96,14 +154,19 @@ The headless profile stacks bundles in `dsh.profile.bundles` order; adding
 the real bundle patches by `tests/loader.spec.ts`, the engine seam and the
 structured-error taxonomy are pinned by `tests/seam.spec.ts`, the structured
 result contract is pinned by `tests/contract.spec.ts`, and the plugin is
-booted end-to-end by `tests/keyless-smoke.e2e.ts`.
+booted end-to-end by `tests/keyless-smoke.e2e.ts`. The runtime-owned emitter —
+canonical bytes/signature, transport ownership, at-most-once duplicate/retry,
+400/401/409/503 classification, and no emission for abstained/error results —
+is pinned by `tests/trace.spec.ts`; the contract and smoke drivers also boot
+a localhost receiver and assert the automatic emission end to end (one record
+per distinct completed result, exact body + HMAC).
 
 ```sh
 # From the worktree, after pnpm install:
-pnpm exec vitest run examples/dsh-pes/tests/loader.spec.ts examples/dsh-pes/tests/seam.spec.ts examples/dsh-pes/tests/contract.spec.ts
+pnpm exec vitest run examples/dsh-pes/tests/loader.spec.ts examples/dsh-pes/tests/seam.spec.ts examples/dsh-pes/tests/contract.spec.ts examples/dsh-pes/tests/trace.spec.ts
 pnpm exec vitest run --config vitest.e2e.config.ts examples/dsh-pes/tests/keyless-smoke.e2e.ts
 # The same suites against built lib/ (as CI runs them):
-DSH_EXAMPLE_MODE=lib pnpm exec vitest run examples/dsh-pes/tests/loader.spec.ts examples/dsh-pes/tests/seam.spec.ts examples/dsh-pes/tests/contract.spec.ts
+DSH_EXAMPLE_MODE=lib pnpm exec vitest run examples/dsh-pes/tests/loader.spec.ts examples/dsh-pes/tests/seam.spec.ts examples/dsh-pes/tests/contract.spec.ts examples/dsh-pes/tests/trace.spec.ts
 DSH_EXAMPLE_MODE=lib pnpm exec vitest run --config vitest.e2e.config.ts examples/dsh-pes/tests/keyless-smoke.e2e.ts
 ```
 
@@ -120,5 +183,9 @@ DSH_EXAMPLE_MODE=lib pnpm exec vitest run --config vitest.e2e.config.ts examples
   sizes, and text lengths are semantically validated before any spawn.
 - Misconfiguration fails loud at load (`config.command`, `timeout_ms`) or as
   `engine-unavailable` at call time (missing events index) — never silently.
+- The trace emitter is runtime-owned: transport and ancestry come only from
+  validated config or `PES_TRACE_*` environment; emission never alters or
+  fails the tool result, emits only for completed results, and is at-most-once
+  per distinct result in-process.
 - Only implemented tools are registered: exactly the four names above; no
   phantom surface.
