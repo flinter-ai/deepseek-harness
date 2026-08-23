@@ -1,0 +1,27 @@
+{
+  "uid": "u_TEST0001",
+  "n_frames": 14,
+  "canon_map": {"cup": ["cup", "mug"]},
+  "_fixture_note": "SYNTHETIC — hand-written to the documented scanner contract (state-delta-scanner SKILL.md). Not real TowerH output. Two cps: a control (acquire) at frame 4 and a support (place) at frame 10.",
+  "states": {
+    "0":  {"holding": [],        "on_surface": ["cup"]},
+    "1":  {"holding": [],        "on_surface": ["cup"]},
+    "2":  {"holding": [],        "on_surface": ["cup"]},
+    "3":  {"holding": [],        "on_surface": ["cup"]},
+    "4":  {"holding": ["cup"],   "on_surface": []},
+    "5":  {"holding": ["cup"],   "on_surface": []},
+    "6":  {"holding": ["cup"],   "on_surface": []},
+    "7":  {"holding": ["cup"],   "on_surface": []},
+    "8":  {"holding": ["cup"],   "on_surface": []},
+    "9":  {"holding": ["cup"],   "on_surface": []},
+    "10": {"holding": [],        "on_surface": ["cup"]},
+    "11": {"holding": [],        "on_surface": ["cup"]},
+    "12": {"holding": [],        "on_surface": ["cup"]},
+    "13": {"holding": [],        "on_surface": ["cup"]}
+  },
+  "delta": {"0": 0, "1": 0, "2": 0, "3": 0, "4": 2, "5": 0, "6": 0, "7": 0, "8": 0, "9": 0, "10": 2, "11": 0, "12": 0, "13": 0},
+  "cps": [
+    {"frame": 4,  "d": 2, "family_hint": "control", "hold_before": [],      "hold_after": ["cup"], "surf_before": ["cup"], "surf_after": []},
+    {"frame": 10, "d": 2, "family_hint": "support", "hold_before": ["cup"], "hold_after": [],      "surf_before": [],      "surf_after": ["cup"]}
+  ]
+}

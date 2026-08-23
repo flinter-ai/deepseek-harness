@@ -746,6 +746,9 @@ importers:
       '@deepseek-ai/dsh-workflow-worker-thread':
         specifier: workspace:*
         version: link:../packages/workflow/workflow-worker-thread
+      '@flinter/dsh-pes':
+        specifier: link:./dsh-pes
+        version: link:dsh-pes
       '@flinter/dsh-segment':
         specifier: link:./dsh-segment
         version: link:dsh-segment
