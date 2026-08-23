@@ -8,8 +8,9 @@
  *     mode) preset default
  *
  * Model routing:
- *   easy          -> deepseek / deepseek-v4-flash   (DeepSeek V4 Flash DIRECT, api.deepseek.com via DEEPSEEK_API_KEY)
- *   opencode      -> opencode-go / deepseek-v4-flash (explicit gateway fallback, OPENCODE_GO_API_KEY)
+ *   easy          -> opencode-go / deepseek-v4-flash (OPERATIVE; OPENCODE_GO_API_KEY live. Gateway route, opencode.ai/zen/go/v1)
+ *   deepseek      -> deepseek / deepseek-v4-flash   (DIRECT api.deepseek.com via DEEPSEEK_API_KEY — used once the key is configured)
+ *   opencode      -> alias of easy
  *   easy-backup   -> gmi-serving / deepseek-ai/DeepSeek-V4-Flash-0731
  *   backup        -> alias of easy-backup
  *   hard          -> kimi-coding / k3-256k         (Kimi K3-256K)
@@ -31,9 +32,11 @@ import { join } from 'node:path'
 import { homedir } from 'node:os'
 
 const MODELS = {
-  // easy primary: DeepSeek V4 Flash DIRECT (api.deepseek.com, DEEPSEEK_API_KEY; builtin pi-ai `deepseek` route).
-  easy: { provider: 'deepseek', model: 'deepseek-v4-flash' },
-  // opencode: explicit gateway fallback (opencode.ai/zen/go/v1, OPENCODE_GO_API_KEY).
+  // easy primary: opencode-go gateway (OPENCODE_GO_API_KEY live; see SKILL routing table).
+  easy: { provider: 'opencode-go', model: 'deepseek-v4-flash' },
+  // deepseek: DIRECT api.deepseek.com via DEEPSEEK_API_KEY; use only when the key is configured.
+  deepseek: { provider: 'deepseek', model: 'deepseek-v4-flash' },
+  // opencode: alias of easy.
   opencode: { provider: 'opencode-go', model: 'deepseek-v4-flash' },
   'easy-backup': { provider: 'gmi-serving', model: 'deepseek-ai/DeepSeek-V4-Flash-0731' },
   backup: { provider: 'gmi-serving', model: 'deepseek-ai/DeepSeek-V4-Flash-0731' },
@@ -66,7 +69,7 @@ const sourceSettings = flag('settings', join(homedir(), '.dsh', 'settings.yaml')
 
 const selection = MODELS[model]
 if (selection === undefined) {
-  console.error(`worker-home: unknown --model "${model}" (use easy|opencode|easy-backup|backup|hard|kimi|hard-backup|glm-5.3|nadirclaw|nadir-auto|nadir-eco|nadir-premium|nadir-reasoning)`)
+  console.error(`worker-home: unknown --model "${model}" (use easy|deepseek|opencode|easy-backup|backup|hard|kimi|hard-backup|glm-5.3|nadirclaw|nadir-auto|nadir-eco|nadir-premium|nadir-reasoning)`)
   process.exit(1)
 }
 if (!home) {
