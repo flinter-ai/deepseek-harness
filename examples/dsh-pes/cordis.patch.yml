@@ -1,0 +1,9 @@
+# The @flinter/dsh-pes bundle patch. A profile that lists
+# @flinter/dsh-pes in dsh.profile.bundles applies this layer and mounts the
+# searchable-trace plugin beside its other rows. The engine itself is NOT
+# bundled here: the plugin spawns it through the configured command seam, and
+# packaging the engine (`python3 -m event_index.query` importable at deploy
+# time) plus pinning its immutable producer SHA is integration-gate work.
+- insert:
+    - id: dsh-pes
+      name: '@flinter/dsh-pes'

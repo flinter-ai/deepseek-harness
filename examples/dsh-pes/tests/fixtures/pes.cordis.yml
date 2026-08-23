@@ -1,0 +1,16 @@
+# Keyless dsh-pes smoke composition: the same service rows the headless
+# profile mounts (tools service + system prompt) plus the @flinter/dsh-pes
+# bundle, booted through the real Cordis Loader. The engine is NOT referenced
+# here: the plugin spawns it through its configured command seam, which the
+# smoke fills from $PES_QUERY_COMMAND (the protocol-compatible fixture stub),
+# with the events index and artifact root from $PES_EVENTS_ENRICHED_JSONL and
+# $PES_ARTIFACTS_ROOT. No engine package or sibling checkout is imported.
+
+- id: system-prompt
+  name: '@deepseek-ai/dsh-system-prompt'
+
+- id: tools
+  name: '@deepseek-ai/dsh-tools'
+
+- id: dsh-pes
+  name: '@flinter/dsh-pes'
