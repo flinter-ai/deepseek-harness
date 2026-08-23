@@ -5,6 +5,7 @@
 
 import type { ParameterSchemaSpec, ValueSchemaSpec } from '@deepseek-ai/dsh-tools'
 import type { ResolvedEngineConfig, StructuredEngineError } from './engine.js'
+import type { TraceEmitter } from './trace.js'
 
 export const SEARCH_EVENTS: 'search_events'
 export const FIND_SIMILAR_STATES: 'find_similar_states'
@@ -83,4 +84,5 @@ export function runQuery(
   tool: 'search_events' | 'find_similar_states' | 'find_counterfactuals' | 'zoom',
   args: Record<string, unknown>,
   config: ResolvedEngineConfig,
+  trace?: TraceEmitter,
 ): Promise<PesResult>
