@@ -15,6 +15,15 @@
  * artifact-reference-missing). Runtime engine packaging and pinning the
  * immutable producer SHA are integration-gate work — `engine_pin` is omitted
  * until a deployment pins it.
+ *
+ * Automatic producer side effect: after every COMPLETED (non-abstained)
+ * result the runtime-owned trace emitter (trace.js) maps the result into the
+ * committed CP searchable-trace record and POSTs the exact signed bytes to
+ * the runtime-configured callback URL. It is NOT a tool and never
+ * model-visible; callbacks, secrets, and ancestry come only from validated
+ * plugin config or $PES_TRACE_* environment. Emission is at-most-once per
+ * distinct result in-process, classified honestly on transport failure, and
+ * never alters the scientific result.
  */
 
 export const name = 'dsh-pes'
@@ -23,6 +32,7 @@ export const inject = ['tools']
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { resolveEngineConfig } from './engine.js'
 import { renderPesResult } from './render.js'
+import { createTraceEmitter, resolveTraceConfig } from './trace.js'
 import {
   SEARCH_EVENTS,
   FIND_SIMILAR_STATES,
@@ -39,6 +49,12 @@ import {
 export function apply(ctx, config = {}) {
   const engine = resolveEngineConfig(config, process.env)
   const logger = ctx.logger
+  const trace = resolveTraceConfig(config, process.env)
+  const emitter = createTraceEmitter({
+    traceConfig: trace,
+    enginePin: engine.enginePin,
+    logger,
+  })
 
   const unregistered = [
     ctx.tools.register(defineTool({
@@ -51,7 +67,7 @@ export function apply(ctx, config = {}) {
       },
       isConcurrencySafe: () => false,
       async execute(args) {
-        return runQuery(SEARCH_EVENTS, args, engine)
+        return runQuery(SEARCH_EVENTS, args, engine, emitter)
       },
     })),
     ctx.tools.register(defineTool({
@@ -64,7 +80,7 @@ export function apply(ctx, config = {}) {
       },
       isConcurrencySafe: () => false,
       async execute(args) {
-        return runQuery(FIND_SIMILAR_STATES, args, engine)
+        return runQuery(FIND_SIMILAR_STATES, args, engine, emitter)
       },
     })),
     ctx.tools.register(defineTool({
@@ -77,7 +93,7 @@ export function apply(ctx, config = {}) {
       },
       isConcurrencySafe: () => false,
       async execute(args) {
-        return runQuery(FIND_COUNTERFACTUALS, args, engine)
+        return runQuery(FIND_COUNTERFACTUALS, args, engine, emitter)
       },
     })),
     ctx.tools.register(defineTool({
@@ -90,12 +106,15 @@ export function apply(ctx, config = {}) {
       },
       isConcurrencySafe: () => false,
       async execute(args) {
-        return runQuery(ZOOM, args, engine)
+        return runQuery(ZOOM, args, engine, emitter)
       },
     })),
   ]
 
   if (logger) logger.info(`[dsh-pes] plugin loaded: engine command ${engine.command.join(' ')}; engine pin ${engine.enginePin ?? '(not pinned)'}`)
+  if (logger && trace.enabled) {
+    logger.info('[dsh-pes] trace emitter enabled: automatic searchable-trace emission after completed results')
+  }
   ctx.on('dispose', () => {
     for (const unregister of unregistered) unregister()
   })

@@ -1,0 +1,35 @@
+# Agent Note: dsh-pes runtime-owned searchable-trace emitter
+
+Status: implemented
+
+English | [中文](2026-08-23-dsh-pes-trace-emitter.zh.md)
+
+## Problem
+
+The CP side of the searchable-trace producer seam (T1) committed a `validateSearchableTraceRecord` wire contract and a `POST /webhooks/dsh-worker/trace` route in `flinter-data-infra`, and listed a missing **worker-side emission hook** as an open dependency: nothing in DSH yet publishes the bounded searchable projection after a search result. The [dsh-pes plugin (2026-08-22 searchable-trace plugin note)](2026-08-22-dsh-pes-searchable-trace-plugin.md) delivers the four searchable-trace tools but no producer side effect. This slice adds the smallest runtime-owned automatic emitter on the existing `examples/dsh-pes` result/completion path — explicitly NOT a model-visible trace tool, NOT a second record schema, and NOT an H1/O1/O2 observation-stream implementation (the CP record stays a bounded searchable projection; a later H1 bridge may append the same scientific result to the authoritative DSH observation stream using shared provenance ids).
+
+## Decision
+
+Ship `examples/dsh-pes/trace-record.js` (pure wire-contract seam) + `examples/dsh-pes/trace.js` (runtime emitter) on branch `feat/dsh-trace-emitter` (base `c799c35a7a`, the merged searchable-trace plugin checkpoint), wiring emission into `runQuery`'s completed-result path as a side effect that never changes or fails the scientific result:
+
+- **Pure T1/T2 byte-equivalence seam (`trace-record.js`).** The committed CP record is re-declared in this repository with its canonical key order (`organizationId, projectId, episodeId, jobId, irId, jobOutputId, artifactId, runOrdinal, traceKind, summaryText, producerSha, schemaVersion, id`), compact JSON serialization (`serializeTraceRecord`), the deterministic id `tr_<sha256(organizationId:irId:runOrdinal)>` first 24 hex chars (`searchableTraceIdFor`, byte-identical to the committed CP derivation), and the HMAC-SHA256 lowercase-hex signer (`signTraceBody`). No control-plane package, sibling repository, or mutable branch is imported — the seam is pure and self-contained, so T1/T2 fixtures can assert identical bytes for identical inputs.
+- **Runtime-owned transport and ancestry (`trace.js`).** Callback URL, HMAC secret, and the seven ancestry ids (organization/project/episode/job/ir/jobOutput/artifact) plus `runOrdinalBase` and `postTimeoutMs` resolve only from validated plugin config or the `PES_TRACE_*` environment — never from tool/model request fields. Exactly-one-of URL/secret and enabling transport without ancestry fail loud at load; absent both keeps the emitter disabled. The header is `x-dsh-signature` (the convention selected by the T1 seam).
+- **Deterministic mapping.** `traceKind` = the invoked tool name; `summaryText` = a bounded (≤ 2000 chars) deterministic projection of the returned event ids plus tool echoes; `producerSha` = `config.engine_pin` else the committed engine commit `c05c3fc…` (the engine commit, never the AWS runtime revision); `schemaVersion` = the committed numeric string `"1"`; `id` = the derived id above. `runOrdinal` is owned by the emitter: a per-process counter from `runOrdinalBase`, one value per distinct result, so the same result sequence always yields the same ordinals and ids.
+- **At-most-once + honest classification.** A result content fingerprint dedupes in-process BEFORE the POST: an identical repeat reports `duplicate` and never re-POSTs (at-most-once per successful result attempt), while CP replay from other processes stays idempotent through the deterministic id. Transport outcomes are classified — accepted (2xx), validation-rejected (400), unauthorized (401), conflict (409), rejected (other 4xx), unavailable (5xx/503), unreachable (network), unexpected — and never alter the scientific result. Abstained/error results never emit (the committed trace contract defines no traceKind for them). Secrets and signatures are never printed or persisted.
+- **Tests.** `tests/trace.spec.ts` pins deterministic bytes/signature against fixed fixtures, transport ownership (config/env precedence, partial wiring fails loud, no model-selected destination), successful automatic emission, duplicate/retry behavior, the 400/401/409/503 table, and no emission for abstained/error/disabled. The shared `pes-driver.ts` now starts a localhost receiver, points `PES_TRACE_*` at it, and asserts — in both the contract suite and the keyless smoke — exactly one canonical signed record per distinct completed result (run ordinals 0..3), with the identical repeat calls deduplicated and structured-error/registry-rejected calls emitting nothing.
+
+This PR changes nothing in `flinter/aws-runtime`, `DSH_COMMIT`, control-plane code, `~/.dsh` credentials/settings, or any AWS/cloud resource; it does not merge this line into aws-runtime. The `dsh-pes` tools surface (four tools, bounded envelopes) is unchanged.
+
+## Alternatives considered
+
+**Register a model-visible `EMIT_TRACE` tool.** Rejected: the task boundary forbids a trace tool; automatic post-result emission is the producer side effect, and a model-callable emitter would let the model choose the destination and timing, violating runtime ownership of transport.
+
+**Import the committed CP record validator from `flinter-data-infra` or a sibling checkout.** Rejected: the task forbids those imports and the seam must stay testable in this repository; the committed contract is re-declared byte-exactly in a pure module instead, so T1/T2 byte equivalence is provable without the CP package.
+
+**Emit for abstained/error results with dedicated traceKinds.** Rejected: the committed trace contract defines no such kinds, and the task requires emission only when the contract explicitly allows it; the emitter skips non-completed results and tests prove it.
+
+**Fire-and-forget emission (no await in the tool path).** Rejected in favor of awaiting the bounded POST inside `runQuery`: emission becomes deterministic and observable in the tool path while never failing the result, and the payload is tiny with a validated 1..60000 ms deadline.
+
+## Consequences
+
+The plugin now emits one CP searchable-trace record per distinct completed searchable result when a deployment configures the runtime transport (else it stays disabled with no behavior change, and the existing S1 tests pass unchanged). In-process at-most-once means an identical repeated search within one process does not double-emit — CP still owns cross-process idempotent replay via the deterministic id. The real `POST /webhooks/dsh-worker/trace` route, real Postgres FK ancestry validation, and any cloud resource remain NOT_RUN (local receiver + classified statuses are the local evidence). The dsh-segment S1 note and the 2026-08-22 dsh-pes plugin note stay current; this note documents the runtime-owned emission half of the seam.

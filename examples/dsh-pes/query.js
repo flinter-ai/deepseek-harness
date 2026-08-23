@@ -338,9 +338,12 @@ export function verifyArtifactReferences(events, artifactsRoot) {
  * @param tool - the invoked tool name.
  * @param args - the validated (schema-level) tool arguments.
  * @param config - resolved engine config from resolveEngineConfig.
+ * @param trace - optional runtime-owned trace emitter (index.js); automatic
+ *   emission after a completed result is a side effect that never changes or
+ *   fails the result.
  * @returns the bounded structured result object.
  */
-export async function runQuery(tool, args, config) {
+export async function runQuery(tool, args, config, trace) {
   const envelopeBase = {
     tool,
     schema_version: RESULT_SCHEMA_VERSION,
@@ -387,7 +390,7 @@ export async function runQuery(tool, args, config) {
   }
 
   const echo = pickEchoFields(built.mode, response)
-  return {
+  const envelope = {
     ...envelopeBase,
     status: abstained ? 'abstained' : 'completed',
     mode: built.mode,
@@ -398,6 +401,13 @@ export async function runQuery(tool, args, config) {
     artifact_verification: verification.unconfigured ? 'unconfigured' : 'verified',
     ...echo,
   }
+  // Runtime-owned automatic emission: only a completed (non-abstained) result
+  // emits; the emitter never throws, so a classified transport failure cannot
+  // alter or fail the scientific result.
+  if (!abstained && typeof trace?.maybeEmit === 'function') {
+    await trace.maybeEmit(envelope)
+  }
+  return envelope
 }
 
 function errorEnvelope(base, tool, error, command) {
