@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-23-dsh-aws-runtime-on-s1-integration.md
-2026-08-23-dsh-aws-runtime-on-s1-integration.md: dd36f69efddee0c6282ae701baf6507c52411b09
-2026-08-23-dsh-aws-runtime-on-s1-integration.zh.md: 96de5c7a1c143991908004d73a8a92256da566ba
+2026-08-23-dsh-aws-runtime-on-s1-integration.md: 606d5ea830ea11eff4de749252ea3e5400b846b9
+2026-08-23-dsh-aws-runtime-on-s1-integration.zh.md: 979492beb3fe0c5426d2eceecaf1ac9fdac754a0

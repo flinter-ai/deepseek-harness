@@ -85,12 +85,10 @@ config: {
 - **Real backends**: real TowerH scans, real outcome labels, RDS
   `005_experience_events`, Octen embeddings, and any AWS/provider resource
   remain NOT_RUN (see the producer roadmap).
-- **Integration status (branch `integration/aws-runtime-on-s1`)**: this plugin
-  and dsh-segment S0+S1 are merged into the AWS runtime line, the aws-headless
-  profile mounts both bundles, and the profile pins
-  `config.engine_pin` to the producer SHA above. `DSH_COMMIT`, control-plane
-  code, and credentials remain unchanged; the standalone PR itself did not
-  merge into `flinter/aws-runtime`.
+- **AWS-headless composition**: the aws-headless profile mounts this plugin
+  beside dsh-segment S0+S1 and pins `config.engine_pin` to the producer SHA
+  above. `DSH_COMMIT`, control-plane code, and credentials remain separate
+  from the plugin composition.
 
 ## Loading and tests
 

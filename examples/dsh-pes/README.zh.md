@@ -52,7 +52,7 @@ config: {
 - **运行时引擎打包**：让 `python3 -m event_index.query` 在部署时可导入（包含 `event_index` 包及其数据文件的 wheel/镜像层）属于部署工作，不是本插件 PR。在此之前，无法导入的引擎会以结构化 `engine-nonzero-exit` / `engine-unavailable` 结果呈现——绝不是一个静默的空答案。
 - **不可变 producer 钉扎**：引擎 producer SHA `c05c3fc747f0aa0fcb9d0603009add71c59e091b` 在此作为 provenance 文档记录；部署通过 `config.engine_pin` 钉扎，它会流入每个结果的 `provenance.engine_pin`。钉扎由打包环节落实，不由本 PR。
 - **真实后端**：真实 TowerH 扫描、真实结局标签、RDS `005_experience_events`、Octen embeddings，以及任何 AWS/provider 资源仍为 NOT_RUN（见 producer roadmap）。
-- **集成状态（分支 `integration/aws-runtime-on-s1`）**：本插件与 dsh-segment S0+S1 已合并进 AWS 运行时主线，aws-headless profile 挂载两个 bundle，并把 `config.engine_pin` 钉扎为上面的 producer SHA。`DSH_COMMIT`、控制平面代码与凭据保持不变；独立 PR 本身并未合并进 `flinter/aws-runtime`。
+- **AWS-headless 组合**：aws-headless profile 会在 dsh-segment S0+S1 旁挂载本插件，并把 `config.engine_pin` 钉扎为上面的 producer SHA。`DSH_COMMIT`、控制平面代码与凭据和插件组合保持分离。
 
 ## 加载与测试
 
