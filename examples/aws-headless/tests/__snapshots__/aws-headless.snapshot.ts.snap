@@ -94,6 +94,11 @@ exports[`aws-headless assembled profile snapshot > records the keyless provider 
       "required": [],
     },
     {
+      "name": "finish_investigation",
+      "properties": [],
+      "required": [],
+    },
+    {
       "name": "get_goal",
       "properties": [],
       "required": [],
@@ -226,6 +231,11 @@ exports[`aws-headless assembled profile snapshot > records the keyless provider 
       ],
     },
     {
+      "name": "run_physical_assessment",
+      "properties": [],
+      "required": [],
+    },
+    {
       "name": "search_events",
       "properties": [
         "n",
@@ -253,6 +263,15 @@ exports[`aws-headless assembled profile snapshot > records the keyless provider 
       ],
       "required": [
         "name",
+      ],
+    },
+    {
+      "name": "stop_unknown",
+      "properties": [
+        "reason",
+      ],
+      "required": [
+        "reason",
       ],
     },
     {

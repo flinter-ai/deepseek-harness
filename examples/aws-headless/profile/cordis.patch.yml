@@ -30,3 +30,16 @@
 - id: dsh-pes
   config:
     engine_pin: 'c05c3fc747f0aa0fcb9d0603009add71c59e091b'
+
+# The agentic-control P0 seam mounts its two rows: the event-sourced
+# investigation service (one investigation per agent, folded from durable
+# session events) and the model-facing macro-action tools over it. `start` stays
+# a privileged harness channel — the model can assess, finish, or stop-unknown
+# but never opens an investigation — and no queue/lease/Fargate retry authority
+# enters the composition.
+- insert:
+    - id: agentic-control
+      name: '@deepseek-ai/dsh-agentic-control'
+
+    - id: tool-agentic-control
+      name: '@deepseek-ai/dsh-tool-agentic-control'

@@ -4,11 +4,12 @@ English | [中文](README.zh.md)
 
 Keyless runtime composition for the AWS deployment line: `dsh-base` plus the
 dsh-orca worker bridge, the dsh-segment semantic surface
-(`RUN_BASELINE_PHYSICS`), and the dsh-pes searchable-trace tools, with the
-credentials store swapped for AWS Secrets Manager and the catalog Bedrock
-route of the dormant pi-ai adapter registered. Boots and runs with ZERO AWS
-calls: both AWS providers defer to the default credential chain per request,
-never at boot.
+(`RUN_BASELINE_PHYSICS`), the dsh-pes searchable-trace tools, and the
+agentic-control investigation seam (`run_physical_assessment`,
+`finish_investigation`, `stop_unknown`), with the credentials store swapped
+for AWS Secrets Manager and the catalog Bedrock route of the dormant pi-ai
+adapter registered. Boots and runs with ZERO AWS calls: both AWS providers
+defer to the default credential chain per request, never at boot.
 
 ## Profile
 
@@ -17,14 +18,19 @@ never at boot.
   `@flinter/dsh-segment`, `@flinter/dsh-pes`).
 - `profile/cordis.patch.yml` — disables the local credential store before the
   AWS Secrets Manager row mounts, registers the Bedrock route with an empty
-  `providers.amazon-bedrock` config, and pins the dsh-pes engine to the
+  `providers.amazon-bedrock` config, pins the dsh-pes engine to the
   immutable producer SHA `c05c3fc747f0aa0fcb9d0603009add71c59e091b` so every
-  tool result carries the pin in `provenance.engine_pin`.
+  tool result carries the pin in `provenance.engine_pin`, and mounts the two
+  agentic-control rows (`@deepseek-ai/dsh-agentic-control`,
+  `@deepseek-ai/dsh-tool-agentic-control`) so the investigation macro-actions
+  ship in the profile. Investigation `start` stays a privileged harness
+  channel; no queue/lease/Fargate retry authority enters the composition.
 
 The keyless gates (`tests/aws-headless.e2e.ts`, `tests/aws-headless.snapshot.ts`,
 `tests/agentic-trajectory.e2e.ts`) boot and snapshot this composition with the
 AWS environment stripped and the engine seam filled by a protocol-compatible
-stub.
+stub; the trajectory gate consumes the shipped rows and drives one inspection
+to a logged finish.
 
 ## Runtime semantic/trace E2E driver
 
