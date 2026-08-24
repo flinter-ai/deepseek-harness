@@ -75,14 +75,8 @@ describe('aws-headless agentic-control trajectory', () => {
     const restoreEnv = sanitizeAwsEnv(home)
     try {
       const profileDir = await materializeProfile(home)
-      // The trajectory plugins and the replay adapter sit outside the app
-      // dependency closure; link them like the profile's own two packages.
-      await linkProfilePackage(
-        profileDir, '@deepseek-ai', 'dsh-agentic-control', join(REPO_ROOT, 'packages/agentic-control/agentic-control'),
-      )
-      await linkProfilePackage(
-        profileDir, '@deepseek-ai', 'dsh-tool-agentic-control', join(REPO_ROOT, 'packages/agentic-control/tool-agentic-control'),
-      )
+      // The replay adapter is a test-only package outside the shipped
+      // composition; link it like the profile's installed packages.
       await linkProfilePackage(
         profileDir, '@deepseek-ai', 'dsh-llm-replay', join(REPO_ROOT, 'packages/test-support/llm-replay'),
       )
@@ -115,8 +109,6 @@ describe('aws-headless agentic-control trajectory', () => {
               // derived script, and a missing log yields the default header.
               config: { file: join(home, 'unused-session.jsonl'), overrideFile },
             },
-            { id: 'agentic-control', name: '@deepseek-ai/dsh-agentic-control' },
-            { id: 'tool-agentic-control', name: '@deepseek-ai/dsh-tool-agentic-control' },
           ],
         },
       ]

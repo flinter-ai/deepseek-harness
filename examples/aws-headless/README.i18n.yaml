@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write examples/aws-headless/README.md
-README.md: 27868cd03152eab392ddba25baf5201d97ed98d5
-README.zh.md: 2804df498443df73bed76b98f932348783d293d9
+README.md: 41d4f7d2ad66a3d52b4fdfebac9669f6581444f3
+README.zh.md: fa65ff453528118e9714e0e862cf3e44e2a22744

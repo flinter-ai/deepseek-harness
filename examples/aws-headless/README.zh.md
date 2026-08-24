@@ -2,14 +2,14 @@
 
 [English](README.md) | 中文
 
-面向 AWS 部署线的无密钥运行时组合：`dsh-base` 加上 dsh-orca worker 桥、dsh-segment 语义面（`RUN_BASELINE_PHYSICS`）与 dsh-pes 可搜索 trace 工具，并把凭据存储替换为 AWS Secrets Manager、注册休眠中 pi-ai 适配器的目录 Bedrock 路由。启动与运行时 AWS 调用为零：两个 AWS provider 都在每次请求时（而非启动时）延后到默认凭据链。
+面向 AWS 部署线的无密钥运行时组合：`dsh-base` 加上 dsh-orca worker 桥、dsh-segment 语义面（`RUN_BASELINE_PHYSICS`）、dsh-pes 可搜索 trace 工具，以及 agentic-control 调查接缝（`run_physical_assessment`、`finish_investigation`、`stop_unknown`），并把凭据存储替换为 AWS Secrets Manager、注册休眠中 pi-ai 适配器的目录 Bedrock 路由。启动与运行时 AWS 调用为零：两个 AWS provider 都在每次请求时（而非启动时）延后到默认凭据链。
 
 ## Profile
 
 - `profile/package.json` — `dsh.profile.bundles` 按顺序列出四个 bundle（`@deepseek-ai/dsh-base`、`@flinter/dsh-orca`、`@flinter/dsh-segment`、`@flinter/dsh-pes`）。
-- `profile/cordis.patch.yml` — 在 AWS Secrets Manager 行挂载之前禁用本地凭据存储，以空的 `providers.amazon-bedrock` 配置注册 Bedrock 路由，并把 dsh-pes 引擎固定到不可变 producer SHA `c05c3fc747f0aa0fcb9d0603009add71c59e091b`，使每个工具结果都在 `provenance.engine_pin` 中携带该 pin。
+- `profile/cordis.patch.yml` — 在 AWS Secrets Manager 行挂载之前禁用本地凭据存储，以空的 `providers.amazon-bedrock` 配置注册 Bedrock 路由，把 dsh-pes 引擎固定到不可变 producer SHA `c05c3fc747f0aa0fcb9d0603009add71c59e091b`，使每个工具结果都在 `provenance.engine_pin` 中携带该 pin，并挂载两行 agentic-control（`@deepseek-ai/dsh-agentic-control`、`@deepseek-ai/dsh-tool-agentic-control`），使调查宏操作随 profile 一起交付。调查的 `start` 仍是特权 harness 通道；队列/lease/Fargate 重试权限不会进入该组合。
 
-无密钥门禁（`tests/aws-headless.e2e.ts`、`tests/aws-headless.snapshot.ts`、`tests/agentic-trajectory.e2e.ts`）在剥离 AWS 环境、并由协议兼容 stub 填充引擎接缝的情况下启动并快照该组合。
+无密钥门禁（`tests/aws-headless.e2e.ts`、`tests/aws-headless.snapshot.ts`、`tests/agentic-trajectory.e2e.ts`）在剥离 AWS 环境、并由协议兼容 stub 填充引擎接缝的情况下启动并快照该组合；trajectory 门禁消费已交付的行，把一次调查驱动到记录在案的结束。
 
 ## Runtime semantic/trace E2E 驱动
 

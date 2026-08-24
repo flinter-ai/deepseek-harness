@@ -17,8 +17,9 @@ export const CLI_BIN = join(REPO_ROOT, 'apps/cli/src/bin.ts')
 export const TSCONFIG = join(REPO_ROOT, 'tsconfig.json')
 
 /**
- * Copy the template into `<home>/profiles/aws-headless` and link the two
- * profile packages outside the dependency closure.
+ * Copy the template into `<home>/profiles/aws-headless` and link the profile's
+ * out-of-tree packages (bundle-less rows the patch mounts by name) — the same
+ * mechanism `dsh plugin --profile aws-headless add <path>` uses.
  * @param home - the temporary DSH_HOME.
  * @param options - `enginePin: false` rewrites the user patch so the dsh-pes
  *   row mounts WITHOUT the engine_pin block — a failure-classification
@@ -51,6 +52,18 @@ export async function materializeProfile(home: string, options: { enginePin?: bo
     '@deepseek-ai',
     'dsh-credentials-aws-secrets-manager',
     join(REPO_ROOT, 'packages/credentials/dsh-credentials-aws-secrets-manager'),
+  )
+  await linkProfilePackage(
+    profileDir,
+    '@deepseek-ai',
+    'dsh-agentic-control',
+    join(REPO_ROOT, 'packages/agentic-control/agentic-control'),
+  )
+  await linkProfilePackage(
+    profileDir,
+    '@deepseek-ai',
+    'dsh-tool-agentic-control',
+    join(REPO_ROOT, 'packages/agentic-control/tool-agentic-control'),
   )
   await writeFile(join(profileDir, 'cordis.yml'), '[]\n')
   return profileDir

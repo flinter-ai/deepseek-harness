@@ -61,7 +61,7 @@ function runDumpConfig(home: string): Promise<{ code: number; stdout: string; st
 }
 
 describe('aws-headless profile composition smoke', () => {
-  it('composes AWS, worker, and searchable-trace rows exactly once (composition gate)', async () => {
+  it('composes AWS, worker, searchable-trace, and agentic-control rows exactly once (composition gate)', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-aws-headless-'))
     try {
       await materializeProfile(home)
@@ -73,6 +73,8 @@ describe('aws-headless profile composition smoke', () => {
       expect(occurrences(stdout, 'amazon-bedrock')).toBe(1)
       expect(occurrences(stdout, "name: '@flinter/dsh-segment'")).toBe(1)
       expect(occurrences(stdout, "name: '@flinter/dsh-pes'")).toBe(1)
+      expect(occurrences(stdout, "name: '@deepseek-ai/dsh-agentic-control'")).toBe(1)
+      expect(occurrences(stdout, "name: '@deepseek-ai/dsh-tool-agentic-control'")).toBe(1)
       expect(occurrences(stdout, EXPECTED_ENGINE_PIN)).toBe(1)
       // The replaced local credential store stays in the tree, disabled.
       expect(stdout).toMatch(/- id: credentials\n {2}name: '@deepseek-ai\/dsh-credentials-local'\n {2}disabled: true/)
@@ -81,7 +83,7 @@ describe('aws-headless profile composition smoke', () => {
     }
   }, 60_000)
 
-  it('activates all three capabilities with zero AWS calls and disposes cleanly (boot gate)', async () => {
+  it('activates AWS, worker, searchable-trace, and agentic-control capabilities with zero AWS calls and disposes cleanly (boot gate)', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dsh-aws-headless-'))
     const restoreEnv = sanitizeAwsEnv(home)
     const restorePesEnv = setPesFixtureEnvironment()
@@ -108,7 +110,18 @@ describe('aws-headless profile composition smoke', () => {
         expect(ctx.llm.listProviders().map(provider => provider.id)).toContain('amazon-bedrock')
         const tools = ctx.tools.schemas().map(schema => schema.name)
         for (const tool of ORCA_TOOL_NAMES) expect(tools).toContain(tool)
-        for (const tool of ['RUN_BASELINE_PHYSICS', 'search_events', 'find_similar_states', 'find_counterfactuals', 'zoom']) {
+        // The shipped profile activates the H0 macro-actions beside the
+        // dsh-segment prototype stub and the dsh-pes searchable-trace tools.
+        for (const tool of [
+          'RUN_BASELINE_PHYSICS',
+          'search_events',
+          'find_similar_states',
+          'find_counterfactuals',
+          'zoom',
+          'run_physical_assessment',
+          'finish_investigation',
+          'stop_unknown',
+        ]) {
           expect(tools).toContain(tool)
         }
         const signal = new AbortController().signal
