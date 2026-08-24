@@ -1,0 +1,4 @@
+# Empty root for the assembled S1 smoke — the tree is composed as bundle patch layers
+# (base + headless + segment), applied by the driver through boot() exactly as
+# the dsh profile launcher does for the headless profile in the worker image.
+[]

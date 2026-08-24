@@ -7,7 +7,8 @@
  * explicit abstention marker, schema-derived content hashes, and the written
  * artifact payload hashing to the recorded artifact content hash. Also pins
  * the registry mechanics (exactly one capability; unknown ids fail loud;
- * disposer removes).
+ * disposer removes) and the adapter's fail-closed request validation (bounded
+ * integer budget, unknown request keys, empty window).
  *
  * Same subprocess harness as the keyless smoke; both src (tsx) and lib (plain
  * Node, DSH_EXAMPLE_MODE=lib) modes run this file.
@@ -26,6 +27,11 @@ import {
   RUN_BASELINE_PHYSICS_RESULT_SCHEMA_VERSION,
   ABSTENTION_PROTOTYPE_STUB,
   DEFAULT_ARTIFACT_NAME,
+  FRAME_BUDGET_MIN,
+  FRAME_BUDGET_MAX,
+  CapabilityRequestError,
+  createRunBaselinePhysicsAdapter,
+  type RunBaselinePhysicsRequest,
 } from '../capabilities/run-baseline-physics.js'
 
 const binScript = fileURLToPath(new URL('./fixtures/segment-driver.ts', import.meta.url))
@@ -113,6 +119,26 @@ describe('dsh-segment S1 semantic-capability contract (aws-runtime-style caller)
       const unknown = lines.filter(line => line['event'] === 'semantic/unknown')
       expect(unknown).toHaveLength(1)
       expect(unknown[0]?.['isError']).toBe(true)
+
+      // Fail-closed terminal behavior on the real surface: the schema rejects
+      // a malformed (non-integer) budget, the adapter rejects an out-of-bounds
+      // integer budget as a real failure result (bounded inputs), and a
+      // model-supplied out_dir is rejected as an unknown request key while the
+      // artifact stays at the runtime-owned path.
+      const schemaReject = lines.filter(line => line['event'] === 'semantic/schema-reject')
+      expect(schemaReject).toHaveLength(1)
+      expect(schemaReject[0]?.['isError']).toBe(true)
+      expect(String(schemaReject[0]?.['error'])).toContain('invalid arguments')
+      const failure = lines.filter(line => line['event'] === 'semantic/failure')
+      expect(failure).toHaveLength(1)
+      expect(failure[0]?.['isError']).toBe(true)
+      expect(failure[0]?.['failClosed']).toBe(true)
+      expect(String(failure[0]?.['error'])).toContain('fail-closed')
+      expect(String(failure[0]?.['error'])).toContain('budget')
+      const unknownKey = lines.filter(line => line['event'] === 'semantic/unknown-key')
+      expect(unknownKey).toHaveLength(1)
+      expect(unknownKey[0]?.['isError']).toBe(true)
+      expect(unknownKey[0]?.['runtimeOwnsPath']).toBe(true)
     } finally {
       await rm(outDir, { recursive: true, force: true })
     }
@@ -142,5 +168,41 @@ describe('dsh-segment S1 capability registry', () => {
     // that type-checks as an adapter but lacks execute", so cast deliberately.
     const malformed = {} as unknown as CapabilityAdapter<unknown, unknown>
     expect(() => registry.register('CAP_NO_EXECUTE', malformed)).toThrow(/adapter with an execute/)
+  })
+})
+
+describe('dsh-segment S1 adapter fail-closed request validation', () => {
+  it('succeeds for an in-bounds request and throws CapabilityRequestError for unknown keys, empty window, and out-of-bounds budgets', async () => {
+    const outDir = await mkdtemp(join(tmpdir(), 'dsh-segment-adapter-unit-'))
+    try {
+      const adapter = createRunBaselinePhysicsAdapter({ outDir })
+      const valid = adapter.execute({ window: 't0-t1', budget: FRAME_BUDGET_MIN })
+      expect(valid.status).toBe('completed')
+      expect(valid.abstention).toBe(ABSTENTION_PROTOTYPE_STUB)
+
+      // Unknown request keys fail closed — a model-supplied artifact path is
+      // never a request knob, not even silently ignored. The request type
+      // cannot express unknown keys, so the malformed literal is cast
+      // deliberately — the adapter validates its raw input.
+      const withOutDir = { window: 't0-t1', out_dir: '/tmp/elsewhere' } as unknown as RunBaselinePhysicsRequest
+      expect(() => adapter.execute(withOutDir)).toThrow(CapabilityRequestError)
+      expect(() => adapter.execute(withOutDir)).toThrow(/unknown request key/)
+
+      // Bounded inputs: the budget must be an integer in [1, 24], enforced by
+      // the adapter itself so direct registry callers cannot bypass the schema.
+      expect(() => adapter.execute({ window: 't0-t1', budget: FRAME_BUDGET_MAX + 1 })).toThrow(/budget must be an integer in \[1, 24\]/)
+      expect(() => adapter.execute({ window: 't0-t1', budget: 0 })).toThrow(/budget must be an integer in \[1, 24\]/)
+      expect(() => adapter.execute({ window: 't0-t1', budget: 2.5 })).toThrow(/budget must be an integer in \[1, 24\]/)
+
+      // A missing or empty window fails closed before any stage runs. The
+      // request type requires `window`, so the malformed value is cast
+      // deliberately — the adapter validates its raw input, like the tool
+      // surface does.
+      const malformedEmpty = {} as unknown as RunBaselinePhysicsRequest
+      expect(() => adapter.execute(malformedEmpty)).toThrow(/window must be a non-empty string/)
+      expect(() => adapter.execute({ window: '' })).toThrow(/window must be a non-empty string/)
+    } finally {
+      await rm(outDir, { recursive: true, force: true })
+    }
   })
 })

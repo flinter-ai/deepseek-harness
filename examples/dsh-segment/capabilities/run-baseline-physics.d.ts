@@ -12,6 +12,16 @@ export const ABSTENTION_PROTOTYPE_STUB: 'prototype_stub'
 export const DEFAULT_ARTIFACT_NAME: 'baseline-physics.json'
 export const DEFAULT_ARTIFACT_OUT_DIR: '/tmp/dsh-segment-artifacts'
 export const DEFAULT_FRAME_BUDGET: 12
+/** Bounded-input contract: the frame budget must be an integer in this range. */
+export const FRAME_BUDGET_MIN: 1
+export const FRAME_BUDGET_MAX: 24
+/** The complete model-visible request contract: exactly these two keys. */
+export const REQUEST_KEYS: readonly ['window', 'budget']
+
+/** Fail-closed request violation from the RUN_BASELINE_PHYSICS adapter. */
+export class CapabilityRequestError extends Error {
+  constructor(message: string)
+}
 
 export interface RunBaselinePhysicsRequest {
   window: string

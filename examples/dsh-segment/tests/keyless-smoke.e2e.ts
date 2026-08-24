@@ -6,8 +6,11 @@
  * prototype tool names exposed — calls the semantic surface twice, and expects
  * schema-valid deterministic results with an explicit abstention marker and a
  * clean exit. The written stub artifact's bytes must hash to the recorded
- * artifact content hash. No TowerH, TowerT, VLM, B2, or live provider — the
- * worker boot → semantic capability → artifact write path.
+ * artifact content hash. Every fail-closed terminal path is exercised on the
+ * real surface: schema-level invalid and non-integer requests, the
+ * adapter-level bounded-input violation, the unknown request key (model-supplied
+ * out_dir), and the unknown capability name. No TowerH, TowerT, VLM, B2, or
+ * live provider — the worker boot → semantic capability → artifact write path.
  *
  * Follows the headless-agent keyless-smoke convention: the fixture driver
  * runs as a subprocess under tsx with the root tsconfig paths facade, so bare
@@ -62,9 +65,31 @@ describe('dsh-segment S1 keyless loader smoke', () => {
       expect(first.artifact.name).toBe(DEFAULT_ARTIFACT_NAME)
       const onDisk = await readFile(join(outDir, DEFAULT_ARTIFACT_NAME), 'utf8')
       expect(createHash('sha256').update(onDisk).digest('hex')).toBe(first.artifact.content_hash)
+
+      // Fail-closed terminal paths on the real surface: schema-level invalid
+      // request, schema-level non-integer budget, adapter-level bounded-input
+      // violation, unknown request key (model-supplied out_dir), and an
+      // unknown capability name — every one an isError result, none hand-crafted.
       const invalid = lines.filter(line => line['event'] === 'semantic/invalid')
       expect(invalid).toHaveLength(1)
       expect(invalid[0]?.['isError']).toBe(true)
+      const schemaReject = lines.filter(line => line['event'] === 'semantic/schema-reject')
+      expect(schemaReject).toHaveLength(1)
+      expect(schemaReject[0]?.['isError']).toBe(true)
+      expect(String(schemaReject[0]?.['error'])).toContain('invalid arguments')
+      const failure = lines.filter(line => line['event'] === 'semantic/failure')
+      expect(failure).toHaveLength(1)
+      expect(failure[0]?.['isError']).toBe(true)
+      expect(failure[0]?.['failClosed']).toBe(true)
+      expect(String(failure[0]?.['error'])).toContain('fail-closed')
+      expect(String(failure[0]?.['error'])).toContain('budget')
+      const unknownKey = lines.filter(line => line['event'] === 'semantic/unknown-key')
+      expect(unknownKey).toHaveLength(1)
+      expect(unknownKey[0]?.['isError']).toBe(true)
+      expect(unknownKey[0]?.['runtimeOwnsPath']).toBe(true)
+      const unknown = lines.filter(line => line['event'] === 'semantic/unknown')
+      expect(unknown).toHaveLength(1)
+      expect(unknown[0]?.['isError']).toBe(true)
     } finally {
       await rm(outDir, { recursive: true, force: true })
     }

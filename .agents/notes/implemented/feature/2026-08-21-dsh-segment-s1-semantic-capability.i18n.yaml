@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-21-dsh-segment-s1-semantic-capability.md
-2026-08-21-dsh-segment-s1-semantic-capability.md: 5fb19350a4ad0b13a27cc5782dee905da667c09d
-2026-08-21-dsh-segment-s1-semantic-capability.zh.md: 3af668ddcd7a233b9acc19705ad3761cd7436109
+2026-08-21-dsh-segment-s1-semantic-capability.md: 3a237fdfc32e5465944c509fcf47b731eadd838e
+2026-08-21-dsh-segment-s1-semantic-capability.zh.md: 6d7523fc2d704df54ebefd67735b4ce3f6555d3d
