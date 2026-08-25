@@ -30,14 +30,15 @@
  * once with the configured fallback model. If both fail, it sends a
  * worker_done(failed) to the coordinator so the dispatch does not hang.
  */
-import { execFileSync, execSync } from 'node:child_process'
+import { execFileSync, execSync, spawn } from 'node:child_process'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { existsSync } from 'node:fs'
 import { parseOrcaPreamble } from './preamble.js'
 import { isProviderError } from './failure-classifier.mjs'
+import { createAttemptPaths, writeLaunchManifest, DEFAULT_DSH_ROOT, DEFAULT_ARTIFACT_ROOT } from './reliability.mjs'
 
-const DSH_ROOT = join(homedir(), 'deepseek-harness')
+const DSH_ROOT = process.env.DSH_HARNESS_ROOT ?? join(homedir(), 'deepseek-harness')
 const NODE_BIN = join(homedir(), '.nvm', 'versions', 'node', 'v22.23.2', 'bin')
 const GMI_ENV = join(homedir(), '.flinter', 'gmi-env.sh')
 
@@ -107,7 +108,7 @@ function prepareHome(home, profile, model, dshRoot, nodeBin) {
   ], { stdio: 'inherit' })
 }
 
-function buildLaunch(home, profile, model, taskSpec, orcaEnv, dshRoot, nodeBin) {
+function buildLaunch(home, profile, model, taskSpec, orcaEnv, dshRoot, nodeBin, artifacts) {
   const orcaExports = Object.entries(orcaEnv)
     .filter(([, v]) => v !== undefined)
     .map(([k, v]) => `export ${k}="${v}"`)
@@ -122,6 +123,7 @@ function buildLaunch(home, profile, model, taskSpec, orcaEnv, dshRoot, nodeBin) 
     `export PATH="${nodeBin}:$PATH"`,
     gmiLoad,
     `export DSH_HOME="${home}"`,
+    `export DSH_ORCA_ARTIFACT_ROOT="${artifacts}"`,
     `export TSX_TSCONFIG_PATH="${join(dshRoot, 'tsconfig.base.json')}"`,
     orcaExports,
     `cd "${process.cwd()}"`,
@@ -158,21 +160,45 @@ function sendFailure(ctx, summary) {
   }
 }
 
-function launchDsh(home, profile, model, taskSpec, orcaEnv, dshRoot, nodeBin) {
-  const launch = buildLaunch(home, profile, model, taskSpec, orcaEnv, dshRoot, nodeBin)
-  try {
-    // Capture both stdout and stderr so we can inspect them for provider errors.
-    // Print them after the fact so the terminal still sees the session log.
-    const result = execFileSync('bash', ['-c', launch], { encoding: 'utf8', stdio: ['inherit', 'pipe', 'pipe'] })
-    if (result) process.stdout.write(result)
-    return { ok: true }
-  } catch (error) {
-    const stdout = error.stdout?.toString() ?? ''
-    const stderr = error.stderr?.toString() ?? ''
-    if (stdout) process.stdout.write(stdout)
-    if (stderr) process.stderr.write(stderr)
-    return { ok: false, output: `${stdout}\n${stderr}`.trim() }
-  }
+function launchDsh(home, profile, model, taskSpec, orcaEnv, dshRoot, nodeBin, artifacts) {
+  const launch = buildLaunch(home, profile, model, taskSpec, orcaEnv, dshRoot, nodeBin, artifacts)
+  const startupTimeoutMs = Number(process.env.DSH_ORCA_STARTUP_TIMEOUT_MS ?? 60000)
+  const startupMarkers = ['[dsh-orca] plugin loaded', 'turn/start', 'heartbeat sent']
+  return new Promise((resolve) => {
+    const child = spawn('bash', ['-c', launch], { stdio: ['inherit', 'pipe', 'pipe'] })
+    let output = ''
+    let started = false
+    let settled = false
+    const finish = (result) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      resolve(result)
+    }
+    const onData = (chunk, stream) => {
+      const text = chunk.toString()
+      output += text
+      stream.write(text)
+      if (!started && startupMarkers.some((marker) => output.includes(marker))) {
+        started = true
+        console.log(`[dsh-agent] startup ready model=${model}`)
+      }
+    }
+    child.stdout.on('data', (chunk) => onData(chunk, process.stdout))
+    child.stderr.on('data', (chunk) => onData(chunk, process.stderr))
+    const timer = setTimeout(() => {
+      if (started || settled) return
+      console.error(`[dsh-agent] STARTUP_TIMEOUT after ${startupTimeoutMs}ms; fencing child`)
+      child.kill('SIGTERM')
+      setTimeout(() => child.kill('SIGKILL'), 5000).unref?.()
+      finish({ ok: false, startupTimeout: true, output: `${output}\nSTARTUP_TIMEOUT`.trim() })
+    }, startupTimeoutMs)
+    child.on('error', (error) => finish({ ok: false, output: `${output}\n${error.message}`.trim() }))
+    child.on('close', (code, signal) => {
+      if (code === 0) finish({ ok: true, output })
+      else finish({ ok: false, output: `${output}\nexit=${code ?? 'null'} signal=${signal ?? 'none'}`.trim() })
+    })
+  })
 }
 
 async function main() {
@@ -180,10 +206,11 @@ async function main() {
   const model = flag('model', 'easy')
   const dshRoot = flag('dsh-root', DSH_ROOT)
   const nodeBin = flag('node', NODE_BIN)
-  const home = flag('home', `/tmp/dsh-worker-${model}`)
+  const tmpRoot = flag('tmp-root', process.env.DSH_ORCA_TMP_ROOT ?? DEFAULT_DSH_ROOT)
+  const artifactRoot = flag('artifact-root', process.env.DSH_ORCA_ARTIFACT_ROOT ?? DEFAULT_ARTIFACT_ROOT)
   const dryRun = process.argv.includes('--dry-run')
 
-  console.log(`[dsh-agent] profile=${profile} model=${model} home=${home}`)
+  console.log(`[dsh-agent] profile=${profile} model=${model} tmpRoot=${tmpRoot}`)
   console.log('[dsh-agent] waiting for task payload on stdin...')
   const raw = await readStdin()
   const payload = parsePayload(raw)
@@ -207,28 +234,39 @@ async function main() {
 
   if (dryRun) {
     console.log('[dsh-agent] dry-run; would launch:')
-    console.log(buildLaunch(home, profile, model, taskSpec, orcaEnv, dshRoot, nodeBin))
+    console.log('[dsh-agent] home is derived after the dispatch payload: /tmp/dsh/<run>/<task>/<attempt>')
     return
   }
+
+  if (!payload?.runId || !payload?.taskId || !payload?.dispatchId) {
+    throw new Error('live DSH worker requires a complete Orca payload before creating DSH_HOME')
+  }
+  const paths = createAttemptPaths({ root: tmpRoot, artifactRoot, runId: payload.runId, taskId: payload.taskId, dispatchId: payload.dispatchId })
+  writeLaunchManifest(paths, { ...payload, model, destination: process.cwd() })
+  const home = paths.home
 
   console.log('[dsh-agent] preparing worker home...')
   prepareHome(home, profile, model, dshRoot, nodeBin)
 
   console.log(`[dsh-agent] launching DSH with model=${model}...`)
-  const first = launchDsh(home, profile, model, taskSpec, orcaEnv, dshRoot, nodeBin)
+  const first = await launchDsh(home, profile, model, taskSpec, orcaEnv, dshRoot, nodeBin, paths.artifacts)
   if (first.ok) return
 
   const fallback = FALLBACK[model]
   if (fallback && isProviderError(first.output)) {
     console.warn(`[dsh-agent] primary model failed with provider error; trying fallback ${fallback}...`)
-    const fallbackHome = `${home}-${fallback}`
+    const fallbackPaths = createAttemptPaths({ root: tmpRoot, artifactRoot, runId: payload.runId, taskId: payload.taskId, dispatchId: `${payload.dispatchId}-${fallback}` })
+    writeLaunchManifest(fallbackPaths, { ...payload, model: fallback, destination: process.cwd() })
+    const fallbackHome = fallbackPaths.home
     prepareHome(fallbackHome, profile, fallback, dshRoot, nodeBin)
-    const second = launchDsh(fallbackHome, profile, fallback, taskSpec, orcaEnv, dshRoot, nodeBin)
+    const second = await launchDsh(fallbackHome, profile, fallback, taskSpec, orcaEnv, dshRoot, nodeBin, fallbackPaths.artifacts)
     if (second.ok) return
 
     sendFailure(orcaEnv, `DSH failed on primary (${model}) and fallback (${fallback})`)
+    process.exitCode = 1
   } else {
     sendFailure(orcaEnv, `DSH failed on ${model}`)
+    process.exitCode = 1
   }
 }
 
