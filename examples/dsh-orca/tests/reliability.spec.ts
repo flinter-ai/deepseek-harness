@@ -30,7 +30,7 @@ describe('local Orca reliability guards', () => {
     const root = mkdtempSync(join(tmpdir(), 'dsh-reliability-'))
     const paths = createAttemptPaths({ root, artifactRoot: join(root, 'artifacts'), runId: 'run', taskId: 'task', dispatchId: 'attempt' })
     writeLaunchManifest(paths, { runId: 'run', taskId: 'task', dispatchId: 'attempt', model: 'easy', destination: '/repo', secret: 'must-not-write' })
-    const manifest = JSON.parse(readFileSync(join(paths.home, 'launch-manifest.json'), 'utf8'))
+    const manifest = JSON.parse(readFileSync(join(paths.home, 'launch-manifest.json'), 'utf8')) as Record<string, unknown>
     expect(manifest).toMatchObject({ runId: 'run', taskId: 'task', dispatchId: 'attempt', model: 'easy' })
     expect(JSON.stringify(manifest)).not.toContain('must-not-write')
     cleanupAttempt(paths, { fenced: true })
@@ -63,7 +63,9 @@ describe('local Orca reliability guards', () => {
 
   it('refuses cleanup unless fencing is confirmed', () => {
     const paths = { home: mkdtempSync(join(tmpdir(), 'dsh-reliability-')) }
-    expect(() => cleanupAttempt(paths)).toThrow(/fencing/)
+    expect(() => {
+      cleanupAttempt(paths)
+    }).toThrow(/fencing/)
     cleanupAttempt(paths, { fenced: true })
   })
 })
