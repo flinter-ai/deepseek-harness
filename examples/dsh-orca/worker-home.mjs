@@ -8,10 +8,12 @@
  *     mode) preset default
  *
  * Model routing:
- *   easy          -> opencode-go / deepseek-v4-flash (DeepSeek via opencode gateway)
+ *   easy          -> opencode-go / deepseek-v4-flash (OPERATIVE; OPENCODE_GO_API_KEY live. Gateway route, opencode.ai/zen/go/v1)
+ *   deepseek      -> deepseek / deepseek-v4-flash   (DIRECT api.deepseek.com via DEEPSEEK_API_KEY — used once the key is configured)
+ *   opencode      -> alias of easy
  *   easy-backup   -> gmi-serving / deepseek-ai/DeepSeek-V4-Flash-0731
  *   backup        -> alias of easy-backup
- *   hard          -> kimi-coding / k3-256k         (Kimi K3-256K)
+ *   hard          -> ark-plan / kimi-k3            (Kimi K3 on the Ark Plan route)
  *   hard-backup   -> opencode-go / glm-5.3         (backup if K3 unavailable)
  *   glm-5.3       -> opencode-go / glm-5.3
  *   kimi          -> alias of hard
@@ -30,13 +32,20 @@ import { join } from 'node:path'
 import { homedir } from 'node:os'
 
 const MODELS = {
-  // easy primary: DeepSeek V4 Flash via the opencode-go gateway.
+  // easy primary: opencode-go gateway (OPENCODE_GO_API_KEY live; see SKILL routing table).
   easy: { provider: 'opencode-go', model: 'deepseek-v4-flash' },
+  // deepseek: DIRECT api.deepseek.com via DEEPSEEK_API_KEY; use only when the key is configured.
+  deepseek: { provider: 'deepseek', model: 'deepseek-v4-flash' },
+  // opencode: alias of easy.
+  opencode: { provider: 'opencode-go', model: 'deepseek-v4-flash' },
   'easy-backup': { provider: 'gmi-serving', model: 'deepseek-ai/DeepSeek-V4-Flash-0731' },
   backup: { provider: 'gmi-serving', model: 'deepseek-ai/DeepSeek-V4-Flash-0731' },
-  // hard primary: Kimi K3-256K (api.kimi.com/coding).
-  hard: { provider: 'kimi-coding', model: 'k3-256k' },
-  kimi: { provider: 'kimi-coding', model: 'k3-256k' },
+  // hard primary: Kimi K3 over the Ark Plan route. The previous target
+  // (kimi-coding / k3-256k on api.kimi.com) resolved KIMI_CODING_API_KEY,
+  // which has never been present in the credentials file this script copies —
+  // so every `hard` and `kimi` dispatch authenticated against nothing.
+  hard: { provider: 'ark-plan', model: 'kimi-k3' },
+  kimi: { provider: 'ark-plan', model: 'kimi-k3' },
   // hard backup when K3-256K is 404 / out of credit / unresponsive.
   'hard-backup': { provider: 'opencode-go', model: 'glm-5.3' },
   'glm-5.3': { provider: 'opencode-go', model: 'glm-5.3' },
@@ -63,7 +72,7 @@ const sourceSettings = flag('settings', join(homedir(), '.dsh', 'settings.yaml')
 
 const selection = MODELS[model]
 if (selection === undefined) {
-  console.error(`worker-home: unknown --model "${model}" (use easy|easy-backup|backup|hard|kimi|hard-backup|glm-5.3|nadirclaw|nadir-auto|nadir-eco|nadir-premium|nadir-reasoning)`)
+  console.error(`worker-home: unknown --model "${model}" (use easy|deepseek|opencode|easy-backup|backup|hard|kimi|hard-backup|glm-5.3|nadirclaw|nadir-auto|nadir-eco|nadir-premium|nadir-reasoning)`)
   process.exit(1)
 }
 if (!home) {
@@ -78,10 +87,15 @@ if (!existsSync(sourceCreds)) {
 mkdirSync(home, { recursive: true })
 
 // 1. Initialize the headless profile and install the plugin bundle.
-execFileSync('bash', ['-c',
-  `export PATH="${nodeBin}:$PATH" && cd "${dshRoot}" && ` +
-  `DSH_HOME="${home}" npx pnpm@11.7.0 dsh plugin --profile headless add "${pluginDir}"`,
-], { stdio: 'inherit' })
+//    execFileSync with argv + env override so nodeBin/dshRoot/home/pluginDir
+//    cannot be evaluated by a shell. A bash -c form would re-introduce
+//    injection: any value containing `$` or backticks would be expanded
+//    before npx ever ran.
+execFileSync('npx', ['pnpm@11.7.0', 'dsh', 'plugin', '--profile', 'headless', 'add', pluginDir], {
+  cwd: dshRoot,
+  env: { ...process.env, PATH: `${nodeBin}:${process.env.PATH ?? ''}`, DSH_HOME: home },
+  stdio: 'inherit',
+})
 
 // 2. Credentials (same machine; file stays 0600 from the copy).
 copyFileSync(sourceCreds, join(home, '.credentials.yaml'))
@@ -105,6 +119,17 @@ const OPENCODE_GO_MODELS = [
     ? `        # gpt-5.6-luna speaks the OpenAI Responses API, not chat/completions.\n        - id: ${id}\n          name: ${name}\n          api: ${api}\n          contextWindow: ${ctx}\n          maxTokens: ${maxTok}\n          input: [${input}]`
     : `        - id: ${id}\n          name: ${name}\n          contextWindow: ${ctx}\n          maxTokens: ${maxTok}\n          input: [${input}]`)
   + (compat ? `\n          compat:\n            ${compat}` : ''))
+// Ark Plan serves Kimi K3 on an OpenAI-compatible route. maxTokens is the
+// server's own stated ceiling: api/plan/v3 rejects a larger value with
+// "integer above maximum value, expected a value <= 131072". contextWindow is
+// the plan route's declared default rather than a per-model figure — the plan
+// endpoint exposes no /models listing to read one from.
+const ARK_PLAN_MODELS = [
+  ['kimi-k3', 'Kimi K3 (Ark Plan)', 1048576, 131072, 'text', null],
+].map(([id, name, ctx, maxTok, input, compat]) =>
+  `        - id: ${id}\n          name: ${name}\n          contextWindow: ${ctx}\n          maxTokens: ${maxTok}\n          input: [${input}]`
+  + (compat ? `\n          compat:\n            ${compat}` : ''))
+
 const GMI_SERVING_MODELS = [
   ['deepseek-ai/DeepSeek-V4-Flash-0731', 'GMI DeepSeek V4 Flash 0731', 1000000, 384000, 'text', null],
 ].map(([id, name, ctx, maxTok, input, compat]) =>
@@ -137,8 +162,13 @@ const settings = [
   '      baseURL: https://api.gmi-serving.com/v1',
   '      models:',
   ...GMI_SERVING_MODELS,
-  '    kimi-coding:',
-  '      apiKeyEnv: KIMI_CODING_API_KEY',
+  '    ark-plan:',
+  '      apiKeyEnv: ARK_PLAN_API_KEY',
+  '      api: openai-completions',
+  // NOT api/v3 — that is the postpaid endpoint and bills separately.
+  '      baseURL: https://ark.cn-beijing.volces.com/api/plan/v3',
+  '      models:',
+  ...ARK_PLAN_MODELS,
   '    nadirclaw:',
   '      apiKeyEnv: NADIRCLAW_API_KEY',
   '      api: openai-completions',

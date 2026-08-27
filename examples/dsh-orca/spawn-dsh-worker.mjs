@@ -19,16 +19,21 @@
  *   orca orchestration check --run <run_id> --wait --types worker_done --timeout-ms 240000 --json
  */
 import { execFileSync } from 'node:child_process'
-import { join } from 'node:path'
-import { homedir } from 'node:os'
+import { dirname, join } from 'node:path'
 import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { assertCanaryProof } from './reliability.mjs'
 
 function git(dest, ...args) {
   return execFileSync('git', ['-C', dest, ...args], { encoding: 'utf8' }).trim()
 }
 
-const DSH_ROOT = join(homedir(), 'deepseek-harness')
-const DSH_AGENT = join(DSH_ROOT, 'examples', 'dsh-orca', 'dsh-agent.mjs')
+const HERE = dirname(fileURLToPath(import.meta.url))
+// Both anchors derive from this file: a self-located agent beside a
+// homedir-defaulted root would hand --dsh-root a different checkout than the
+// agent it launches. DSH_HARNESS_ROOT still overrides for an out-of-tree root.
+const DSH_ROOT = process.env.DSH_HARNESS_ROOT ?? join(HERE, '..', '..')
+const DSH_AGENT = join(HERE, 'dsh-agent.mjs')
 
 function flag(name, fallback) {
   const at = process.argv.indexOf(`--${name}`)
@@ -56,7 +61,11 @@ const prompt = promptFile ? readFileSync(promptFile, 'utf8') : flag('prompt')
 // Sandbox note: workspace-write is bounded by the session cwd, so the
 // worker must launch INSIDE the repo it needs to write.
 const dest = flag('dest', process.cwd())
-const home = flag('home', `/tmp/dsh-worker-${model}-${Date.now()}`)
+const tmpRoot = flag('tmp-root', process.env.DSH_ORCA_TMP_ROOT ?? '/tmp/dsh')
+const artifactRoot = flag('artifact-root', process.env.DSH_ORCA_ARTIFACT_ROOT ?? '/tmp/dsh-artifacts')
+const from = flag('from', process.env.DSH_ORCA_COORDINATOR)
+const canaryProof = flag('require-canary')
+const retryRequest = flag('retry-request')
 const dryRun = process.argv.includes('--dry-run')
 
 if (![
@@ -67,6 +76,12 @@ if (![
   console.error(`spawn-dsh-worker: unknown --model "${model}"`)
   process.exit(1)
 }
+
+if (!from && !dryRun) {
+  console.error('spawn-dsh-worker: --from <coordinator-handle> is required for a live dispatch')
+  process.exit(1)
+}
+if (canaryProof) assertCanaryProof(canaryProof)
 
 // Preflight: mirror the destination-safety contract from the general
 // orchestration skill. Resolve the exact repo, record HEAD/branch/upstream,
@@ -115,7 +130,7 @@ try {
   process.exit(1)
 }
 
-console.log(`[spawn-dsh-worker] model=${model} dest=${dest} home=${home}`)
+console.log(`[spawn-dsh-worker] model=${model} dest=${dest} tmpRoot=${tmpRoot} artifactRoot=${artifactRoot}`)
 if (dryRun) {
   console.log('[preflight] passed (dry-run)')
   console.log('[dry-run] would: run-create / task-create / terminal create --command dsh-agent / dispatch / terminal send payload')
@@ -123,19 +138,30 @@ if (dryRun) {
 }
 
 // 1. Run (bound to the invoking coordinator terminal).
-const runResp = orcaOrExit('orchestration', 'run-create', '--objective', objective, '--json')
+const runArgs = ['orchestration', 'run-create', '--objective', objective, '--from', from, '--json']
+if (retryRequest) runArgs.push('--retry-request', retryRequest)
+const runResp = orcaOrExit(...runArgs)
 const runId = runResp.result.run.id
 const coordHandle = runResp.result.run.coordinator_handle
 console.log(`  run: ${runId} (coordinator ${coordHandle})`)
 
 // 2. Task.
-const taskResp = orcaOrExit('orchestration', 'task-create', '--spec', spec, '--task-title', title, '--run', runId, '--json')
+const taskResp = orcaOrExit('orchestration', 'task-create', '--spec', spec, '--task-title', title, '--run', runId, '--from', coordHandle, '--json')
 const taskId = taskResp.result.task.id
 console.log(`  task: ${taskId}`)
 
 // 3. Terminal: Orca launches dsh-agent as the terminal command.
 //    DSH is the worker; Orca owns the terminal lifecycle.
-const command = `node ${JSON.stringify(DSH_AGENT)} --model ${JSON.stringify(model)} --home ${JSON.stringify(home)}`
+//
+//    The command string is shell-parsed by Orca's terminal layer, so values
+//    MUST be single-quoted — JSON.stringify's double quotes still let bash
+//    expand $VAR and backticks. Anything that flows through --tmp-root /
+//    --artifact-root / --dsh-root inherits that trust boundary, so they all
+//    go through quoteShell.
+function quoteShell(value) {
+  return `'${String(value).replace(/'/g, `'\\''`)}'`
+}
+const command = `node ${quoteShell(DSH_AGENT)} --model ${quoteShell(model)} --tmp-root ${quoteShell(tmpRoot)} --artifact-root ${quoteShell(artifactRoot)} --dsh-root ${quoteShell(DSH_ROOT)}`
 const termResp = orcaOrExit('terminal', 'create', '--worktree', `path:${dest}`, '--title', title, '--command', command, '--json')
 const termHandle = termResp.result.terminal.handle
 console.log(`  terminal: ${termHandle}`)
@@ -148,7 +174,7 @@ try {
 }
 
 // 4. Dispatch for tracking (no --inject: DSH is not a recognized Orca agent CLI).
-const dispatchResp = orcaOrExit('orchestration', 'dispatch', '--task', taskId, '--to', termHandle, '--json')
+const dispatchResp = orcaOrExit('orchestration', 'dispatch', '--task', taskId, '--to', termHandle, '--from', coordHandle, '--run', runId, '--json')
 const dispatchId = dispatchResp.result.dispatch.id
 console.log(`  dispatch: ${dispatchId}`)
 

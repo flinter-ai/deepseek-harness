@@ -63,11 +63,40 @@ node examples/dsh-orca/spawn-dsh-worker.mjs \
   --objective "Refactor error handling" \
   --spec "Split errors.ts into domain modules" \
   --model hard \
+  --from term_coordinator \
   --dest /Users/oldap/flinter/flinter-contracts \
   --prompt-file /path/to/contract.md
 ```
 
-然后等待完成：
+Live launcher 强制要求显式传入 `--from` coordinator handle。它在 Orca 分配完 dispatch
+之后才推导出 worker home，所以同一 model 下的多次 attempt 永远不共享 home：
+
+```text
+/tmp/dsh/<run-id>/<task-id>/<dispatch-id>/
+```
+
+Launch manifest 不含密钥。证据落到独立的 `/tmp/dsh-artifacts/<run-id>/<task-id>/<dispatch-id>/`
+根目录。通过 `DSH_ORCA_STARTUP_TIMEOUT_MS` 调整 60 秒 startup fence。Startup timeout
+会上报 worker 失败并以非零退出码退出 —— **不会** 走 provider fallback。
+
+Coordinator 在 fan-out 之前可能要求先有一份 canary 证明：
+
+```bash
+node examples/dsh-orca/spawn-dsh-worker.mjs ... \
+  --require-canary /tmp/dsh-canary/<run-id>.json
+```
+
+证明里必须 `heartbeat`、`destinationWrite`、`artifact`、`workerDone` 四个字段都是 `true`。
+如果还有 retry pending 或未知，先 fence 一下：
+
+```bash
+node examples/dsh-orca/fence-dsh-worker.mjs --dispatch <dispatch_id>
+```
+
+只在 Orca 无法证明旧进程已停止时用 `--abandon`。fence 命令**不会**删除 worktree 或
+attempt 证据。清理是另一个动作，要求 fence 已确认。
+
+然后等完成：
 
 ```bash
 orca orchestration check --run <run_id> --wait --types worker_done --timeout-ms 240000 --json
@@ -98,7 +127,7 @@ worker home（`worker-home.mjs`）配置 DSH 可以调用的模型。当前路�
 |---|---|---|
 | `easy`（默认） | opencode-go / `deepseek-v4-flash` | 快速/低成本工作（经网关使用 DeepSeek） |
 | `easy-backup`、`backup` | gmi-serving / `deepseek-ai/DeepSeek-V4-Flash-0731` | `easy` 的运营 fallback |
-| `hard` | kimi-coding / `k3-256k` | 强力编程模型 |
+| `hard` | ark-plan / `kimi-k3` | 强力编程模型，走 Ark Plan 路线 |
 | `hard-backup` | opencode-go / `glm-5.3` | Kimi 失败时的 fallback |
 | `glm-5.3` | opencode-go / `glm-5.3` | 显式 GLM 档位 |
 | `nadirclaw` 等 | NadirClaw localhost router | 本地验证 agent |
@@ -128,7 +157,7 @@ DSH `llm-pi-ai` 支持按模型 `api` 选择（`model.api ?? provider.api`），
    DEEPSEEK_API_KEY: sk-…
    OPENCODE_GO_API_KEY: sk-…
    GMI_SERVING_API_KEY: sk-…
-   KIMI_CODING_API_KEY: sk-…
+   ARK_PLAN_API_KEY: ark-…
    ```
 
    GMI 也会读取 `~/.flinter/gmi-env.sh`；`dsh-agent` 会自动 source 它。
@@ -147,7 +176,7 @@ pnpm dsh web
 # easy (default): opencode-go / deepseek-v4-flash
 pnpm dsh --profile headless "your task here"
 
-# hard: kimi-coding / k3-256k
+# hard: ark-plan / kimi-k3
 pnpm dsh --profile headless --model hard "your task here"
 
 # explicit GLM tier: opencode-go / glm-5.3
@@ -181,7 +210,7 @@ pnpm dsh --profile headless --model easy "Say OK"
 # gmi-serving / deepseek-ai/DeepSeek-V4-Flash-0731
 pnpm dsh --profile headless --model easy-backup "Say OK"
 
-# kimi-coding / k3-256k
+# ark-plan / kimi-k3
 pnpm dsh --profile headless --model hard "Say OK"
 
 # opencode-go / glm-5.3

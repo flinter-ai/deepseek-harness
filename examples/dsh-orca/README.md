@@ -75,9 +75,42 @@ node examples/dsh-orca/spawn-dsh-worker.mjs \
   --objective "Refactor error handling" \
   --spec "Split errors.ts into domain modules" \
   --model hard \
+  --from term_coordinator \
   --dest /Users/oldap/flinter/flinter-contracts \
   --prompt-file /path/to/contract.md
 ```
+
+The live launcher requires an explicit `--from` coordinator handle. It derives
+the worker home only after Orca assigns the dispatch, so attempts never share a
+model-scoped home:
+
+```text
+/tmp/dsh/<run-id>/<task-id>/<dispatch-id>/
+```
+
+Launch manifests are secret-free. Evidence belongs under the separate
+`/tmp/dsh-artifacts/<run-id>/<task-id>/<dispatch-id>/` root. Set
+`DSH_ORCA_STARTUP_TIMEOUT_MS` to change the 60-second startup fence. A startup
+timeout reports a failed worker and exits nonzero; it never falls through to a
+provider fallback.
+
+Before fan-out, a coordinator may require a completed canary proof:
+
+```bash
+node examples/dsh-orca/spawn-dsh-worker.mjs ... \
+  --require-canary /tmp/dsh-canary/<run-id>.json
+```
+
+The proof must have `heartbeat`, `destinationWrite`, `artifact`, and
+`workerDone` set to `true`. If a retry is pending or unknown, fence it first:
+
+```bash
+node examples/dsh-orca/fence-dsh-worker.mjs --dispatch <dispatch_id>
+```
+
+Use `--abandon` only when Orca cannot prove that the old process stopped. The
+fence command never deletes a worktree or attempt evidence. Cleanup is a
+separate action and requires confirmed fencing.
 
 Then wait for completion:
 
@@ -114,7 +147,7 @@ Current routing:
 |---|---|---|
 | `easy` (default) | opencode-go / `deepseek-v4-flash` | fast/cheap work (DeepSeek via gateway) |
 | `easy-backup`, `backup` | gmi-serving / `deepseek-ai/DeepSeek-V4-Flash-0731` | operational fallback for `easy` |
-| `hard` | kimi-coding / `k3-256k` | strong coding model |
+| `hard` | ark-plan / `kimi-k3` | strong coding model, on the Ark Plan route |
 | `hard-backup` | opencode-go / `glm-5.3` | fallback when Kimi fails |
 | `glm-5.3` | opencode-go / `glm-5.3` | explicit GLM tier |
 | `nadirclaw` etc. | NadirClaw localhost router | local verification agents |
@@ -152,7 +185,7 @@ routes.
    DEEPSEEK_API_KEY: sk-…
    OPENCODE_GO_API_KEY: sk-…
    GMI_SERVING_API_KEY: sk-…
-   KIMI_CODING_API_KEY: sk-…
+   ARK_PLAN_API_KEY: ark-…
    ```
 
    GMI also reads `~/.flinter/gmi-env.sh`; `dsh-agent` sources it automatically.
@@ -171,7 +204,7 @@ Open `http://127.0.0.1:3080`. The model selector shows every configured provider
 # easy (default): opencode-go / deepseek-v4-flash
 pnpm dsh --profile headless "your task here"
 
-# hard: kimi-coding / k3-256k
+# hard: ark-plan / kimi-k3
 pnpm dsh --profile headless --model hard "your task here"
 
 # explicit GLM tier: opencode-go / glm-5.3
@@ -205,7 +238,7 @@ pnpm dsh --profile headless --model easy "Say OK"
 # gmi-serving / deepseek-ai/DeepSeek-V4-Flash-0731
 pnpm dsh --profile headless --model easy-backup "Say OK"
 
-# kimi-coding / k3-256k
+# ark-plan / kimi-k3
 pnpm dsh --profile headless --model hard "Say OK"
 
 # opencode-go / glm-5.3
