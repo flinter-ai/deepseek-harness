@@ -75,9 +75,42 @@ node examples/dsh-orca/spawn-dsh-worker.mjs \
   --objective "Refactor error handling" \
   --spec "Split errors.ts into domain modules" \
   --model hard \
+  --from term_coordinator \
   --dest /Users/oldap/flinter/flinter-contracts \
   --prompt-file /path/to/contract.md
 ```
+
+The live launcher requires an explicit `--from` coordinator handle. It derives
+the worker home only after Orca assigns the dispatch, so attempts never share a
+model-scoped home:
+
+```text
+/tmp/dsh/<run-id>/<task-id>/<dispatch-id>/
+```
+
+Launch manifests are secret-free. Evidence belongs under the separate
+`/tmp/dsh-artifacts/<run-id>/<task-id>/<dispatch-id>/` root. Set
+`DSH_ORCA_STARTUP_TIMEOUT_MS` to change the 60-second startup fence. A startup
+timeout reports a failed worker and exits nonzero; it never falls through to a
+provider fallback.
+
+Before fan-out, a coordinator may require a completed canary proof:
+
+```bash
+node examples/dsh-orca/spawn-dsh-worker.mjs ... \
+  --require-canary /tmp/dsh-canary/<run-id>.json
+```
+
+The proof must have `heartbeat`, `destinationWrite`, `artifact`, and
+`workerDone` set to `true`. If a retry is pending or unknown, fence it first:
+
+```bash
+node examples/dsh-orca/fence-dsh-worker.mjs --dispatch <dispatch_id>
+```
+
+Use `--abandon` only when Orca cannot prove that the old process stopped. The
+fence command never deletes a worktree or attempt evidence. Cleanup is a
+separate action and requires confirmed fencing.
 
 Then wait for completion:
 

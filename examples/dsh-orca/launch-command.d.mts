@@ -7,6 +7,8 @@ export interface DshLaunchCommandOptions {
   nodeBin: string
   cwd: string
   gmiEnv: string | null
+  /** Attempt artifact root exported as DSH_ORCA_ARTIFACT_ROOT; omitted when absent. */
+  artifacts?: string
   inheritedEnv?: NodeJS.ProcessEnv
 }
 
