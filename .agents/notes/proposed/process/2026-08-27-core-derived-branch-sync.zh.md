@@ -37,9 +37,9 @@ Status: implemented and active
   SHA。已经存在于目标内容中的变更不会再次打开重复 PR；树数据缺失或被截断时
   工作流会失败，而不是猜测。
 - 创建同步 PR 使用已经安装的 `DSH Issue Management-1` GitHub App。该 App
-  必须拥有仓库级 `Pull requests: Read and write` 权限；当前安装仍然只有
-  `Read`，因此下一次真正有内容的 core 同步会在比较成功后于创建 PR 阶段失败，
-  直到该权限被更新。仓库级 GITHUB_TOKEN 创建/批准 PR 的开关仍保持关闭。
+  必须拥有仓库级 `Pull requests: Read and write` 权限；2026-08-27 已验证当前
+  安装拥有 `Pull requests: Write`。仓库级 GITHUB_TOKEN 创建/批准 PR 的开关仍保持
+  关闭。
 - AWS/dsh-segment 漂移只作为警告证据。core 同步绝不包含独立的 segment 能力
   集成。
 
