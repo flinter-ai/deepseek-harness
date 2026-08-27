@@ -152,7 +152,16 @@ console.log(`  task: ${taskId}`)
 
 // 3. Terminal: Orca launches dsh-agent as the terminal command.
 //    DSH is the worker; Orca owns the terminal lifecycle.
-const command = `node ${JSON.stringify(DSH_AGENT)} --model ${JSON.stringify(model)} --tmp-root ${JSON.stringify(tmpRoot)} --artifact-root ${JSON.stringify(artifactRoot)} --dsh-root ${JSON.stringify(DSH_ROOT)}`
+//
+//    The command string is shell-parsed by Orca's terminal layer, so values
+//    MUST be single-quoted — JSON.stringify's double quotes still let bash
+//    expand $VAR and backticks. Anything that flows through --tmp-root /
+//    --artifact-root / --dsh-root inherits that trust boundary, so they all
+//    go through quoteShell.
+function quoteShell(value) {
+  return `'${String(value).replace(/'/g, `'\\''`)}'`
+}
+const command = `node ${quoteShell(DSH_AGENT)} --model ${quoteShell(model)} --tmp-root ${quoteShell(tmpRoot)} --artifact-root ${quoteShell(artifactRoot)} --dsh-root ${quoteShell(DSH_ROOT)}`
 const termResp = orcaOrExit('terminal', 'create', '--worktree', `path:${dest}`, '--title', title, '--command', command, '--json')
 const termHandle = termResp.result.terminal.handle
 console.log(`  terminal: ${termHandle}`)

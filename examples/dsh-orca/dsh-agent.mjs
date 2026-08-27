@@ -96,10 +96,16 @@ function parsePayload(text) {
 }
 
 function prepareHome(home, profile, model, dshRoot, nodeBin) {
-  execFileSync('bash', ['-c',
-    `export PATH="${nodeBin}:$PATH" && cd "${dshRoot}" && ` +
-    `DSH_HOME="${home}" npx pnpm@11.7.0 dsh plugin --profile "${profile}" add "${join(dshRoot, 'examples', 'dsh-orca')}"`,
-  ], { stdio: 'inherit' })
+  // execFileSync with an argv array and an env override so none of the
+  // values (home, profile, dshRoot, nodeBin, plugin path) can be evaluated
+  // by a shell. A `bash -c "export PATH=...; cd ...; DSH_HOME=... npx ..."`
+  // form would re-introduce injection: any value containing `$` or
+  // backticks would be expanded before npx ever ran.
+  execFileSync('npx', ['pnpm@11.7.0', 'dsh', 'plugin', '--profile', profile, 'add', join(dshRoot, 'examples', 'dsh-orca')], {
+    cwd: dshRoot,
+    env: { ...process.env, PATH: `${nodeBin}:${process.env.PATH ?? ''}`, DSH_HOME: home },
+    stdio: 'inherit',
+  })
   execFileSync('node', [
     join(dshRoot, 'examples', 'dsh-orca', 'worker-home.mjs'),
     '--home', home,
@@ -254,6 +260,16 @@ async function main() {
   const first = await launchDsh(home, profile, model, taskSpec, orcaEnv, dshRoot, nodeBin, paths.artifacts)
   if (first.ok) return
 
+  // A startup timeout means the worker fenced the child before any LLM call
+  // happened. There is nothing for a fallback model to retry: the next
+  // attempt would time out the same way. Surface it as a hard failure
+  // before considering a provider fallback.
+  if (first.startupTimeout) {
+    sendFailure(orcaEnv, `DSH startup timed out on ${model}`)
+    process.exitCode = 1
+    return
+  }
+
   const fallback = FALLBACK[model]
   if (fallback && isProviderError(first.output)) {
     console.warn(`[dsh-agent] primary model failed with provider error; trying fallback ${fallback}...`)
@@ -265,8 +281,10 @@ async function main() {
     if (second.ok) return
 
     sendFailure(orcaEnv, `DSH failed on primary (${model}) and fallback (${fallback})`)
+    process.exitCode = 1
   } else {
     sendFailure(orcaEnv, `DSH failed on ${model}`)
+    process.exitCode = 1
   }
 }
 
