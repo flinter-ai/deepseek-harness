@@ -98,7 +98,7 @@ worker home（`worker-home.mjs`）配置 DSH 可以调用的模型。当前路�
 |---|---|---|
 | `easy`（默认） | opencode-go / `deepseek-v4-flash` | 快速/低成本工作（经网关使用 DeepSeek） |
 | `easy-backup`、`backup` | gmi-serving / `deepseek-ai/DeepSeek-V4-Flash-0731` | `easy` 的运营 fallback |
-| `hard` | kimi-coding / `k3-256k` | 强力编程模型 |
+| `hard` | ark-plan / `kimi-k3` | 强力编程模型，走 Ark Plan 路线 |
 | `hard-backup` | opencode-go / `glm-5.3` | Kimi 失败时的 fallback |
 | `glm-5.3` | opencode-go / `glm-5.3` | 显式 GLM 档位 |
 | `nadirclaw` 等 | NadirClaw localhost router | 本地验证 agent |
@@ -128,7 +128,7 @@ DSH `llm-pi-ai` 支持按模型 `api` 选择（`model.api ?? provider.api`），
    DEEPSEEK_API_KEY: sk-…
    OPENCODE_GO_API_KEY: sk-…
    GMI_SERVING_API_KEY: sk-…
-   KIMI_CODING_API_KEY: sk-…
+   ARK_PLAN_API_KEY: ark-…
    ```
 
    GMI 也会读取 `~/.flinter/gmi-env.sh`；`dsh-agent` 会自动 source 它。
@@ -147,7 +147,7 @@ pnpm dsh web
 # easy (default): opencode-go / deepseek-v4-flash
 pnpm dsh --profile headless "your task here"
 
-# hard: kimi-coding / k3-256k
+# hard: ark-plan / kimi-k3
 pnpm dsh --profile headless --model hard "your task here"
 
 # explicit GLM tier: opencode-go / glm-5.3
@@ -181,7 +181,7 @@ pnpm dsh --profile headless --model easy "Say OK"
 # gmi-serving / deepseek-ai/DeepSeek-V4-Flash-0731
 pnpm dsh --profile headless --model easy-backup "Say OK"
 
-# kimi-coding / k3-256k
+# ark-plan / kimi-k3
 pnpm dsh --profile headless --model hard "Say OK"
 
 # opencode-go / glm-5.3

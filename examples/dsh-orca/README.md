@@ -114,7 +114,7 @@ Current routing:
 |---|---|---|
 | `easy` (default) | opencode-go / `deepseek-v4-flash` | fast/cheap work (DeepSeek via gateway) |
 | `easy-backup`, `backup` | gmi-serving / `deepseek-ai/DeepSeek-V4-Flash-0731` | operational fallback for `easy` |
-| `hard` | kimi-coding / `k3-256k` | strong coding model |
+| `hard` | ark-plan / `kimi-k3` | strong coding model, on the Ark Plan route |
 | `hard-backup` | opencode-go / `glm-5.3` | fallback when Kimi fails |
 | `glm-5.3` | opencode-go / `glm-5.3` | explicit GLM tier |
 | `nadirclaw` etc. | NadirClaw localhost router | local verification agents |
@@ -152,7 +152,7 @@ routes.
    DEEPSEEK_API_KEY: sk-…
    OPENCODE_GO_API_KEY: sk-…
    GMI_SERVING_API_KEY: sk-…
-   KIMI_CODING_API_KEY: sk-…
+   ARK_PLAN_API_KEY: ark-…
    ```
 
    GMI also reads `~/.flinter/gmi-env.sh`; `dsh-agent` sources it automatically.
@@ -171,7 +171,7 @@ Open `http://127.0.0.1:3080`. The model selector shows every configured provider
 # easy (default): opencode-go / deepseek-v4-flash
 pnpm dsh --profile headless "your task here"
 
-# hard: kimi-coding / k3-256k
+# hard: ark-plan / kimi-k3
 pnpm dsh --profile headless --model hard "your task here"
 
 # explicit GLM tier: opencode-go / glm-5.3
@@ -205,7 +205,7 @@ pnpm dsh --profile headless --model easy "Say OK"
 # gmi-serving / deepseek-ai/DeepSeek-V4-Flash-0731
 pnpm dsh --profile headless --model easy-backup "Say OK"
 
-# kimi-coding / k3-256k
+# ark-plan / kimi-k3
 pnpm dsh --profile headless --model hard "Say OK"
 
 # opencode-go / glm-5.3
