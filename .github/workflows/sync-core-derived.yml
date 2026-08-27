@@ -19,6 +19,75 @@ permissions:
   pull-requests: write
 
 jobs:
+  check-aws-segment-drift:
+    name: Warn on AWS/dsh-segment drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out the complete branch history
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Fetch the AWS and segment tips
+        env:
+          AWS_BRANCH: flinter/aws-runtime
+          SEGMENT_BRANCH: flinter/dsh-segment
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin \
+            "+refs/heads/${AWS_BRANCH}:refs/remotes/origin/${AWS_BRANCH}" \
+            "+refs/heads/${SEGMENT_BRANCH}:refs/remotes/origin/${SEGMENT_BRANCH}"
+
+      - name: Compare AWS runtime with the segment capability line
+        env:
+          AWS_BRANCH: flinter/aws-runtime
+          SEGMENT_BRANCH: flinter/dsh-segment
+        run: |
+          set -u
+          aws_ref="origin/${AWS_BRANCH}"
+          segment_ref="origin/${SEGMENT_BRANCH}"
+
+          counts="$(git rev-list --left-right --count "$aws_ref...$segment_ref")"
+          read -r aws_only segment_only <<< "$counts"
+
+          set +e
+          merge_output="$(git merge-tree --write-tree --messages "$aws_ref" "$segment_ref" 2>&1)"
+          merge_status=$?
+          set -e
+
+          {
+            echo "### AWS/dsh-segment compatibility"
+            echo
+            echo "- AWS branch: `$AWS_BRANCH`"
+            echo "- Segment branch: `$SEGMENT_BRANCH`"
+            echo "- AWS-only commits: $aws_only"
+            echo "- Segment-only commits: $segment_only"
+            echo "- Merge-tree status: $([ "$merge_status" -eq 0 ] && echo clean || echo conflict)"
+            if [ -n "$merge_output" ]; then
+              echo
+              echo '```text'
+              echo "$merge_output"
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$segment_only" -gt 0 ]; then
+            echo "::warning::${AWS_BRANCH} does not contain ${segment_only} commit(s) from ${SEGMENT_BRANCH}; resolve the capability update separately."
+          fi
+
+          if [ "$merge_status" -ne 0 ]; then
+            echo "::warning::AWS/dsh-segment has a textual merge conflict; do not hide it in a core sync PR."
+          elif [ "$segment_only" -eq 0 ]; then
+            echo "AWS contains the current dsh-segment history and merges cleanly."
+          else
+            echo "AWS is behind dsh-segment but the current tips merge cleanly; review the separate capability update."
+          fi
+
+          # Warnings are intentional evidence for review. They do not turn an
+          # AWS profile divergence into a false-green core-sync acceptance.
+          exit 0
   open-sync-pr:
     name: Sync core into ${{ matrix.target }}
     runs-on: ubuntu-latest
@@ -67,6 +136,27 @@ jobs:
               head: source,
             });
 
+            let driftWarning = "";
+            if (target === "flinter/aws-runtime") {
+              const segmentComparison = await github.rest.repos.compareCommitsWithBasehead({
+                owner,
+                repo,
+                base: target,
+                head: "flinter/dsh-segment",
+              });
+              if (segmentComparison.data.ahead_by > 0) {
+                const compareUrl = `https://github.com/${owner}/${repo}/compare/${target}...flinter/dsh-segment`;
+                driftWarning = [
+                  "",
+                  "> [!WARNING] AWS is behind `flinter/dsh-segment`.",
+                  `> The segment line has ${segmentComparison.data.ahead_by} commit(s) not contained in AWS.`,
+                  "> This PR only synchronizes core; resolve the segment capability update separately.",
+                  `> Compare: ${compareUrl}`,
+                ].join("\n");
+                core.warning(`AWS/dsh-segment drift detected: ${compareUrl}`);
+              }
+            }
+
             if (comparison.data.ahead_by === 0) {
               core.info(`No core commits need syncing into ${target}.`);
               return;
@@ -88,6 +178,7 @@ jobs:
                 `Source head: \`${source}\``,
                 `Target branch: \`${target}\``,
                 `Triggered by: ${context.eventName}`,
+                driftWarning,
               ].join("\n"),
             });
 
