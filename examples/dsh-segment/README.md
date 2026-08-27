@@ -29,14 +29,14 @@ retries, or control-plane wiring is present in this milestone.
 - Abstention semantics: every result carries `abstention: 'prototype_stub'`
   plus provenance listing each internal stage's content hash, so a stub can
   never be consumed as real physics output.
-- Bounded inputs, fail-closed: the request contract is exactly
-  `{ window, budget }`; `budget` must be an integer in `[1, 24]` (the schema
-  rejects non-integers, the adapter rejects out-of-range values BEFORE any
+- Validated inputs, fail-closed: the request contract is exactly
+  `{ window, budget }`; `budget` must be a positive integer (the schema
+  rejects non-integers, the adapter rejects non-positive values BEFORE any
   stage runs), and any unknown request key — for example a model-supplied
   `out_dir` — is rejected rather than silently ignored, so the runtime-owned
   artifact path can never be steered from the model side.
 - Real success/failure terminal behavior on the Loader surface: valid calls
-  return the structured envelope; malformed calls, bounded-input violations,
+  return the structured envelope; malformed calls, invalid-budget violations,
   unknown request keys, and unknown capability names all terminate as real
   `isError` tool results produced by the actual registered tool — no
   hand-crafted callback anywhere.
@@ -96,6 +96,9 @@ DSH_EXAMPLE_MODE=lib pnpm exec vitest run --config vitest.e2e.config.ts examples
 
 - Wire real samplers/trackers/detectors behind the capability adapter and
   replace the abstained stub with a real output envelope.
+- Define a runtime-owned sampling/resource policy once window duration and
+  real sampling semantics exist; derive and validate any maximum there before
+  allocating frames instead of restoring a fixed model-visible budget cap.
 - Register further semantic capabilities as their adapters land.
 - Replace the `writeArtifact` stub with B2 capability-URL write.
 - Add session-log shipping to B2 at teardown.
@@ -105,6 +108,6 @@ DSH_EXAMPLE_MODE=lib pnpm exec vitest run --config vitest.e2e.config.ts examples
 - Register only implemented capabilities: the tool roster is exactly `[RUN_BASELINE_PHYSICS]`; never advertise a not-yet-implemented name.
 - Prototype primitives are internal implementation: the five S0 tools (`frames.sample`, `track.cotracker`, `boundary.detect`, `vlm.ask`, `artifact.write`) are plain functions driven by the adapter, not a public surface.
 - Stub results are always explicitly abstained: `abstention: 'prototype_stub'` plus provenance and `content_hash` — a stub can never be consumed as measured physics output.
-- Requests fail closed at the semantic boundary: the adapter enforces exactly `{ window, budget }`, a non-empty string window, and an integer budget in `[1, 24]` BEFORE any stage runs — a failing invocation writes no artifact and fabricates no provenance. Unknown request keys (including any model-supplied `out_dir`) are rejected, never silently ignored, so the artifact path stays plugin-config → runtime env → module default.
+- Requests fail closed at the semantic boundary: the adapter enforces exactly `{ window, budget }`, a non-empty string window, and a positive integer budget BEFORE any stage runs — a failing invocation writes no artifact and fabricates no provenance. Unknown request keys (including any model-supplied `out_dir`) are rejected, never silently ignored, so the artifact path stays plugin-config → runtime env → module default. No fixed maximum is claimed until a real sampler and runtime-owned resource policy establish one.
 - Capabilities are model-visible TOOLS today: DSH owns investigation, and the control plane does not select scientific capability. Switch to an internal service seam only when a runtime must enforce baseline before the model starts — that is the S2/runtime-contract track, not this plugin's S1.
 - Merge gate: an integration branch combining this line with `flinter/aws-runtime` (and then updating `DSH_COMMIT`) happens only after the semantic contract checkpoint.

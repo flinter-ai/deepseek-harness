@@ -12,7 +12,7 @@
  * Proves on the assembled tree: plugin boot, the semantic tool call, the
  * returned structured result, deterministic artifact/provenance, invalid
  * request rejection, unknown capability rejection, and the real
- * nonzero/failure terminal path (an adapter-level bounded-input violation
+ * nonzero/failure terminal path (an adapter-level non-positive-budget violation
  * surfacing as an isError result) — all without a live model or any
  * hand-crafted callback: the failing calls run through the real registered
  * tool and its real fail-closed validation.
@@ -95,7 +95,7 @@ describe('dsh-segment S1 assembled loader smoke (base + headless + segment, the 
 
       // Fail-closed terminal paths on the assembled tree, all real (no
       // hand-crafted callback): schema-invalid, schema non-integer,
-      // adapter bounded-input failure, unknown request key, unknown capability.
+      // adapter invalid-budget failure, unknown request key, unknown capability.
       const invalid = lines.filter(line => line['event'] === 'semantic/invalid')
       expect(invalid).toHaveLength(1)
       expect(invalid[0]?.['isError']).toBe(true)

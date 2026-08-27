@@ -8,7 +8,7 @@
  * clean exit. The written stub artifact's bytes must hash to the recorded
  * artifact content hash. Every fail-closed terminal path is exercised on the
  * real surface: schema-level invalid and non-integer requests, the
- * adapter-level bounded-input violation, the unknown request key (model-supplied
+ * adapter-level non-positive-budget violation, the unknown request key (model-supplied
  * out_dir), and the unknown capability name. No TowerH, TowerT, VLM, B2, or
  * live provider — the worker boot → semantic capability → artifact write path.
  *
@@ -67,7 +67,7 @@ describe('dsh-segment S1 keyless loader smoke', () => {
       expect(createHash('sha256').update(onDisk).digest('hex')).toBe(first.artifact.content_hash)
 
       // Fail-closed terminal paths on the real surface: schema-level invalid
-      // request, schema-level non-integer budget, adapter-level bounded-input
+      // request, schema-level non-integer budget, adapter-level invalid-budget
       // violation, unknown request key (model-supplied out_dir), and an
       // unknown capability name — every one an isError result, none hand-crafted.
       const invalid = lines.filter(line => line['event'] === 'semantic/invalid')

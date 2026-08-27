@@ -7,7 +7,7 @@
  * explicit abstention marker, schema-derived content hashes, and the written
  * artifact payload hashing to the recorded artifact content hash. Also pins
  * the registry mechanics (exactly one capability; unknown ids fail loud;
- * disposer removes) and the adapter's fail-closed request validation (bounded
+ * disposer removes) and the adapter's fail-closed request validation (positive
  * integer budget, unknown request keys, empty window).
  *
  * Same subprocess harness as the keyless smoke; both src (tsx) and lib (plain
@@ -27,8 +27,6 @@ import {
   RUN_BASELINE_PHYSICS_RESULT_SCHEMA_VERSION,
   ABSTENTION_PROTOTYPE_STUB,
   DEFAULT_ARTIFACT_NAME,
-  FRAME_BUDGET_MIN,
-  FRAME_BUDGET_MAX,
   CapabilityRequestError,
   createRunBaselinePhysicsAdapter,
   type RunBaselinePhysicsRequest,
@@ -121,8 +119,8 @@ describe('dsh-segment S1 semantic-capability contract (aws-runtime-style caller)
       expect(unknown[0]?.['isError']).toBe(true)
 
       // Fail-closed terminal behavior on the real surface: the schema rejects
-      // a malformed (non-integer) budget, the adapter rejects an out-of-bounds
-      // integer budget as a real failure result (bounded inputs), and a
+      // a malformed (non-integer) budget, the adapter rejects a non-positive
+      // integer budget as a real failure result, and a
       // model-supplied out_dir is rejected as an unknown request key while the
       // artifact stays at the runtime-owned path.
       const schemaReject = lines.filter(line => line['event'] === 'semantic/schema-reject')
@@ -142,7 +140,7 @@ describe('dsh-segment S1 semantic-capability contract (aws-runtime-style caller)
     } finally {
       await rm(outDir, { recursive: true, force: true })
     }
-  }, LOADER_SMOKE_TEST_TIMEOUT_MS) // eslint-disable-line no-magic-numbers
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
 })
 
 describe('dsh-segment S1 capability registry', () => {
@@ -172,13 +170,14 @@ describe('dsh-segment S1 capability registry', () => {
 })
 
 describe('dsh-segment S1 adapter fail-closed request validation', () => {
-  it('succeeds for an in-bounds request and throws CapabilityRequestError for unknown keys, empty window, and out-of-bounds budgets', async () => {
+  it('accepts positive integer budgets above the old prototype cap and rejects unknown keys, empty windows, and invalid budgets', async () => {
     const outDir = await mkdtemp(join(tmpdir(), 'dsh-segment-adapter-unit-'))
     try {
       const adapter = createRunBaselinePhysicsAdapter({ outDir })
-      const valid = adapter.execute({ window: 't0-t1', budget: FRAME_BUDGET_MIN })
+      const valid = adapter.execute({ window: 'episode-17:120-150', budget: 30 })
       expect(valid.status).toBe('completed')
       expect(valid.abstention).toBe(ABSTENTION_PROTOTYPE_STUB)
+      expect((valid.output.frames as { budget: number }).budget).toBe(30)
 
       // Unknown request keys fail closed — a model-supplied artifact path is
       // never a request knob, not even silently ignored. The request type
@@ -188,11 +187,10 @@ describe('dsh-segment S1 adapter fail-closed request validation', () => {
       expect(() => adapter.execute(withOutDir)).toThrow(CapabilityRequestError)
       expect(() => adapter.execute(withOutDir)).toThrow(/unknown request key/)
 
-      // Bounded inputs: the budget must be an integer in [1, 24], enforced by
-      // the adapter itself so direct registry callers cannot bypass the schema.
-      expect(() => adapter.execute({ window: 't0-t1', budget: FRAME_BUDGET_MAX + 1 })).toThrow(/budget must be an integer in \[1, 24\]/)
-      expect(() => adapter.execute({ window: 't0-t1', budget: 0 })).toThrow(/budget must be an integer in \[1, 24\]/)
-      expect(() => adapter.execute({ window: 't0-t1', budget: 2.5 })).toThrow(/budget must be an integer in \[1, 24\]/)
+      // Positive integers are enforced by the adapter itself so direct
+      // registry callers cannot bypass the schema.
+      expect(() => adapter.execute({ window: 't0-t1', budget: 0 })).toThrow(/budget must be a positive integer/)
+      expect(() => adapter.execute({ window: 't0-t1', budget: 2.5 })).toThrow(/budget must be a positive integer/)
 
       // A missing or empty window fails closed before any stage runs. The
       // request type requires `window`, so the malformed value is cast

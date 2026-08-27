@@ -6,7 +6,7 @@
  * prototype names in `includes` mode), validates the request/result schemas,
  * calls the capability twice expecting deterministic abstained results, and
  * proves the fail-closed terminal paths on the surface: schema-level invalid
- * requests, adapter-level bounded-input violations, unknown request keys
+ * requests, adapter-level non-positive-budget violations, unknown request keys
  * (a model-supplied out_dir), and unknown capability names.
  *
  * Modes and boot shape are selected by environment:
@@ -36,7 +36,6 @@ import { tmpdir } from 'node:os'
 import { delimiter, join } from 'node:path'
 import {
   RUN_BASELINE_PHYSICS,
-  FRAME_BUDGET_MAX,
   runBaselinePhysicsResult,
 } from '../../capabilities/run-baseline-physics.js'
 
@@ -152,19 +151,19 @@ try {
   if (!nonInteger.isError) throw new Error(`${NAME}: non-integer budget was not rejected by the request schema`)
   process.stdout.write(`${JSON.stringify({ event: 'semantic/schema-reject', name: RUN_BASELINE_PHYSICS, isError: nonInteger.isError, error: nonInteger.error.message })}\n`)
 
-  // Adapter-level fail-closed: an integer budget outside the bounded range
-  // passes the schema (which cannot express min/max) and is rejected by the
+  // Adapter-level fail-closed: a non-positive integer budget passes the schema
+  // (which cannot express positivity) and is rejected by the
   // adapter itself, before any stage runs. No artifact/provenance is
   // fabricated for the failing invocation.
   const bounded = await ctx.tools.execute({
     signal,
     callId: CallId('smoke-baseline-physics-bounded'),
     name: RUN_BASELINE_PHYSICS,
-    arguments: { window: 't0-t1', budget: FRAME_BUDGET_MAX + 1 },
+    arguments: { window: 't0-t1', budget: 0 },
   })
-  if (!bounded.isError) throw new Error(`${NAME}: out-of-bounds budget was not rejected fail-closed`)
+  if (!bounded.isError) throw new Error(`${NAME}: non-positive budget was not rejected fail-closed`)
   if (!bounded.error.message.includes('fail-closed') || !bounded.error.message.includes('budget')) {
-    throw new Error(`${NAME}: bounded-input failure did not carry the fail-closed contract message: ${bounded.error.message}`)
+    throw new Error(`${NAME}: invalid-budget failure did not carry the fail-closed contract message: ${bounded.error.message}`)
   }
   process.stdout.write(`${JSON.stringify({ event: 'semantic/failure', name: RUN_BASELINE_PHYSICS, isError: bounded.isError, failClosed: true, error: bounded.error.message })}\n`)
 

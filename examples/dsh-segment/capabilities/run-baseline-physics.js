@@ -26,9 +26,8 @@ export const ABSTENTION_PROTOTYPE_STUB = 'prototype_stub'
 export const DEFAULT_ARTIFACT_NAME = 'baseline-physics.json'
 export const DEFAULT_ARTIFACT_OUT_DIR = '/tmp/dsh-segment-artifacts'
 export const DEFAULT_FRAME_BUDGET = 12
-/** Bounded-input contract: the frame budget must be an integer in this range. */
+/** The frame budget must be a positive integer. */
 export const FRAME_BUDGET_MIN = 1
-export const FRAME_BUDGET_MAX = 24
 /** The complete model-visible request contract: exactly these two keys. */
 export const REQUEST_KEYS = ['window', 'budget']
 
@@ -53,7 +52,7 @@ export const runBaselinePhysicsInput = {
   window: { type: 'string', required: true, description: 'Video window identifier, e.g. "t0-t1"' },
   budget: {
     type: 'integer',
-    description: `Frame sample budget, an integer in [${FRAME_BUDGET_MIN}, ${FRAME_BUDGET_MAX}]`,
+    description: 'Frame sample budget, expressed as a positive integer',
     default: DEFAULT_FRAME_BUDGET,
   },
 }
@@ -127,11 +126,11 @@ export function createRunBaselinePhysicsAdapter({ outDir } = {}) {
  * Fail-closed request validation at the semantic boundary. The adapter — the
  * operation that makes the decision — enforces the request contract itself,
  * so direct registry callers cannot bypass the model-visible tool schema:
- * exactly the declared keys, a non-empty string window, and an in-bounds
- * integer budget. Any violation throws a deterministic
+ * exactly the declared keys, a non-empty string window, and a positive integer
+ * budget. Any violation throws a deterministic
  * {@link CapabilityRequestError} before a stage runs.
  * @param request - the raw semantic request.
- * @returns the resolved in-bounds integer budget.
+ * @returns the resolved positive integer budget.
  */
 function validateRequest(request) {
   const unknownKeys = Object.keys(request).filter(key => !REQUEST_KEYS.includes(key))
@@ -146,9 +145,9 @@ function validateRequest(request) {
     )
   }
   const budget = request.budget ?? DEFAULT_FRAME_BUDGET
-  if (!Number.isInteger(budget) || budget < FRAME_BUDGET_MIN || budget > FRAME_BUDGET_MAX) {
+  if (!Number.isInteger(budget) || budget < FRAME_BUDGET_MIN) {
     throw new CapabilityRequestError(
-      `[dsh-segment] ${RUN_BASELINE_PHYSICS}: budget must be an integer in [${FRAME_BUDGET_MIN}, ${FRAME_BUDGET_MAX}], got ${JSON.stringify(budget)} (fail-closed)`,
+      `[dsh-segment] ${RUN_BASELINE_PHYSICS}: budget must be a positive integer, got ${JSON.stringify(budget)} (fail-closed)`,
     )
   }
   return budget
