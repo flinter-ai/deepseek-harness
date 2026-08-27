@@ -1,6 +1,6 @@
 # Agent Note: 将 core 同步到派生 DSH 分支
 
-Status: proposed
+Status: implemented and active
 
 [English](2026-08-27-core-derived-branch-sync.md) | 中文
 
@@ -19,6 +19,29 @@ Status: proposed
 工作流不会强制推送或自动合并。独立的兼容性检查会比较 `flinter/aws-runtime` 与 `flinter/dsh-segment`，运行本地 `git merge-tree` 检查，并在 segment 分支存在 AWS 缺少的提交或两个分支的最新提交存在文本合并冲突时发出 GitHub Actions 警告。AWS core 同步拉取请求也会在正文中重复历史漂移警告，并说明 segment 能力的协调仍是独立工作。
 
 `flinter/dsh-orca-plugin` 没有被加入这组派生分支，因为它当前的历史不是建立在最新 `flinter/core` 线上。它的对齐以及消费者 package 更新仍需单独决定。
+
+## 实现记录（2026-08-27）
+
+该工作流已经在 `flinter/core` 上实现。PR #14、#18、#19 和 #23 分别落地了
+同步工作流、正确的 GitHub compare 请求、使用 App 身份创建 PR，以及对 squash
+重放历史安全的内容检测。第一次同步使用 squash 合并后，PR #27、#28 和 #29
+以目标分支为起点补做了修复合并，使 `flinter/core` 真正成为每条派生线的第二
+父提交。
+
+运行规则：
+
+- core 同步 PR 必须使用普通 merge commit 合并，不能使用 squash 或 rebase，
+  这样后续比较才能保留源分支祖先关系。如果已经发生 squash 重放，下一次
+  core 同步前必须从目标分支补做一次保留祖先的合并。
+- 检测器会对 compare 响应中的变更路径，比较目标树和源树的 mode、type 与对象
+  SHA。已经存在于目标内容中的变更不会再次打开重复 PR；树数据缺失或被截断时
+  工作流会失败，而不是猜测。
+- 创建同步 PR 使用已经安装的 `DSH Issue Management-1` GitHub App。该 App
+  必须拥有仓库级 `Pull requests: Read and write` 权限；当前安装仍然只有
+  `Read`，因此下一次真正有内容的 core 同步会在比较成功后于创建 PR 阶段失败，
+  直到该权限被更新。仓库级 GITHUB_TOKEN 创建/批准 PR 的开关仍保持关闭。
+- AWS/dsh-segment 漂移只作为警告证据。core 同步绝不包含独立的 segment 能力
+  集成。
 
 ## 考虑过的替代方案
 
