@@ -63,11 +63,40 @@ node examples/dsh-orca/spawn-dsh-worker.mjs \
   --objective "Refactor error handling" \
   --spec "Split errors.ts into domain modules" \
   --model hard \
+  --from term_coordinator \
   --dest /Users/oldap/flinter/flinter-contracts \
   --prompt-file /path/to/contract.md
 ```
 
-然后等待完成：
+Live launcher 强制要求显式传入 `--from` coordinator handle。它在 Orca 分配完 dispatch
+之后才推导出 worker home，所以同一 model 下的多次 attempt 永远不共享 home：
+
+```text
+/tmp/dsh/<run-id>/<task-id>/<dispatch-id>/
+```
+
+Launch manifest 不含密钥。证据落到独立的 `/tmp/dsh-artifacts/<run-id>/<task-id>/<dispatch-id>/`
+根目录。通过 `DSH_ORCA_STARTUP_TIMEOUT_MS` 调整 60 秒 startup fence。Startup timeout
+会上报 worker 失败并以非零退出码退出 —— **不会** 走 provider fallback。
+
+Coordinator 在 fan-out 之前可能要求先有一份 canary 证明：
+
+```bash
+node examples/dsh-orca/spawn-dsh-worker.mjs ... \
+  --require-canary /tmp/dsh-canary/<run-id>.json
+```
+
+证明里必须 `heartbeat`、`destinationWrite`、`artifact`、`workerDone` 四个字段都是 `true`。
+如果还有 retry pending 或未知，先 fence 一下：
+
+```bash
+node examples/dsh-orca/fence-dsh-worker.mjs --dispatch <dispatch_id>
+```
+
+只在 Orca 无法证明旧进程已停止时用 `--abandon`。fence 命令**不会**删除 worktree 或
+attempt 证据。清理是另一个动作，要求 fence 已确认。
+
+然后等完成：
 
 ```bash
 orca orchestration check --run <run_id> --wait --types worker_done --timeout-ms 240000 --json
