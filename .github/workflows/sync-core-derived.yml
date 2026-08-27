@@ -163,10 +163,94 @@ jobs:
               }
             }
 
-            if (comparison.data.ahead_by === 0) {
-              core.info(`No core commits need syncing into ${target}.`);
+            // A sync PR may be squash-merged, leaving source commits
+            // non-ancestors even when their file content is already present.
+            // Compare the changed paths by tree content to avoid reopening the
+            // same sync PR on every subsequent core push.
+            const sourceFiles = comparison.data.files || [];
+            if (sourceFiles.length === 0) {
+              core.info("No core content needs syncing into " + target + ".");
               return;
             }
+
+            const sourceCommit = comparison.data.commits[
+              comparison.data.commits.length - 1
+            ];
+            const targetTreeSha = comparison.data.base_commit?.commit?.tree?.sha;
+            const sourceTreeSha = sourceCommit?.commit?.tree?.sha;
+            if (!targetTreeSha || !sourceTreeSha) {
+              core.setFailed("Cannot prove core content synchronization: comparison tree data is missing.");
+              return;
+            }
+
+            const [targetTree, sourceTree] = await Promise.all([
+              github.rest.git.getTree({
+                owner,
+                repo,
+                tree_sha: targetTreeSha,
+                recursive: "1",
+              }),
+              github.rest.git.getTree({
+                owner,
+                repo,
+                tree_sha: sourceTreeSha,
+                recursive: "1",
+              }),
+            ]);
+
+            if (targetTree.data.truncated || sourceTree.data.truncated) {
+              core.setFailed("Cannot prove core content synchronization: Git tree response was truncated.");
+              return;
+            }
+
+            const entriesByPath = (tree) =>
+              new Map(
+                tree.data.tree
+                  .filter((entry) => entry.path)
+                  .map((entry) => [
+                    entry.path,
+                    {
+                      mode: entry.mode,
+                      sha: entry.sha,
+                      type: entry.type,
+                    },
+                  ]),
+              );
+            const targetEntries = entriesByPath(targetTree);
+            const sourceEntries = entriesByPath(sourceTree);
+            const changedPaths = new Set();
+            for (const file of sourceFiles) {
+              changedPaths.add(file.filename);
+              if (file.previous_filename) {
+                changedPaths.add(file.previous_filename);
+              }
+            }
+
+            const pathsNeedingSync = [...changedPaths].filter((path) => {
+              const targetEntry = targetEntries.get(path);
+              const sourceEntry = sourceEntries.get(path);
+              return (
+                targetEntry?.mode !== sourceEntry?.mode ||
+                targetEntry?.sha !== sourceEntry?.sha ||
+                targetEntry?.type !== sourceEntry?.type
+              );
+            });
+
+            if (pathsNeedingSync.length === 0) {
+              core.info(
+                "No core content needs syncing into " +
+                  target +
+                  "; source commits are already represented in target content.",
+              );
+              return;
+            }
+
+            core.info(
+              "Core content needing sync into " +
+                target +
+                ": " +
+                pathsNeedingSync.join(", "),
+            );
 
             const pull = await github.rest.pulls.create({
               owner,
