@@ -40,10 +40,8 @@ Operational rules:
   the job instead of guessing.
 - Sync PR creation uses the installed `DSH Issue Management-1` GitHub App.
   The App must have repository `Pull requests: Read and write`; the current
-  installation is still `Read`, so a future non-no-op core sync will reach
-  comparison successfully but fail at PR creation until that permission is
-  updated. The repository-wide GITHUB_TOKEN create/approve setting remains
-  disabled.
+  installation was verified with `Pull requests: Write` on 2026-08-27. The
+  repository-wide GITHUB_TOKEN create/approve setting remains disabled.
 - AWS/dsh-segment drift is warning evidence only. Core synchronization never
   includes the separate segment capability integration.
 
