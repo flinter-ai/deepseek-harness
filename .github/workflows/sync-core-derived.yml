@@ -16,7 +16,6 @@ concurrency:
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   check-aws-segment-drift:
@@ -101,13 +100,22 @@ jobs:
           - flinter/aws-runtime
 
     steps:
+      - name: Create sync PR token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
+        with:
+          client-id: ${{ vars.DSH_ISSUE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.DSH_ISSUE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+
       - name: Open or reuse core sync PR
         uses: actions/github-script@v7
         env:
           SOURCE_BRANCH: flinter/core
           TARGET_BRANCH: ${{ matrix.target }}
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ steps.app-token.outputs.token }}
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
