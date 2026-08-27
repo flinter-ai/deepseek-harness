@@ -1,6 +1,6 @@
 # Agent Note: Synchronize core into derived DSH branches
 
-Status: proposed
+Status: implemented and active
 
 English | [中文](2026-08-27-core-derived-branch-sync.zh.md)
 
@@ -19,6 +19,33 @@ The `Sync core to derived branches` workflow listens for pushes to `flinter/core
 The workflow never force-pushes or auto-merges. A separate compatibility check compares `flinter/aws-runtime` with `flinter/dsh-segment`, runs a local `git merge-tree` check, and emits a GitHub Actions warning when the segment branch has commits absent from AWS or the two tips have a textual merge conflict. An AWS core-sync pull request repeats history-drift warnings in its body and states that segment capability reconciliation remains separate.
 
 `flinter/dsh-orca-plugin` is not included in this derived-branch list because its current history is not based on the current `flinter/core` line. Its alignment and consumer package updates remain an explicit integration decision.
+
+## Implementation record (2026-08-27)
+
+The workflow is implemented on `flinter/core`. PRs #14, #18, #19, and #23
+landed the synchronization workflow, the correct GitHub compare request,
+App-authenticated PR path, and squash-replay-safe content detection.
+Target-based repair PRs #27, #28, and #29 restored `flinter/core` as a real
+second parent of each derived line after the first syncs were squash-merged.
+
+Operational rules:
+
+- Merge a core-sync PR with a normal merge commit, not squash or rebase, so
+  future comparisons retain source ancestry. If a squash replay has already
+  happened, repair from the target branch with a merge commit before the next
+  core sync.
+- The detector compares the source compare response's changed paths by target
+  and source tree entry (mode, type, and object SHA), so already-represented
+  content does not reopen a duplicate PR. Missing or truncated tree data fails
+  the job instead of guessing.
+- Sync PR creation uses the installed `DSH Issue Management-1` GitHub App.
+  The App must have repository `Pull requests: Read and write`; the current
+  installation is still `Read`, so a future non-no-op core sync will reach
+  comparison successfully but fail at PR creation until that permission is
+  updated. The repository-wide GITHUB_TOKEN create/approve setting remains
+  disabled.
+- AWS/dsh-segment drift is warning evidence only. Core synchronization never
+  includes the separate segment capability integration.
 
 ## Alternatives considered
 

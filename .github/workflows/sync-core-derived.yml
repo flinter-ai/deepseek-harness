@@ -59,8 +59,8 @@ jobs:
           {
             echo "### AWS/dsh-segment compatibility"
             echo
-            echo "- AWS branch: `$AWS_BRANCH`"
-            echo "- Segment branch: `$SEGMENT_BRANCH`"
+            printf '%s\n' "- AWS branch: \`$AWS_BRANCH\`"
+            printf '%s\n' "- Segment branch: \`$SEGMENT_BRANCH\`"
             echo "- AWS-only commits: $aws_only"
             echo "- Segment-only commits: $segment_only"
             echo "- Merge-tree status: $([ "$merge_status" -eq 0 ] && echo clean || echo conflict)"
@@ -264,6 +264,7 @@ jobs:
                 "",
                 "The source branch remains the shared upstream; this PR is intentionally not auto-merged.",
                 "Resolve conflicts and run the target profile's checks before merging.",
+                "Merge this sync PR with a merge commit, not squash or rebase, so core ancestry remains visible.",
                 "",
                 `Source head: \`${source}\``,
                 `Target branch: \`${target}\``,
