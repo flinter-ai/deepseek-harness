@@ -26,14 +26,35 @@ export const ABSTENTION_PROTOTYPE_STUB = 'prototype_stub'
 export const DEFAULT_ARTIFACT_NAME = 'baseline-physics.json'
 export const DEFAULT_ARTIFACT_OUT_DIR = '/tmp/dsh-segment-artifacts'
 export const DEFAULT_FRAME_BUDGET = 12
+/** The frame budget must be a positive integer. */
+export const FRAME_BUDGET_MIN = 1
+/** The complete model-visible request contract: exactly these two keys. */
+export const REQUEST_KEYS = ['window', 'budget']
 
-/** Typed semantic request: model-visible knobs only. The artifact path is
- *  runtime/config-owned (plugin config -> env -> module default) and is never
- *  a request parameter; a model-supplied `out_dir` is ignored (see the
- *  keyless smoke's ownership assertion). */
+/**
+ * Fail-closed request violation from the RUN_BASELINE_PHYSICS adapter. Thrown
+ * BEFORE any stage runs, so a failing invocation writes no artifact and
+ * fabricates no provenance; the tools registry normalizes it into the DSH
+ * `isError` terminal result every caller sees.
+ */
+export class CapabilityRequestError extends Error {
+  constructor(message) {
+    super(message)
+    this.name = 'CapabilityRequestError'
+  }
+}
+
+/** Typed semantic request: model-visible knobs only, enforced by the adapter.
+ *  The artifact path is runtime/config-owned (plugin config -> env -> module
+ *  default) and is never a request parameter; a model-supplied `out_dir` is
+ *  REJECTED fail-closed as an unknown request key, never silently ignored. */
 export const runBaselinePhysicsInput = {
   window: { type: 'string', required: true, description: 'Video window identifier, e.g. "t0-t1"' },
-  budget: { type: 'number', description: 'Frame sample budget', default: DEFAULT_FRAME_BUDGET },
+  budget: {
+    type: 'integer',
+    description: 'Frame sample budget, expressed as a positive integer',
+    default: DEFAULT_FRAME_BUDGET,
+  },
 }
 
 /** Typed semantic result: provenance + abstention + content_hash envelope. */
@@ -101,9 +122,40 @@ export function createRunBaselinePhysicsAdapter({ outDir } = {}) {
   }
 }
 
-function runBaselinePhysics(request, configOutDir) {
-  const window = request.window
+/**
+ * Fail-closed request validation at the semantic boundary. The adapter — the
+ * operation that makes the decision — enforces the request contract itself,
+ * so direct registry callers cannot bypass the model-visible tool schema:
+ * exactly the declared keys, a non-empty string window, and a positive integer
+ * budget. Any violation throws a deterministic
+ * {@link CapabilityRequestError} before a stage runs.
+ * @param request - the raw semantic request.
+ * @returns the resolved positive integer budget.
+ */
+function validateRequest(request) {
+  const unknownKeys = Object.keys(request).filter(key => !REQUEST_KEYS.includes(key))
+  if (unknownKeys.length > 0) {
+    throw new CapabilityRequestError(
+      `[dsh-segment] ${RUN_BASELINE_PHYSICS}: unknown request key(s) ${unknownKeys.map(key => JSON.stringify(key)).join(', ')}; the request contract is exactly ${JSON.stringify(REQUEST_KEYS)} (fail-closed)`,
+    )
+  }
+  if (typeof request.window !== 'string' || request.window.length === 0) {
+    throw new CapabilityRequestError(
+      `[dsh-segment] ${RUN_BASELINE_PHYSICS}: window must be a non-empty string, got ${JSON.stringify(request.window)} (fail-closed)`,
+    )
+  }
   const budget = request.budget ?? DEFAULT_FRAME_BUDGET
+  if (!Number.isInteger(budget) || budget < FRAME_BUDGET_MIN) {
+    throw new CapabilityRequestError(
+      `[dsh-segment] ${RUN_BASELINE_PHYSICS}: budget must be a positive integer, got ${JSON.stringify(budget)} (fail-closed)`,
+    )
+  }
+  return budget
+}
+
+function runBaselinePhysics(request, configOutDir) {
+  const budget = validateRequest(request)
+  const window = request.window
   const outDir = configOutDir ?? DEFAULT_ARTIFACT_OUT_DIR
 
   const frames = sampleFrames(window, budget)
