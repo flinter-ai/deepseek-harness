@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import {
   assertCanaryProof,
@@ -14,8 +14,8 @@ import {
 describe('local Orca reliability guards', () => {
   it('derives one isolated home per run/task/attempt', () => {
     const paths = attemptPaths({ root: '/tmp/dsh', artifactRoot: '/tmp/dsh-artifacts', runId: 'run_1', taskId: 'task_2', dispatchId: 'ctx_3' })
-    expect(paths.home).toBe('/tmp/dsh/run_1/task_2/ctx_3')
-    expect(paths.artifacts).toBe('/tmp/dsh-artifacts/run_1/task_2/ctx_3')
+    expect(paths.home).toBe(resolve('/tmp/dsh', 'run_1', 'task_2', 'ctx_3'))
+    expect(paths.artifacts).toBe(resolve('/tmp/dsh-artifacts', 'run_1', 'task_2', 'ctx_3'))
   })
 
   it('rejects path traversal and home reuse', () => {
