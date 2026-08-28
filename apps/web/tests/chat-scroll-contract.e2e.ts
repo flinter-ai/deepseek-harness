@@ -511,7 +511,8 @@ describe('web e2e: long Chat scroll contract', () => {
         await expect.poll(
           () => world.events.filter(event => event.type === 'assistant/chunk').length,
           { timeout: 10_000 },
-        ).toBeGreaterThan(chunksAfterAnchor + 5)
+        // Require five additional chunks; a strict `>` here accidentally required six.
+        ).toBeGreaterThanOrEqual(chunksAfterAnchor + 5)
 
         releaseHistory()
         await expect.poll(() => loadedFlowRows(world.page), { timeout: 30_000 }).toBeGreaterThan(beforeRows)
