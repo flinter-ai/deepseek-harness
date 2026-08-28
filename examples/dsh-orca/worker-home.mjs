@@ -87,10 +87,15 @@ if (!existsSync(sourceCreds)) {
 mkdirSync(home, { recursive: true })
 
 // 1. Initialize the headless profile and install the plugin bundle.
-execFileSync('bash', ['-c',
-  `export PATH="${nodeBin}:$PATH" && cd "${dshRoot}" && ` +
-  `DSH_HOME="${home}" npx pnpm@11.7.0 dsh plugin --profile headless add "${pluginDir}"`,
-], { stdio: 'inherit' })
+//    execFileSync with argv + env override so nodeBin/dshRoot/home/pluginDir
+//    cannot be evaluated by a shell. A bash -c form would re-introduce
+//    injection: any value containing `$` or backticks would be expanded
+//    before npx ever ran.
+execFileSync('npx', ['pnpm@11.7.0', 'dsh', 'plugin', '--profile', 'headless', 'add', pluginDir], {
+  cwd: dshRoot,
+  env: { ...process.env, PATH: `${nodeBin}:${process.env.PATH ?? ''}`, DSH_HOME: home },
+  stdio: 'inherit',
+})
 
 // 2. Credentials (same machine; file stays 0600 from the copy).
 copyFileSync(sourceCreds, join(home, '.credentials.yaml'))
