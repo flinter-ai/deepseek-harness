@@ -68,6 +68,13 @@ function gateway(baseURL: string, overrides: Record<string, unknown> = {}): LlmP
   }
 }
 
+/** Clone a shipped model while exercising a provider-factory protocol branch. */
+function modelWithApi(api: string | undefined, id: string): Model<Api> {
+  const source = getBuiltinModels('deepseek')[0]
+  if (source === undefined) throw new Error('the installed catalog ships no model fixture')
+  return { ...source, id, provider: 'acme-gateway', api: api as Api }
+}
+
 async function harness(config: LlmPiAi.Config): Promise<Context> {
   const ctx = new Context()
   await ctx.plugin(LlmRuntime)
@@ -330,6 +337,38 @@ describe('hand-declared providers', () => {
     expect(() => buildProvider({ ...spec, api: 'quantum-telepathy' }))
       .toThrow(/cannot serve; supported protocols are/)
     expect(() => buildProvider(spec)).toThrow(/cannot serve; supported protocols are/)
+  })
+
+  it('rejects a model with a missing or unknown wire protocol', () => {
+    const spec = { provider: 'acme-gateway', displayName: 'Acme Gateway', namesCredential: true }
+    expect(() => buildProvider({
+      ...spec,
+      models: [modelWithApi(undefined, 'missing-api')],
+    })).toThrow(/names api "undefined"/)
+    expect(() => buildProvider({
+      ...spec,
+      models: [modelWithApi('quantum-telepathy', 'unknown-api')],
+    })).toThrow(/names api "quantum-telepathy"/)
+  })
+
+  it('rejects an unknown protocol in a mixed model map', () => {
+    expect(() => buildProvider({
+      provider: 'acme-gateway',
+      displayName: 'Acme Gateway',
+      namesCredential: false,
+      models: [modelWithApi('openai-completions', 'known-api'), modelWithApi('quantum-telepathy', 'unknown-api')],
+    })).toThrow(/names api "quantum-telepathy"/)
+  })
+
+  it('builds a mixed protocol provider without a provider-level endpoint', () => {
+    const provider = buildProvider({
+      provider: 'acme-gateway',
+      displayName: 'Acme Gateway',
+      namesCredential: false,
+      models: [modelWithApi('openai-completions', 'completion-api'), modelWithApi('openai-responses', 'response-api')],
+    })
+    expect(provider.baseUrl).toBeUndefined()
+    expect(provider.getModels().map(model => model.id)).toEqual(['completion-api', 'response-api'])
   })
 
   it('leaves an unauthenticated route to its protocol rather than inventing a credential', async () => {
@@ -768,7 +807,7 @@ describe('reasoning-dispatch compat switches', () => {
       'acme-gateway': {
         api: 'openai-completions',
         baseURL: 'https://acme.test',
-        compat: { thinkingFormat: 'deepseek' },
+        compat: { thinkingFormat: 'deepseek', supportsDeveloperRole: true },
         models: [
           { id: 'dialect-default', reasoningEfforts: { off: null, high: 'high' } },
           { id: 'dialect-odd', compat: { thinkingFormat: 'openai', supportsReasoningEffort: false } },
@@ -776,8 +815,12 @@ describe('reasoning-dispatch compat switches', () => {
       },
     }, 'acme-gateway')
 
-    expect(models.get('dialect-default')?.compat).toEqual({ thinkingFormat: 'deepseek' })
-    expect(models.get('dialect-odd')?.compat).toEqual({ thinkingFormat: 'openai', supportsReasoningEffort: false })
+    expect(models.get('dialect-default')?.compat).toEqual({ thinkingFormat: 'deepseek', supportsDeveloperRole: true })
+    expect(models.get('dialect-odd')?.compat).toEqual({
+      thinkingFormat: 'openai',
+      supportsReasoningEffort: false,
+      supportsDeveloperRole: true,
+    })
   })
 
   it('merges the switches over the catalog entry’s own compat instead of replacing it', () => {

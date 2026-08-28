@@ -729,6 +729,53 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'investigations',
+    summary: 'Investigation service (`ctx.investigations`) backed exclusively by the owning session log.',
+    description: 'Investigation service (`ctx.investigations`) backed exclusively by the owning session log. One investigation per session; every mutation commits a full-snapshot `investigation/change` event.',
+    methods: [
+      {
+        signature: 'registerProvider(provider: PhysicalAssessmentProvider): () => void',
+        description: 'Register an additional physical-assessment provider. Registrations are effects: the returned disposer removes the provider. The configured provider is resolved lazily at the first assessment, so provider plugins may load after this service.',
+        parameters: [{ name: 'provider', description: 'provider with a unique id and a provenance tag.' }],
+        returns: 'disposer that unregisters the provider.',
+      },
+      {
+        signature: 'get(agent: Agent): InvestigationState | undefined',
+        description: 'Read the current investigation for one exact live agent.',
+        parameters: [{ name: 'agent', description: 'owning live agent.' }],
+        returns: 'a detached state copy, or `undefined` when no investigation exists.',
+        throws: ['{@link InvestigationError} when the agent is not the registry\'s live instance.'],
+      },
+      {
+        signature: 'start(agent: Agent, request: StartInvestigationRequest): InvestigationState',
+        description: 'Start the session\'s investigation. This is the privileged channel: the harness creates investigations, the model never does.',
+        parameters: [{ name: 'agent', description: 'owning live agent.' }, { name: 'request', description: 'candidate identity, evidence requirements, optional attempt cap.' }],
+        returns: 'the created state at revision 1.',
+        throws: ['{@link InvestigationError} `INVESTIGATION_EXISTS` when any investigation already exists.'],
+      },
+      {
+        signature: 'async runPhysicalAssessment(agent: Agent): Promise<{ state: InvestigationState; result: PhysicalAssessmentResult }>',
+        description: 'Run one provider-mediated physical assessment, consuming one budget slot whether the provider succeeds or fails. Lineage moves only through the provider\'s typed result.',
+        parameters: [{ name: 'agent', description: 'owning live agent.' }],
+        returns: 'the committed state and the provider\'s typed result.',
+        throws: ['{@link InvestigationError} `INVESTIGATION_NOT_FOUND`, `INVESTIGATION_CLOSED`, `INVESTIGATION_BUDGET_EXHAUSTED`, or `INVESTIGATION_UNKNOWN_PROVIDER`; rethrows provider failures after committing a failed attempt.'],
+      },
+      {
+        signature: 'finish(agent: Agent): InvestigationState',
+        description: 'Finish an active investigation whose evidence requirements are satisfied.',
+        parameters: [{ name: 'agent', description: 'owning live agent.' }],
+        returns: 'the terminal state.',
+        throws: ['{@link InvestigationError} `INVESTIGATION_NOT_FINISHABLE` while any physical dimension remains unknown.'],
+      },
+      {
+        signature: 'stopUnknown(agent: Agent, reason: string): InvestigationState',
+        description: 'Stop an active investigation that cannot be resolved with the available evidence.',
+        parameters: [{ name: 'agent', description: 'owning live agent.' }, { name: 'reason', description: 'concrete non-empty explanation recorded durably.' }],
+        returns: 'the terminal state.',
+      },
+    ],
+  },
+  {
     key: 'jobs',
     summary: 'Abstract background job registry.',
     description: 'Abstract background job registry. Subclass, implement the abstract methods, and load the subclass as a plugin — it registers as `ctx.jobs` (one implementation per context; loading a second throws, which is cordis\' standard duplicate-service behavior).\n\nImplementations must honor these semantics:\n\n- Registrations outlive producer and controller fibers. Owner and service disposal cancel live work and await compliant producers; a throwing teardown cancel force-fails only the record. Teardown cancellation also marks the record reported, because a record its owner is being destroyed for has no reader left.\n- Owned-job access is fenced by the owner\'s session id. Ids are predictable, so authorization — not secrecy — is the boundary.\n- Settlement is first-wins: one terminal record, released waiters, and one round of contained listener notification, even against a late producer outcome. Completion is announced last, after the record is committed and every other observer of the settlement has seen it, because a reporter may open a model turn synchronously.\n- start refuses work while no attached job controller serves the spec\'s owner, so a producer cannot start work that owner cannot collect or stop. One registry serves every composition in the process, so this question — and completion-listener delivery — is owner-relative rather than process-wide: registrations made from an unscoped context serve every owner, and registrations made under an agent composition\'s scope serve exactly the agents composed under it.',
@@ -2720,6 +2767,22 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type AttachmentId = Branded<\'AttachmentId\'>;',
   },
   {
+    name: 'AttemptAction',
+    declaration: 'export type AttemptAction = \'run_physical_assessment\';',
+  },
+  {
+    name: 'AttemptOutcome',
+    declaration: 'export type AttemptOutcome = \'completed\' | \'failed\';',
+  },
+  {
+    name: 'AttemptProvenance',
+    declaration: 'export type AttemptProvenance = \'stub\';',
+  },
+  {
+    name: 'AttemptRecord',
+    declaration: 'export interface AttemptRecord {\n    readonly action: AttemptAction;\n    readonly provider: string;\n    readonly outcome: AttemptOutcome;\n    readonly provenance: AttemptProvenance;\n    readonly at: number;\n    readonly reason?: string;\n}',
+  },
+  {
     name: 'BackendRegistry',
     declaration: 'export class BackendRegistry {\n    register(name: string, backend: StorageBackend): () => void;\n    get(name: string): StorageBackend;\n    names(): string[];\n}',
   },
@@ -2742,6 +2805,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'CancelOptions',
     declaration: 'export interface CancelOptions {\n    keepInbox?: boolean | undefined;\n}',
+  },
+  {
+    name: 'CandidateRef',
+    declaration: 'export interface CandidateRef {\n    readonly id: string;\n    readonly actionFamily: string;\n    readonly window: string;\n}',
   },
   {
     name: 'ClientResponse',
@@ -3036,6 +3103,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface EpochHeader {\n    config: LlmCallConfig;\n    adapterDefaults?: LlmCallConfigAdapterDefaults;\n    system?: string;\n    tools?: ToolSchema[];\n}',
   },
   {
+    name: 'EvidenceState',
+    declaration: 'export interface EvidenceState {\n    readonly requirements: readonly string[];\n    readonly currentStatus: EvidenceStatus;\n}',
+  },
+  {
+    name: 'EvidenceStatus',
+    declaration: 'export type EvidenceStatus = \'pending\' | \'partial\' | \'satisfied\';',
+  },
+  {
     name: 'FileDiff',
     declaration: 'export interface FileDiff {\n    path: string;\n    oldText: string | null;\n    newText: string;\n}',
   },
@@ -3136,6 +3211,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface GoalView extends GoalSnapshot {\n    readonly roundsStarted: number;\n    readonly createdAt: number;\n    readonly updatedAt: number;\n    readonly activation: GoalActivation;\n}',
   },
   {
+    name: 'HandObservation',
+    declaration: 'export type HandObservation = \'unknown\' | \'valid\' | \'invalid\';',
+  },
+  {
+    name: 'HoiSupport',
+    declaration: 'export type HoiSupport = \'unknown\' | \'positive\' | \'negative\';',
+  },
+  {
     name: 'ImageAttachmentLimits',
     declaration: 'export interface ImageAttachmentLimits {\n    maxImageBytes: number;\n    maxImagesPerMessage: number;\n    maxMessageImageBytes: number;\n    maxImagePixels: number;\n    mediaTypes: readonly ImageMediaType[];\n}',
   },
@@ -3170,6 +3253,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'InvariantInstaller',
     declaration: 'export interface InvariantInstaller {\n    (ctx: Context, fail: InvariantFailure): void | Promise<void>;\n    readonly inject?: Inject;\n}',
+  },
+  {
+    name: 'InvestigationBudget',
+    declaration: 'export interface InvestigationBudget {\n    readonly maxAttempts: number;\n    readonly usedAttempts: number;\n}',
+  },
+  {
+    name: 'InvestigationPhase',
+    declaration: 'export type InvestigationPhase = \'active\' | \'finished\' | \'stopped-unknown\';',
+  },
+  {
+    name: 'InvestigationState',
+    declaration: 'export interface InvestigationState {\n    readonly revision: number;\n    readonly candidate: CandidateRef;\n    readonly evidence: EvidenceState;\n    readonly physical: PhysicalState;\n    readonly lineage: Lineage;\n    readonly attempts: readonly AttemptRecord[];\n    readonly budget: InvestigationBudget;\n    readonly phase: InvestigationPhase;\n}',
   },
   {
     name: 'InvocationDescriptor',
@@ -3266,6 +3361,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'KvUnitDescriptor',
     declaration: 'export interface KvUnitDescriptor {\n    readonly name: string;\n    readonly version: number;\n    readonly tables: readonly string[];\n    readonly hasGlobal: boolean;\n}',
+  },
+  {
+    name: 'Lineage',
+    declaration: 'export type Lineage = \'unknown\' | \'attached\' | \'rejected\';',
   },
   {
     name: 'LlmAdapter',
@@ -3482,6 +3581,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'PermissionSelect',
     declaration: 'export interface PermissionSelect {\n    options: PresetOption[];\n    currentValue: string;\n}',
+  },
+  {
+    name: 'PhysicalAssessmentProvider',
+    declaration: 'export interface PhysicalAssessmentProvider {\n    readonly id: string;\n    readonly provenance: AttemptProvenance;\n    assess(state: InvestigationState): PhysicalAssessmentResult | Promise<PhysicalAssessmentResult>;\n}',
+  },
+  {
+    name: 'PhysicalAssessmentResult',
+    declaration: 'export interface PhysicalAssessmentResult {\n    readonly physical: PhysicalState;\n    readonly lineage?: \'attached\' | \'rejected\';\n    readonly summary: string;\n}',
+  },
+  {
+    name: 'PhysicalState',
+    declaration: 'export interface PhysicalState {\n    readonly handObservation: HandObservation;\n    readonly traceQuality: TraceQuality;\n    readonly hoiSupport: HoiSupport;\n    readonly objectTraceQuality: TraceQuality;\n}',
   },
   {
     name: 'PostToolDecision',
@@ -4088,6 +4199,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface SpillSource {\n    toolName: string;\n    callId: CallId;\n    label: string;\n}',
   },
   {
+    name: 'StartInvestigationRequest',
+    declaration: 'export interface StartInvestigationRequest {\n    readonly candidateId: string;\n    readonly actionFamily: string;\n    readonly window: string;\n    readonly requirements: readonly string[];\n    readonly maxAttempts?: number;\n}',
+  },
+  {
     name: 'StorageBackend',
     declaration: 'export interface StorageBackend {\n    readonly kv?: KvFacet;\n    close(): Promise<void>;\n}',
   },
@@ -4458,6 +4573,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ToolSchema',
     declaration: 'export interface ToolSchema {\n    name: string;\n    description: string;\n    parameters: Record<string, unknown>;\n}',
+  },
+  {
+    name: 'TraceQuality',
+    declaration: 'export type TraceQuality = \'unknown\' | \'reliable\' | \'degraded\' | \'absent\';',
   },
   {
     name: 'TurnEndCancelCause',

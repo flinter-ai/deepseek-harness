@@ -126,7 +126,11 @@ function present(title: string, rawInput?: unknown): GenericCallView {
   return { card: 'generic', title, kind: 'other', ...rawInput === undefined ? {} : { rawInput } }
 }
 
-/** Render the authoritative state snapshot projected before an agent step. */
+/**
+ * Render the authoritative state snapshot projected before an agent step.
+ * @param state - current durable investigation state.
+ * @returns the model-visible state snapshot text.
+ */
 export function renderInvestigationState(state: InvestigationState): string {
   const lines = [
     `Investigation state (revision ${state.revision}, phase ${state.phase}):`,

@@ -17,6 +17,7 @@ import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SqliteSessionQueryEngine from '@deepseek-ai/dsh-session-query-sqlite'
 import GoalService from '@deepseek-ai/dsh-goal'
+import InvestigationService from '@deepseek-ai/dsh-agentic-control'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { type Config as ToolsConfig } from '@deepseek-ai/dsh-tools'
 import LocalBashExecutor from '@deepseek-ai/dsh-bash-local'
@@ -40,6 +41,7 @@ import SkillRegistry from '@deepseek-ai/dsh-skill'
 import * as SkillFileSystem from '@deepseek-ai/dsh-skill-filesystem'
 import LocalJobRegistry from '@deepseek-ai/dsh-jobs-local'
 import * as ToolAskUser from '@deepseek-ai/dsh-tool-ask-user'
+import * as ToolAgenticControl from '@deepseek-ai/dsh-tool-agentic-control'
 import * as ToolBash from '@deepseek-ai/dsh-tool-bash'
 import * as ToolPwsh from '@deepseek-ai/dsh-tool-pwsh'
 import * as ToolBashPersistent from '@deepseek-ai/dsh-tool-bash-persistent'
@@ -182,6 +184,20 @@ export interface ToolPackage {
  * guard proves it is exhaustive against the on-disk glob.
  */
 const TOOL_PACKAGES: ToolPackage[] = [
+  {
+    pkg: '@deepseek-ai/dsh-tool-agentic-control',
+    dir: 'tool-agentic-control',
+    source: 'packages/agentic-control/tool-agentic-control/src/index.ts',
+    requires: ['ctx.tools', 'ctx.agents', 'ctx.investigations', 'ctx.systemPrompt', 'a calling Agent for execution'],
+    writes: ['tool/call', 'investigation/change', 'user/message state projection', 'tool/result'],
+    async mount(ctx) {
+      await ctx.plugin(AgentRegistry)
+      await ctx.plugin(InvestigationService)
+      await ctx.plugin(ToolAgenticControl)
+    },
+    note:
+      'The three bounded macro-actions operate on a harness-started investigation. The model can assess, finish, or stop-unknown, but cannot start an investigation or author lineage; the durable state snapshot is projected only after a revision change.',
+  },
   {
     pkg: '@deepseek-ai/dsh-tool-ask-user',
     dir: 'tool-ask-user',

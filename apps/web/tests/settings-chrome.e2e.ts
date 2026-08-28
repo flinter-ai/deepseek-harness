@@ -278,7 +278,10 @@ describe('web e2e: settings modal and General preferences', () => {
     const dialog = page.getByRole('dialog', { name: '设置' })
     await dialog.waitFor({ timeout: 10_000 })
     const darkCube = dialog.getByRole('button', { name: '深色' })
-    expect(await darkCube.getAttribute('aria-pressed')).toBe('false')
+    // The dialog mounts before the Host-backed preference has necessarily
+    // hydrated.  Wait for the light/system state established by the previous
+    // scenario instead of sampling the transient button state.
+    await expect.poll(() => darkCube.getAttribute('aria-pressed'), { timeout: 5_000 }).toBe('false')
     await darkCube.click()
     // The full cascade: pressed state, Host-backed preference, body attribute,
     // alias token flip — all from one real user gesture.

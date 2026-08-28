@@ -758,6 +758,9 @@ importers:
       '@deepseek-ai/dsh-workflow-worker-thread':
         specifier: workspace:*
         version: link:../packages/workflow/workflow-worker-thread
+      '@flinter/dsh-orca':
+        specifier: link:./dsh-orca
+        version: link:dsh-orca
       '@flinter/dsh-pes':
         specifier: link:./dsh-pes
         version: link:dsh-pes
