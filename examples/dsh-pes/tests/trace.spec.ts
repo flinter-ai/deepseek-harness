@@ -101,6 +101,14 @@ function completedResult(overrides: Record<string, unknown> = {}): PesResult {
   }
 }
 
+function parseJsonObject(text: string): Record<string, unknown> {
+  const value: unknown = JSON.parse(text)
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new TypeError('expected a JSON object')
+  }
+  return value as Record<string, unknown>
+}
+
 function abstainedResult(): PesResult {
   return completedResult({ status: 'abstained', abstained: true, count: 0, event_ids: [] })
 }
@@ -187,7 +195,7 @@ describe('dsh-pes trace record seam (trace-record.js)', () => {
       + '"id":"tr_2ef87eec35fe7911b28138df"}',
     )
     // Key order is exactly the committed canonical order.
-    expect(Object.keys(JSON.parse(body))).toEqual(TRACE_RECORD_KEYS)
+    expect(Object.keys(parseJsonObject(body))).toEqual(TRACE_RECORD_KEYS)
   })
 
   it('is byte-deterministic: identical input yields identical bytes and signature', () => {
@@ -311,7 +319,7 @@ describe('dsh-pes trace emitter (trace.js)', () => {
     const smuggled = completedResult({
       trace_callback_url: 'https://evil.example/trace',
       hmac_secret: 'model-chosen-secret',
-    }) as PesResult
+    })
     await emitter.maybeEmit(smuggled)
     expect(calls).toHaveLength(1)
     expect(calls[0]!.url).toBe(config.callbackUrl)
@@ -336,9 +344,11 @@ describe('dsh-pes trace emitter (trace.js)', () => {
     await emitter.maybeEmit(completedResult())
     await emitter.maybeEmit(zoomResult())
     expect(calls).toHaveLength(2)
-    expect(JSON.parse(calls[0]!.body).runOrdinal).toBe(0)
-    expect(JSON.parse(calls[1]!.body).runOrdinal).toBe(1)
-    expect(JSON.parse(calls[0]!.body).id).not.toBe(JSON.parse(calls[1]!.body).id)
+    const first = parseJsonObject(calls[0]!.body)
+    const second = parseJsonObject(calls[1]!.body)
+    expect(first.runOrdinal).toBe(0)
+    expect(second.runOrdinal).toBe(1)
+    expect(first.id).not.toBe(second.id)
   })
 
   it('does not emit for abstained or error results, and reports disabled when unconfigured', async () => {
