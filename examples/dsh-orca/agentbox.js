@@ -13,6 +13,7 @@ import { access, constants } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { defineTool } from '@deepseek-ai/dsh-tools'
+import { quoteShell } from './quote-shell.mjs'
 
 export const DEFAULT_GMI_SCRIPT = '/Users/oldap/flinter/flinter-data-infra/scripts/gmi-task.mjs'
 export const GMI_ENV_FILE = join(homedir(), '.flinter', 'gmi-env.sh')
@@ -31,10 +32,6 @@ export async function gmiEnvStatus() {
     envFile = false
   }
   return { token, envFile, ready: token || envFile }
-}
-
-function quoteShell(value) {
-  return `'${String(value).replace(/'/g, `'\\''`)}'`
 }
 
 function buildCommand(script, action, args) {
