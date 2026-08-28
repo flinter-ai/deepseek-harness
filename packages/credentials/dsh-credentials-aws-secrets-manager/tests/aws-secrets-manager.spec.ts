@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Context } from '@deepseek-ai/cordis'
+import { Context, Service } from '@deepseek-ai/cordis'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import {
   CreateSecretCommand,
@@ -54,6 +54,15 @@ describe('AwsSecretsManagerCredentialProvider', () => {
     expect(send).toHaveBeenCalledWith(expect.any(GetSecretValueCommand))
   })
 
+  it('constructs with explicit region and profile overrides', async () => {
+    const { provider, send } = makeProvider({ region: 'us-west-2', profile: 'ops' })
+    send.mockResolvedValue({ SecretString: '{"MY_KEY":"sk-json"}' })
+    await expect(provider.resolve(credentialRef('MY_KEY'))).resolves.toEqual({
+      value: 'sk-json',
+      source: 'aws-secrets-manager',
+    })
+  })
+
   it('resolves a JSON secret using the ref name as the default field', async () => {
     const { provider, send } = makeProvider()
     send.mockResolvedValue({ SecretString: '{"MY_KEY":"sk-json"}' })
@@ -72,6 +81,23 @@ describe('AwsSecretsManagerCredentialProvider', () => {
     const { provider, send } = makeProvider()
     send.mockRejectedValue({ name: 'ResourceNotFoundException' })
     await expect(provider.resolve(credentialRef('MISSING'))).resolves.toBeUndefined()
+  })
+
+  it('returns undefined for binary and empty secret payloads', async () => {
+    const { provider, send } = makeProvider()
+    send.mockResolvedValueOnce({ SecretString: undefined })
+      .mockResolvedValueOnce({ SecretString: '' })
+    await expect(provider.resolve(credentialRef('BINARY'))).resolves.toBeUndefined()
+    await expect(provider.resolve(credentialRef('EMPTY'))).resolves.toBeUndefined()
+  })
+
+  it('rethrows non-not-found resolve and describe failures', async () => {
+    const { provider, send } = makeProvider()
+    const error = new Error('access denied')
+    send.mockRejectedValueOnce(error)
+    await expect(provider.resolve(credentialRef('DENIED'))).rejects.toBe(error)
+    send.mockRejectedValueOnce(error)
+    await expect(provider.describe(credentialRef('DENIED'))).rejects.toBe(error)
   })
 
   it('returns undefined for an empty JSON field', async () => {
@@ -130,6 +156,22 @@ describe('AwsSecretsManagerCredentialProvider', () => {
     expect(send).not.toHaveBeenCalledWith(expect.any(CreateSecretCommand))
   })
 
+  it('writes plain secret payloads', async () => {
+    const { provider, send } = makeProvider({ secretFormat: 'plain' })
+    send.mockResolvedValue({})
+    await provider.set(credentialRef('MY_KEY'), 'sk-plain')
+    expect(send).toHaveBeenCalledWith(expect.any(PutSecretValueCommand))
+  })
+
+  it('rethrows non-not-found set and unset failures', async () => {
+    const { provider, send } = makeProvider()
+    const error = new Error('access denied')
+    send.mockRejectedValueOnce(error)
+    await expect(provider.set(credentialRef('MY_KEY'), 'sk-denied')).rejects.toBe(error)
+    send.mockRejectedValueOnce(error)
+    await expect(provider.unset(credentialRef('MY_KEY'))).rejects.toBe(error)
+  })
+
   it('deletes a secret on unset', async () => {
     const { provider, send } = makeProvider()
     send.mockResolvedValue({})
@@ -141,5 +183,13 @@ describe('AwsSecretsManagerCredentialProvider', () => {
     const { provider, send } = makeProvider()
     send.mockRejectedValue({ name: 'ResourceNotFoundException' })
     await expect(provider.unset(credentialRef('MISSING'))).resolves.toBeUndefined()
+  })
+
+  it('destroys the client from the service disposer', () => {
+    const { provider } = makeProvider()
+    const disposer = provider[Service.init]().next().value
+    if (typeof disposer !== 'function') throw new Error('provider did not yield a disposer')
+    disposer()
+    expect(mockDestroy).toHaveBeenCalledOnce()
   })
 })

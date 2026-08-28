@@ -91,6 +91,8 @@ describe('PiAiAdapter provider routing', () => {
       transport: 'sse',
       timeoutMs: 5000,
       websocketConnectTimeoutMs: 3000,
+      region: 'us-west-2',
+      profile: 'dsh-test',
       streamIdleTimeoutMs: 10_000,
       thinkingBudgets: { high: 2048 },
     })
