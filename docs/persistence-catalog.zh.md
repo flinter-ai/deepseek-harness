@@ -472,6 +472,22 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 
 来源：[`packages/hooks/hook-protocol/src/types.ts:31`](../packages/hooks/hook-protocol/src/types.ts)
 
+### `investigation/*`
+
+<a id="investigationchange--log-only"></a>
+
+#### `investigation/change` — log-only
+
+```ts persistence-catalog
+/**
+ * Complete post-mutation investigation state. Required-on-read: builds
+ * that do not know its type refuse the log.
+ */
+'investigation/change': InvestigationChangeMeta
+```
+
+来源：[`packages/agentic-control/agentic-control/src/domain.ts:38`](../packages/agentic-control/agentic-control/src/domain.ts)
+
 ### `llm/*`
 
 <a id="llmretry--log-only"></a>

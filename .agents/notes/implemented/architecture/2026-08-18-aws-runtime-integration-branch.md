@@ -31,11 +31,6 @@ Neither gate requires credentials, and neither dispatches an AWS request. A cred
 
 ## Consequences
 
-- `flinter/aws-runtime` is the only trunk that composes the three capability
-  branches; sibling feature branches and `master` never carry the composition.
-- The keyless structural smoke proves the composition with zero AWS calls and
-  no credentials: the composition and boot gates assert the composed rows and
-  clean disposal, and the environment is stripped of every `AWS_*` variable
-  with IMDS disabled, so a boot-time cloud call would fail loud.
-- A credential-aware live smoke and any real AWS request remain separate,
-  later, gated tests.
+- `flinter/aws-runtime` is the only trunk that composes the three capability branches; sibling feature branches and `master` never carry the composition.
+- The keyless structural smoke proves the composition with zero AWS calls and no credentials: the composition and boot gates assert the composed rows and clean disposal, and the environment is stripped of every `AWS_*` variable with IMDS disabled, so a boot-time cloud call would fail loud.
+- A credential-aware live smoke and any real AWS request remain separate, later, gated tests.

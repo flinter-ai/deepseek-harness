@@ -14,10 +14,10 @@ export interface CapabilityRegistry {
   ): () => void
   has(id: string): boolean
   list(): string[]
-  execute<Request = unknown, Result = unknown>(
+  execute(
     id: string,
-    request: Request,
-  ): Result | Promise<Result>
+    request: unknown,
+  ): unknown
 }
 
 export function createCapabilityRegistry(): CapabilityRegistry

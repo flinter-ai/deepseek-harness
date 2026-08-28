@@ -13,6 +13,10 @@
     "taskkill",
     "where.exe"
   ],
+  "ignoreFiles": [
+    "examples/dsh-pes/*.d.ts",
+    "examples/dsh-segment/capabilities/*.d.ts"
+  ],
   "ignoreWorkspaces": [
     "vendor/*",
     "python/sdk-runtime"
@@ -71,7 +75,8 @@
         "**/*.ts"
       ],
       "ignoreDependencies": [
-        "@deepseek-ai/.+"
+        "@deepseek-ai/.+",
+        "@flinter/dsh-(orca|pes|segment)"
       ]
     },
     "packages/util/home": {
