@@ -188,8 +188,11 @@ jobs:
       DSH_NODE_COMPAT_SKIP_TYPECHECK: '1'
       DSH_OXLINT_THREADS: '8'
       DSH_PUBLINT_CONCURRENCY: '8'
-      # Failover halves snapshot concurrency for the shared 64-core VM.
-      DSH_SNAPSHOT_MAX_CONCURRENCY: ${{ vars.DSH_CI_FAILOVER_LINUX == 'selfhosted' && github.event.pull_request.user.login != 'dependabot[bot]' && '12' || '32' }}
+      # The standard hosted runner is deliberately bounded below the old
+      # enterprise-pool setting: replay starts real subprocesses, and an
+      # over-large fan-out can starve a queued parent turn in multi-turn
+      # subagent fixtures. The shared failover VM has the headroom for 12.
+      DSH_SNAPSHOT_MAX_CONCURRENCY: ${{ vars.DSH_CI_FAILOVER_LINUX == 'selfhosted' && github.event.pull_request.user.login != 'dependabot[bot]' && '12' || '8' }}
     steps:
       - uses: actions/checkout@v6
         with:
