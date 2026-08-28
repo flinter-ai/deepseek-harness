@@ -63,9 +63,36 @@ node examples/dsh-orca/spawn-dsh-worker.mjs \
   --objective "Refactor error handling" \
   --spec "Split errors.ts into domain modules" \
   --model hard \
+  --from term_coordinator \
   --dest /Users/oldap/flinter/flinter-contracts \
   --prompt-file /path/to/contract.md
 ```
+
+实时启动器要求显式提供 `--from` coordinator handle。它只会在 Orca 分配 dispatch 之后推导 worker home，因此不同尝试不会共享按模型划分的 home：
+
+```text
+/tmp/dsh/<run-id>/<task-id>/<dispatch-id>/
+```
+
+启动 manifest 不包含 secret。证据应写入独立的
+`/tmp/dsh-artifacts/<run-id>/<task-id>/<dispatch-id>/` 根目录。设置
+`DSH_ORCA_STARTUP_TIMEOUT_MS` 可以修改 60 秒的启动 fence。启动超时会报告 worker 失败并以非零状态退出；不会继续进入 provider fallback。
+
+在 fan-out 之前，coordinator 可以要求先完成 canary proof：
+
+```bash
+node examples/dsh-orca/spawn-dsh-worker.mjs ... \
+  --require-canary /tmp/dsh-canary/<run-id>.json
+```
+
+proof 必须将 `heartbeat`、`destinationWrite`、`artifact` 和
+`workerDone` 都设置为 `true`。如果某个 retry 处于 pending 或 unknown，先将它 fence：
+
+```bash
+node examples/dsh-orca/fence-dsh-worker.mjs --dispatch <dispatch_id>
+```
+
+只有在 Orca 无法证明旧进程已经停止时才使用 `--abandon`。fence 命令不会删除 worktree 或 attempt evidence；清理是独立操作，并且要求已经确认 fencing。
 
 然后等待完成：
 

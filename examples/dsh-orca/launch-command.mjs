@@ -16,6 +16,7 @@ export function buildDshLaunchCommand({
   nodeBin,
   cwd,
   gmiEnv,
+  artifacts,
   inheritedEnv = process.env,
 }) {
   const env = {
@@ -30,6 +31,7 @@ export function buildDshLaunchCommand({
     DSH_AGENT_CLI: join(dshRoot, 'apps', 'cli', 'src', 'bin.ts'),
     DSH_AGENT_PROFILE: profile,
     DSH_TASK_SPEC: String(taskSpec ?? ''),
+    ...(artifacts ? { DSH_ORCA_ARTIFACT_ROOT: artifacts } : {}),
     ...(gmiEnv ? { DSH_AGENT_GMI_ENV: gmiEnv } : {}),
   }
   const sourceGmi = gmiEnv ? 'source "$DSH_AGENT_GMI_ENV" && ' : ''
