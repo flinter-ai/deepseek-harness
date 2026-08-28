@@ -1,6 +1,6 @@
 # Agent Note: 将 core 同步到派生 DSH 分支
 
-Status: implemented and active
+Status: proposed
 
 [English](2026-08-27-core-derived-branch-sync.md) | 中文
 
@@ -22,26 +22,14 @@ Status: implemented and active
 
 ## 实现记录（2026-08-27）
 
-该工作流已经在 `flinter/core` 上实现。PR #14、#18、#19 和 #23 分别落地了
-同步工作流、正确的 GitHub compare 请求、使用 App 身份创建 PR，以及对 squash
-重放历史安全的内容检测。第一次同步使用 squash 合并后，PR #27、#28 和 #29
-以目标分支为起点补做了修复合并，使 `flinter/core` 真正成为每条派生线的第二
-父提交。
+该工作流已经在 `flinter/core` 上实现。PR #14、#18、#19 和 #23 分别落地了同步工作流、正确的 GitHub compare 请求、使用 App 身份创建 PR，以及对 squash 重放历史安全的内容检测。第一次同步使用 squash 合并后，PR #27、#28 和 #29 以目标分支为起点补做了修复合并，使 `flinter/core` 真正成为每条派生线的第二父提交。
 
 运行规则：
 
-- core 同步 PR 必须使用普通 merge commit 合并，不能使用 squash 或 rebase，
-  这样后续比较才能保留源分支祖先关系。如果已经发生 squash 重放，下一次
-  core 同步前必须从目标分支补做一次保留祖先的合并。
-- 检测器会对 compare 响应中的变更路径，比较目标树和源树的 mode、type 与对象
-  SHA。已经存在于目标内容中的变更不会再次打开重复 PR；树数据缺失或被截断时
-  工作流会失败，而不是猜测。
-- 创建同步 PR 使用已经安装的 `DSH Issue Management-1` GitHub App。该 App
-  必须拥有仓库级 `Pull requests: Read and write` 权限；2026-08-27 已验证当前
-  安装拥有 `Pull requests: Write`。仓库级 GITHUB_TOKEN 创建/批准 PR 的开关仍保持
-  关闭。
-- AWS/dsh-segment 漂移只作为警告证据。core 同步绝不包含独立的 segment 能力
-  集成。
+- core 同步 PR 必须使用普通 merge commit 合并，不能使用 squash 或 rebase，这样后续比较才能保留源分支祖先关系。如果已经发生 squash 重放，下一次 core 同步前必须从目标分支补做一次保留祖先的合并。
+- 检测器会对 compare 响应中的变更路径，比较目标树和源树的 mode、type 与对象 SHA。已经存在于目标内容中的变更不会再次打开重复 PR；树数据缺失或被截断时工作流会失败，而不是猜测。
+- 创建同步 PR 使用已经安装的 `DSH Issue Management-1` GitHub App。该 App 必须拥有仓库级 `Pull requests: Read and write` 权限；2026-08-27 已验证当前安装拥有 `Pull requests: Write`。仓库级 GITHUB_TOKEN 创建/批准 PR 的开关仍保持关闭。
+- AWS/dsh-segment 漂移只作为警告证据。core 同步绝不包含独立的 segment 能力集成。
 
 ## 考虑过的替代方案
 

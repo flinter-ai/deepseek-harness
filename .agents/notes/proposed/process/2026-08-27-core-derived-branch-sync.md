@@ -1,6 +1,6 @@
 # Agent Note: Synchronize core into derived DSH branches
 
-Status: implemented and active
+Status: proposed
 
 English | [中文](2026-08-27-core-derived-branch-sync.zh.md)
 
@@ -22,28 +22,14 @@ The workflow never force-pushes or auto-merges. A separate compatibility check c
 
 ## Implementation record (2026-08-27)
 
-The workflow is implemented on `flinter/core`. PRs #14, #18, #19, and #23
-landed the synchronization workflow, the correct GitHub compare request,
-App-authenticated PR path, and squash-replay-safe content detection.
-Target-based repair PRs #27, #28, and #29 restored `flinter/core` as a real
-second parent of each derived line after the first syncs were squash-merged.
+The workflow is implemented on `flinter/core`. PRs #14, #18, #19, and #23 landed the synchronization workflow, the correct GitHub compare request, App-authenticated PR path, and squash-replay-safe content detection. Target-based repair PRs #27, #28, and #29 restored `flinter/core` as a real second parent of each derived line after the first syncs were squash-merged.
 
 Operational rules:
 
-- Merge a core-sync PR with a normal merge commit, not squash or rebase, so
-  future comparisons retain source ancestry. If a squash replay has already
-  happened, repair from the target branch with a merge commit before the next
-  core sync.
-- The detector compares the source compare response's changed paths by target
-  and source tree entry (mode, type, and object SHA), so already-represented
-  content does not reopen a duplicate PR. Missing or truncated tree data fails
-  the job instead of guessing.
-- Sync PR creation uses the installed `DSH Issue Management-1` GitHub App.
-  The App must have repository `Pull requests: Read and write`; the current
-  installation was verified with `Pull requests: Write` on 2026-08-27. The
-  repository-wide GITHUB_TOKEN create/approve setting remains disabled.
-- AWS/dsh-segment drift is warning evidence only. Core synchronization never
-  includes the separate segment capability integration.
+- Merge a core-sync PR with a normal merge commit, not squash or rebase, so future comparisons retain source ancestry. If a squash replay has already happened, repair from the target branch with a merge commit before the next core sync.
+- The detector compares the source compare response's changed paths by target and source tree entry (mode, type, and object SHA), so already-represented content does not reopen a duplicate PR. Missing or truncated tree data fails the job instead of guessing.
+- Sync PR creation uses the installed `DSH Issue Management-1` GitHub App. The App must have repository `Pull requests: Read and write`; the current installation was verified with `Pull requests: Write` on 2026-08-27. The repository-wide GITHUB_TOKEN create/approve setting remains disabled.
+- AWS/dsh-segment drift is warning evidence only. Core synchronization never includes the separate segment capability integration.
 
 ## Alternatives considered
 
