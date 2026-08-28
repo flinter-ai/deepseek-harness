@@ -69,7 +69,8 @@ describe('CI workflow', () => {
     expect(windowsNative['runs-on']).not.toContain('DSH_CI_FAILOVER_LINUX')
     expect(windowsNative['runs-on']).toContain('self-hosted')
     expect(windowsNative['runs-on']).toContain('dsh-win-ci')
-    expect(windowsNative['runs-on']).toContain('dsh-windows-2025-16core')
+    expect(windowsNative['runs-on']).toContain("|| 'windows-2025'")
+    expect(windowsNative['runs-on']).not.toContain('dsh-windows-2025-16core')
     expect(windowsNative.name).toBe('windows node 24 / native complete')
     expect(windowsNative.if).toBe("github.event_name == 'pull_request'")
     expect(windowsNative.env).toMatchObject({
@@ -102,6 +103,8 @@ describe('CI workflow', () => {
       expect(job['runs-on'], `${jobName} runs-on must use the Linux failover switch`).toContain('DSH_CI_FAILOVER_LINUX')
       expect(job['runs-on'], `${jobName} runs-on must not use the Windows failover switch`).not.toContain('DSH_CI_FAILOVER_WINDOWS')
       expect(job['runs-on']).toContain('vm-backup')
+      expect(job['runs-on']).toContain("|| 'ubuntu-latest'")
+      expect(job['runs-on']).not.toContain('dsh-ubuntu-24-04-16core')
     }
     expect(aggregate['runs-on']).toContain('DSH_CI_FAILOVER_LINUX')
     expect(aggregate['runs-on']).not.toContain('DSH_CI_FAILOVER_WINDOWS')

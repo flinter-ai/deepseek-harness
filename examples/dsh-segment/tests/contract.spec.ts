@@ -116,7 +116,7 @@ describe('dsh-segment S1 semantic-capability contract (aws-runtime-style caller)
     } finally {
       await rm(outDir, { recursive: true, force: true })
     }
-  }, LOADER_SMOKE_TEST_TIMEOUT_MS) // eslint-disable-line no-magic-numbers
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
 })
 
 describe('dsh-segment S1 capability registry', () => {
@@ -140,7 +140,7 @@ describe('dsh-segment S1 capability registry', () => {
     expect(() => registry.register('CAP_DUP', { execute: () => 'ok' })).toThrow(/already registered/)
     // The runtime rejects a malformed adapter; TS cannot express "an object
     // that type-checks as an adapter but lacks execute", so cast deliberately.
-    const malformed = {} as unknown as CapabilityAdapter<unknown, unknown>
+    const malformed = {} as unknown as CapabilityAdapter
     expect(() => registry.register('CAP_NO_EXECUTE', malformed)).toThrow(/adapter with an execute/)
   })
 })

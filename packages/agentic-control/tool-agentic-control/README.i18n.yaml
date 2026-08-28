@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/agentic-control/tool-agentic-control/README.md
-README.md: 6591ed8aaa1937f85f1b19c44e102f68d0278819
-README.zh.md: 39b484c6c4fd76a6f0bd143aaffe14a541708b53
+README.md: cea98b1b94c59bfb8b8117b5667b8f73bf77d19b
+README.zh.md: bd9a3f9689f00aa1afc1655e841efb1b4df02a9e

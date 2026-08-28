@@ -467,7 +467,11 @@ describe('web e2e: long Chat scroll contract', () => {
   it.skipIf(MODE === 'record')('preserves the reader anchor when history and streaming arrive concurrently', async () => {
     await withScrollWorld({
       failureShot: 'web-e2e-chat-scroll-history-stream',
-      replay: [replayEntry(textStream(LIVE_TEXT_FIRST, LIVE_TEXT_DONE, 120))],
+      // Keep the model stream alive through slow full-suite setup. At the
+      // 24ms replay pace, 2048 deltas leave roughly 49 seconds for the
+      // history gate to be held; a shorter stream can finish before this
+      // contract reaches the overlap assertion on a loaded hosted runner.
+      replay: [replayEntry(textStream(LIVE_TEXT_FIRST, LIVE_TEXT_DONE, 2048))],
       seeds: [{ fixture: HISTORY_FIXTURE, id: HISTORY_SESSION_ID }],
     }, async (world) => {
       await openSeed(
@@ -511,7 +515,8 @@ describe('web e2e: long Chat scroll contract', () => {
         await expect.poll(
           () => world.events.filter(event => event.type === 'assistant/chunk').length,
           { timeout: 10_000 },
-        ).toBeGreaterThan(chunksAfterAnchor + 5)
+        // Require five additional chunks; a strict `>` here accidentally required six.
+        ).toBeGreaterThanOrEqual(chunksAfterAnchor + 5)
 
         releaseHistory()
         await expect.poll(() => loadedFlowRows(world.page), { timeout: 30_000 }).toBeGreaterThan(beforeRows)

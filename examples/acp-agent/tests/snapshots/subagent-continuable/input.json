@@ -17,6 +17,7 @@
     },
     {
       "op": "waitForTurnStart",
+      "timeoutMs": 60000,
       "minimumTurn": 2
     },
     {

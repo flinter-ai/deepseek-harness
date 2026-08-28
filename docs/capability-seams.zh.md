@@ -35,6 +35,9 @@ flowchart LR
   pkg_message_feedback["message-feedback"]
   svc_invariants["ctx.invariants<br/>Package-owned invariant registry"]
   pkg_scope["scope"]
+  pkg_agentic_control["agentic-control"]
+  svc_investigations["ctx.investigations<br/>Session-backed investigation control"]
+  pkg_tool_agentic_control["tool-agentic-control"]
   pkg_typert_registry["typert-registry"]
   svc_typert["ctx.typert<br/>Runtime type registry"]
   pkg_typert_loader["typert-loader"]
@@ -200,6 +203,7 @@ flowchart LR
   pkg_agent_default_model --> svc_agentDefaultModel
   pkg_agent_loop --> svc_agentLoop
   pkg_agent_presets --> svc_agentPresets
+  pkg_agentic_control --> svc_investigations
   pkg_api_gateway --> svc_typertGateway
   pkg_apiproxy --> svc_apiProxy
   pkg_approval --> svc_approval
@@ -323,6 +327,7 @@ flowchart LR
   svc_invariants --> pkg_agent_loop
   svc_invariants --> pkg_scope
   svc_invariants --> pkg_session
+  svc_investigations --> pkg_tool_agentic_control
   svc_jobs --> pkg_tool_bash
   svc_jobs --> pkg_tool_jobs
   svc_jobs --> pkg_tool_subagent
@@ -419,6 +424,7 @@ flowchart LR
 | `ctx.toolResultPruner` | `core` | [`compaction-tool-result-pruner`](../packages/compaction/compaction-tool-result-pruner) | - | [`compaction-basic`](../packages/compaction/compaction-basic) | - | 在摘要压缩前，通过可回放的单节点表层替换来改写过大的当前工具结果。 |
 | `ctx.sessions` | `core` | [`session`](../packages/core/session) | - | [`agent-loop`](../packages/core/agent-loop), [`agent`](../packages/core/agent), [`session-persistence`](../packages/session/session-persistence), [`session-query`](../packages/session-query/session-query), [`session-query-sqlite`](../packages/session-query/session-query-sqlite), `subagent-inprocess`, [`invariants`](../packages/runtime-diagnostics/invariants), [`message-feedback`](../packages/feedback/message-feedback) | - | 拥有仅追加的 Session 实例，并发出持久的会话事件流。 |
 | `ctx.invariants` | `core` | [`invariants`](../packages/runtime-diagnostics/invariants) | - | [`session`](../packages/core/session), [`agent`](../packages/core/agent), [`scope`](../packages/core/scope), [`agent-loop`](../packages/core/agent-loop) | - | 配套子路径注册所属包本地的检查；该服务负责选择、唯一性、子 fiber，以及标明所属包的失败。 |
+| `ctx.investigations` | `core` | [`agentic-control`](../packages/agentic-control/agentic-control) | - | [`tool-agentic-control`](../packages/agentic-control/tool-agentic-control) | - | harness 为每个会话拥有一个类型化调查；提供方介导的物理评估和终止转换以完整快照持久化到会话日志，而面向模型的工具消费该服务，但不能创建候选身份或 lineage。 |
 | `ctx.typert` | `core` | [`typert-registry`](../packages/typert/registry) | - | [`typert-loader`](../packages/typert/loader), [`api-gateway`](../packages/api/gateway) | - | 插件直接或通过 dsh-typert-loader 注册实时 zod 贡献；API 网关消费调用描述符和提供方，其他运行时消费方则在各自边界查询 schema 与反射元数据。 |
 | `ctx.typertGateway` | `core` | [`api-gateway`](../packages/api/gateway) | - | - | - | 将生成的 Remote 描述符与实时 Cordis 服务关联，解析已注册的身份，并通过共享的 Connection RPC 载体提供一元调用。 |
 | `ctx.sessionPersistence` | `seam` | [`session-persistence`](../packages/session/session-persistence) | [`session-persistence-jsonl`](../packages/session/session-persistence-jsonl), [`session-persistence-sqlite`](../packages/session/session-persistence-sqlite) | [`agent-loop`](../packages/core/agent-loop), [`tool-bash`](../packages/shell/tool-bash), [`hooks-claude-code`](../packages/hooks/hooks-claude-code), [`hooks-codex`](../packages/hooks/hooks-codex), [`session-query`](../packages/session-query/session-query), [`session-query-sqlite`](../packages/session-query/session-query-sqlite), [`message-feedback`](../packages/feedback/message-feedback) | - | 各后端持久化同一套 SessionEvent 词汇；应用在组合时选择后端。 |

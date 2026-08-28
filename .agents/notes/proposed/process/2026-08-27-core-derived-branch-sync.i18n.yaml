@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/process/2026-08-27-core-derived-branch-sync.md
-2026-08-27-core-derived-branch-sync.md: b84f776874c81f964386842ee9a08ecba7a2c9b6
-2026-08-27-core-derived-branch-sync.zh.md: f4d2322ff58ea7dd37f69e37099ab42c8d926028
+2026-08-27-core-derived-branch-sync.md: 31617b14cd1804c0ddeaec1f4199fa4c6634b6bd
+2026-08-27-core-derived-branch-sync.zh.md: 6fba080c827d4144053462414b916df28aab2bec

@@ -318,6 +318,24 @@ Depends on: [`ToolPresentationMode`](subsystems/tools.md)
 
 Source: [`packages/core/agent-tool-presentation/src/index.ts:38`](../packages/core/agent-tool-presentation/src/index.ts)
 
+<a id="deepseek-aidsh-agentic-control"></a>
+
+## `@deepseek-ai/dsh-agentic-control`
+
+Requires: `agents`
+
+```ts config-catalog
+/** Deployment configuration for the investigation service. */
+export interface Config {
+  /** Default attempt cap for investigations that omit their own. */
+  maxAttempts?: number
+  /** Id of the registered physical-assessment provider. */
+  provider?: string
+}
+```
+
+Source: [`packages/agentic-control/agentic-control/src/index.ts:53`](../packages/agentic-control/agentic-control/src/index.ts)
+
 <a id="deepseek-aidsh-attachment-local"></a>
 
 ## `@deepseek-ai/dsh-attachment-local`
@@ -546,6 +564,28 @@ export interface Config {
 ```
 
 Source: [`packages/extensions/cordis-host-runner/src/index.ts:88`](../packages/extensions/cordis-host-runner/src/index.ts)
+
+<a id="deepseek-aidsh-credentials-aws-secrets-manager"></a>
+
+## `@deepseek-ai/dsh-credentials-aws-secrets-manager`
+
+```ts config-catalog
+/** Plugin config: AWS connection and secret-naming behavior. */
+export interface Config {
+  /** AWS region; defaults to `AWS_REGION` / `AWS_DEFAULT_REGION` / the SDK default. */
+  region?: string
+  /** AWS profile; defaults to `AWS_PROFILE` / the default credential chain. */
+  profile?: string
+  /** Prefix prepended to every credential reference to form the secret name. */
+  secretPrefix?: string
+  /** Payload shape: `plain` for a raw string, `json` for a JSON object. */
+  secretFormat?: 'plain' | 'json'
+  /** JSON property that carries the secret value when `secretFormat` is `json`. */
+  jsonField?: string
+}
+```
+
+Source: [`packages/credentials/dsh-credentials-aws-secrets-manager/src/index.ts:35`](../packages/credentials/dsh-credentials-aws-secrets-manager/src/index.ts)
 
 <a id="deepseek-aidsh-credentials-local"></a>
 
@@ -923,6 +963,16 @@ export interface PiAiProviderProfile {
   /** Endpoint for this route's models; defaults to the installed catalog's endpoint. */
   baseURL?: string
   /**
+   * AWS region for `bedrock-converse-stream` routes. Absent defers to the
+   * model ARN, the endpoint URL, `AWS_REGION`, or `AWS_DEFAULT_REGION`.
+   */
+  region?: string
+  /**
+   * AWS profile for `bedrock-converse-stream` routes. Absent defers to
+   * `AWS_PROFILE` or the default credential chain.
+   */
+  profile?: string
+  /**
    * This route's model catalog. Omission serves the installed catalog for the
    * route unchanged; an explicit list replaces it, each entry defaulting its
    * unset fields from the installed model of the same id.
@@ -993,6 +1043,8 @@ export interface PiAiModelProfile {
   id: string
   /** Display name for selectors; defaults to the catalog name, then the id. */
   name?: string
+  /** Wire protocol this model speaks; absent defers to the route's `api`. */
+  api?: string
   /** Maximum combined request and response context in tokens. */
   contextWindow?: number
   /**
@@ -1049,6 +1101,13 @@ export interface PiAiCompatProfile {
   thinkingFormat?: PiAiThinkingFormat
   /** Whether the endpoint accepts `reasoning_effort`; absent keeps the catalog entry's, then pi-ai's baseURL-derived guess. */
   supportsReasoningEffort?: boolean
+  /**
+   * Whether a reasoning model's system prompt may be sent as the `developer`
+   * chat-completions role. Some OpenAI-compatible gateways (e.g. api.kimi.com)
+   * reject `developer`; setting this `false` forces the `system` role for the
+   * route. Absent keeps the catalog entry's, then pi-ai's baseURL-derived guess.
+   */
+  supportsDeveloperRole?: boolean
 }
 
 /** One request modality a pi-ai model may accept. */
@@ -1079,7 +1138,7 @@ type WithheldThinkingFormat = 'chat-template' | 'qwen-chat-template'
 
 Depends on: `Api` (`@earendil-works/pi-ai`) · `CacheRetention` (`@earendil-works/pi-ai`) · `Model` (`@earendil-works/pi-ai`) · `ModelThinkingLevel` (`@earendil-works/pi-ai`) · `OpenAICompletionsCompat` (`@earendil-works/pi-ai`) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts) · `ThinkingBudgets` (`@earendil-works/pi-ai`) · `Transport` (`@earendil-works/pi-ai`)
 
-Source: [`packages/llm/llm-pi-ai/src/config.ts:172`](../packages/llm/llm-pi-ai/src/config.ts)
+Source: [`packages/llm/llm-pi-ai/src/config.ts:182`](../packages/llm/llm-pi-ai/src/config.ts)
 
 <a id="deepseek-aidsh-llm-replay"></a>
 
@@ -3084,6 +3143,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-subagent` ([`packages/subagent/subagent/src/index.ts`](../packages/subagent/subagent/src/index.ts))
 - `@deepseek-ai/dsh-subprocess-local` ([`packages/subprocess/subprocess-local/src/index.ts`](../packages/subprocess/subprocess-local/src/index.ts))
 - `@deepseek-ai/dsh-terminal` ([`packages/terminal/terminal/src/index.ts`](../packages/terminal/terminal/src/index.ts))
+- `@deepseek-ai/dsh-tool-agentic-control` — requires `agents` · `investigations` · `tools` · `systemPrompt` ([`packages/agentic-control/tool-agentic-control/src/index.ts`](../packages/agentic-control/tool-agentic-control/src/index.ts))
 - `@deepseek-ai/dsh-tool-ask-user` — requires `tools` · `userQuestions` ([`packages/interaction/tool-ask-user/src/index.ts`](../packages/interaction/tool-ask-user/src/index.ts))
 - `@deepseek-ai/dsh-tool-call-timeout-policy` — requires `tools` ([`packages/guard/timeout-policy/src/index.ts`](../packages/guard/timeout-policy/src/index.ts))
 - `@deepseek-ai/dsh-tool-cordis` — requires `tools` · `systemPrompt` · `dynamicCordisRunner` · `cordisInspect` ([`packages/extensions/tool-cordis/src/index.ts`](../packages/extensions/tool-cordis/src/index.ts))

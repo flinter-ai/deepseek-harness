@@ -147,6 +147,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Companion subpaths register owner-local checks; the service owns selection, uniqueness, child fibers, and package-attributed failures.',
   },
   {
+    key: 'investigations',
+    pkg: 'agentic-control',
+    title: 'Session-backed investigation control',
+    mode: 'core',
+    consumers: ['tool-agentic-control'],
+    note: 'The harness owns one typed investigation per session; provider-mediated physical assessments and terminal transitions are persisted as full snapshots in the session log, while model-facing tools consume the service without authoring candidate identity or lineage.',
+  },
+  {
     key: 'typert',
     pkg: 'typert-registry',
     title: 'Runtime type registry',

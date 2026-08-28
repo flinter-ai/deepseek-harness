@@ -33,6 +33,9 @@ flowchart LR
   pkg_message_feedback["message-feedback"]
   svc_invariants["ctx.invariants<br/>Package-owned invariant registry"]
   pkg_scope["scope"]
+  pkg_agentic_control["agentic-control"]
+  svc_investigations["ctx.investigations<br/>Session-backed investigation control"]
+  pkg_tool_agentic_control["tool-agentic-control"]
   pkg_typert_registry["typert-registry"]
   svc_typert["ctx.typert<br/>Runtime type registry"]
   pkg_typert_loader["typert-loader"]
@@ -198,6 +201,7 @@ flowchart LR
   pkg_agent_default_model --> svc_agentDefaultModel
   pkg_agent_loop --> svc_agentLoop
   pkg_agent_presets --> svc_agentPresets
+  pkg_agentic_control --> svc_investigations
   pkg_api_gateway --> svc_typertGateway
   pkg_apiproxy --> svc_apiProxy
   pkg_approval --> svc_approval
@@ -321,6 +325,7 @@ flowchart LR
   svc_invariants --> pkg_agent_loop
   svc_invariants --> pkg_scope
   svc_invariants --> pkg_session
+  svc_investigations --> pkg_tool_agentic_control
   svc_jobs --> pkg_tool_bash
   svc_jobs --> pkg_tool_jobs
   svc_jobs --> pkg_tool_subagent
@@ -417,6 +422,7 @@ flowchart LR
 | `ctx.toolResultPruner` | `core` | [`compaction-tool-result-pruner`](../packages/compaction/compaction-tool-result-pruner) | - | [`compaction-basic`](../packages/compaction/compaction-basic) | - | Rewrites oversized current tool results through replayable single-node surface replacements before summary compaction. |
 | `ctx.sessions` | `core` | [`session`](../packages/core/session) | - | [`agent-loop`](../packages/core/agent-loop), [`agent`](../packages/core/agent), [`session-persistence`](../packages/session/session-persistence), [`session-query`](../packages/session-query/session-query), [`session-query-sqlite`](../packages/session-query/session-query-sqlite), `subagent-inprocess`, [`invariants`](../packages/runtime-diagnostics/invariants), [`message-feedback`](../packages/feedback/message-feedback) | - | Owns append-only Session instances and emits the durable session event feed. |
 | `ctx.invariants` | `core` | [`invariants`](../packages/runtime-diagnostics/invariants) | - | [`session`](../packages/core/session), [`agent`](../packages/core/agent), [`scope`](../packages/core/scope), [`agent-loop`](../packages/core/agent-loop) | - | Companion subpaths register owner-local checks; the service owns selection, uniqueness, child fibers, and package-attributed failures. |
+| `ctx.investigations` | `core` | [`agentic-control`](../packages/agentic-control/agentic-control) | - | [`tool-agentic-control`](../packages/agentic-control/tool-agentic-control) | - | The harness owns one typed investigation per session; provider-mediated physical assessments and terminal transitions are persisted as full snapshots in the session log, while model-facing tools consume the service without authoring candidate identity or lineage. |
 | `ctx.typert` | `core` | [`typert-registry`](../packages/typert/registry) | - | [`typert-loader`](../packages/typert/loader), [`api-gateway`](../packages/api/gateway) | - | Plugins register live zod contributions directly or through dsh-typert-loader; the API gateway consumes invocation descriptors and providers, while other runtime consumers query schemas and reflection metadata at their own edges. |
 | `ctx.typertGateway` | `core` | [`api-gateway`](../packages/api/gateway) | - | - | - | Associates generated Remote descriptors with live Cordis services, resolves registered identities, and exposes unary calls through the shared Connection RPC carrier. |
 | `ctx.sessionPersistence` | `seam` | [`session-persistence`](../packages/session/session-persistence) | [`session-persistence-jsonl`](../packages/session/session-persistence-jsonl), [`session-persistence-sqlite`](../packages/session/session-persistence-sqlite) | [`agent-loop`](../packages/core/agent-loop), [`tool-bash`](../packages/shell/tool-bash), [`hooks-claude-code`](../packages/hooks/hooks-claude-code), [`hooks-codex`](../packages/hooks/hooks-codex), [`session-query`](../packages/session-query/session-query), [`session-query-sqlite`](../packages/session-query/session-query-sqlite), [`message-feedback`](../packages/feedback/message-feedback) | - | Backends persist the same SessionEvent vocabulary; apps choose a backend at composition time. |

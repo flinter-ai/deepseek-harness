@@ -84,7 +84,8 @@ async function startTraceReceiver(): Promise<TraceReceiver> {
   const records: CapturedTrace[] = []
   const server = createServer((req, res) => {
     let body = ''
-    req.on('data', (chunk) => {
+    req.setEncoding('utf8')
+    req.on('data', (chunk: string) => {
       body += chunk
     })
     req.on('end', () => {
@@ -105,7 +106,11 @@ async function startTraceReceiver(): Promise<TraceReceiver> {
   return {
     port: address.port,
     records,
-    close: () => new Promise<void>(resolve => server.close(() => resolve())),
+    close: () => new Promise<void>((resolve) => {
+      server.close(() => {
+        resolve()
+      })
+    }),
   }
 }
 
@@ -169,7 +174,7 @@ function assertTraceEmission(receiver: TraceReceiver): void {
       .digest('hex')
       .slice(0, 24)}`
     if (parsed.id !== derived) {
-      throw new Error(`${NAME}: trace record ${index} id ${String(parsed.id)} deviates from the derived ${derived}`)
+      throw new Error(`${NAME}: trace record ${index} id ${parsed.id} deviates from the derived ${derived}`)
     }
   })
 }

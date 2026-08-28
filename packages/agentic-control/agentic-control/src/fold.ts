@@ -88,7 +88,11 @@ function decodeEnum<T extends string>(value: unknown, allowed: ReadonlySet<T>, f
   return value as T
 }
 
-/** Evidence status is a pure function of the four physical dimensions. */
+/**
+ * Derive evidence status as a pure function of the four physical dimensions.
+ * @param physical - independently assessed physical evidence dimensions.
+ * @returns the aggregate evidence status.
+ */
 export function deriveEvidenceStatus(physical: PhysicalState): EvidenceStatus {
   const dimensions = [
     physical.handObservation,
@@ -100,7 +104,11 @@ export function deriveEvidenceStatus(physical: PhysicalState): EvidenceStatus {
   return resolved === 0 ? 'pending' : resolved === dimensions.length ? 'satisfied' : 'partial'
 }
 
-/** Decode and validate one physical-dimension record. */
+/**
+ * Decode and validate one physical-dimension record.
+ * @param value - untrusted serialized physical-dimension value.
+ * @returns the validated physical state.
+ */
 export function decodePhysical(value: unknown): PhysicalState {
   if (!isRecord(value)) throw new Error('investigation change state.physical must be a record')
   requireKeys(value, ['handObservation', 'traceQuality', 'hoiSupport', 'objectTraceQuality'], 'state.physical')

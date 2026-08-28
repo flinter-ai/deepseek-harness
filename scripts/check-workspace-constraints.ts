@@ -145,6 +145,11 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   '@deepseek-ai/dsh-sandbox-windows-acl': ['lib/runner.js', 'lib/types-*.js'],
   '@deepseek-ai/dsh-skill-badge': ['assets'],
   '@deepseek-ai/dsh-subprocess-local': ['scripts/ensure-spawn-helper.mjs'],
+  // These two packages are split by tsdown into a public entry plus a
+  // private hashed runtime chunk. The public entry imports the chunk at
+  // runtime, so it must remain in the package tarball.
+  '@deepseek-ai/dsh-agentic-control': ['lib/fold-*.js'],
+  '@deepseek-ai/dsh-credentials-aws-secrets-manager': ['lib/checksum-*.js'],
 }
 
 function sameStringList(actual: readonly string[] | undefined, expected: readonly string[]): boolean {

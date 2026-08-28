@@ -20,11 +20,47 @@ No tool parameter touches lineage or the verdict: results come from the provider
 
 ## Model Experience
 
-Three exclusive tools with generic args-only presentation and a guidance section (`tool:agentic-control`, order 115) describing the macro-action policy.
+### State projection
+
+#### What the model sees
+
+When a harness-started investigation has a new durable revision, the plugin appends one source-attributed state snapshot before the next model step. It describes the candidate, evidence status, independently assessed physical dimensions, provider-authored lineage, phase, and attempt budget; the model cannot start an investigation or author lineage.
+
+#### Token effect
+
+Each durable revision that reaches a pre-step adds one compact user-role state snapshot; an unchanged revision adds no projection tokens.
 
 #### KV Cache effect
 
-The pre-step projection appends a new snapshot message only on state revision changes, so unchanged state never invalidates a request prefix.
+The projection is append-only after the existing request prefix. A changed state adds suffix content and does not rewrite earlier prompt tokens.
+
+### Tool schemas
+
+#### What the model sees
+
+When visible, the three exclusive schemas `run_physical_assessment`, `finish_investigation`, and `stop_unknown` expose bounded macro-actions with generic argument-only presentation; their generated [tool-catalog section](../../../docs/tool-catalog.md#deepseek-aidsh-tool-agentic-control) records the exact schemas. The guidance section (`tool:agentic-control`, order 115) describes when to use them.
+
+#### Token effect
+
+The visible schemas and guidance add a fixed request-prefix cost while this plugin is active; call arguments and results add their own history tokens.
+
+#### KV Cache effect
+
+The schemas and guidance are prefix-stable while plugin registration and tool visibility remain unchanged. Registration or scoped visibility changes invalidate reuse from the first changed schema or guidance token.
+
+### Tool results
+
+#### What the model sees
+
+`run_physical_assessment` returns the provider-authored physical dimensions, lineage, summary, evidence status, revision, and budget counters. The terminal tools return their phase, revision, and evidence status; failures remain explicit rather than becoming a fabricated verdict.
+
+#### Token effect
+
+Tool arguments and compact JSON results remain in the session history until compaction; the state projection is the separate revision-triggered context described above.
+
+#### KV Cache effect
+
+Calls and results append after the reusable request prefix. They do not invalidate earlier cache entries unless a separate state or tool-visibility change alters that prefix.
 
 ## Known Limitations and Deferred Work
 
