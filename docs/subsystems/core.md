@@ -722,6 +722,73 @@ roots(): Agent[]
 
 Source: [`packages/core/agent/src/index.ts:256`](../../packages/core/agent/src/index.ts)
 
+<a id="ctxinvestigations--investigationservice"></a>
+
+### `ctx.investigations` — `InvestigationService`
+
+Investigation service (`ctx.investigations`) backed exclusively by the owning session log. One investigation per session; every mutation commits a full-snapshot `investigation/change` event.
+
+```ts cordis-catalog
+/**
+ * Register an additional physical-assessment provider. Registrations are
+ * effects: the returned disposer removes the provider. The configured
+ * provider is resolved lazily at the first assessment, so provider plugins
+ * may load after this service.
+ * @param provider - provider with a unique id and a provenance tag.
+ * @returns disposer that unregisters the provider.
+ */
+registerProvider(provider: PhysicalAssessmentProvider): () => void
+
+/**
+ * Read the current investigation for one exact live agent.
+ * @param agent - owning live agent.
+ * @returns a detached state copy, or `undefined` when no investigation exists.
+ * @throws {@link InvestigationError} when the agent is not the registry's live instance.
+ */
+get(agent: Agent): InvestigationState | undefined
+
+/**
+ * Start the session's investigation. This is the privileged channel: the
+ * harness creates investigations, the model never does.
+ * @param agent - owning live agent.
+ * @param request - candidate identity, evidence requirements, optional attempt cap.
+ * @returns the created state at revision 1.
+ * @throws {@link InvestigationError} `INVESTIGATION_EXISTS` when any investigation already exists.
+ */
+start(agent: Agent, request: StartInvestigationRequest): InvestigationState
+
+/**
+ * Run one provider-mediated physical assessment, consuming one budget slot
+ * whether the provider succeeds or fails. Lineage moves only through the
+ * provider's typed result.
+ * @param agent - owning live agent.
+ * @returns the committed state and the provider's typed result.
+ * @throws {@link InvestigationError} `INVESTIGATION_NOT_FOUND`, `INVESTIGATION_CLOSED`,
+ *   `INVESTIGATION_BUDGET_EXHAUSTED`, or `INVESTIGATION_UNKNOWN_PROVIDER`; rethrows provider failures
+ *   after committing a failed attempt.
+ */
+async runPhysicalAssessment(agent: Agent): Promise<{ state: InvestigationState; result: PhysicalAssessmentResult }>
+
+/**
+ * Finish an active investigation whose evidence requirements are satisfied.
+ * @param agent - owning live agent.
+ * @returns the terminal state.
+ * @throws {@link InvestigationError} `INVESTIGATION_NOT_FINISHABLE` while any
+ *   physical dimension remains unknown.
+ */
+finish(agent: Agent): InvestigationState
+
+/**
+ * Stop an active investigation that cannot be resolved with the available evidence.
+ * @param agent - owning live agent.
+ * @param reason - concrete non-empty explanation recorded durably.
+ * @returns the terminal state.
+ */
+stopUnknown(agent: Agent, reason: string): InvestigationState
+```
+
+Source: [`packages/agentic-control/agentic-control/src/index.ts:134`](../../packages/agentic-control/agentic-control/src/index.ts)
+
 <a id="agent-events"></a>
 
 ### `agent/*` events
