@@ -127,12 +127,10 @@
           "config": {
             "provider": "deepseek-official",
             "model": "smoke-model",
-            "maxTokens": 256000,
             "reasoningEffort": "high"
           },
           "adapterDefaults": {
-            "reasoningEffort": true,
-            "maxTokens": true
+            "reasoningEffort": true
           },
           "system": "{{system}}",
           "tools": [
@@ -568,12 +566,10 @@
           "config": {
             "provider": "deepseek-official",
             "model": "smoke-model",
-            "maxTokens": 256000,
             "reasoningEffort": "high"
           },
           "adapterDefaults": {
-            "reasoningEffort": true,
-            "maxTokens": true
+            "reasoningEffort": true
           },
           "system": "{{system}}",
           "tools": [
@@ -1452,12 +1448,10 @@
           "config": {
             "provider": "deepseek-official",
             "model": "smoke-model",
-            "maxTokens": 256000,
             "reasoningEffort": "high"
           },
           "adapterDefaults": {
-            "reasoningEffort": true,
-            "maxTokens": true
+            "reasoningEffort": true
           },
           "system": "{{system}}",
           "tools": [
@@ -1802,12 +1796,10 @@
               "config": {
                 "provider": "deepseek-official",
                 "model": "smoke-model",
-                "maxTokens": 256000,
                 "reasoningEffort": "high"
               },
               "adapterDefaults": {
-                "reasoningEffort": true,
-                "maxTokens": true
+                "reasoningEffort": true
               },
               "system": "{{system}}",
               "tools": [
@@ -2387,12 +2379,10 @@
               "config": {
                 "provider": "deepseek-official",
                 "model": "smoke-model",
-                "maxTokens": 256000,
                 "reasoningEffort": "high"
               },
               "adapterDefaults": {
-                "reasoningEffort": true,
-                "maxTokens": true
+                "reasoningEffort": true
               },
               "system": "{{system}}",
               "tools": [
@@ -3132,11 +3122,7 @@
               "config": {
                 "provider": "deepseek-official",
                 "model": "smoke-model",
-                "reasoningEffort": "high",
-                "maxTokens": 256000
-              },
-              "adapterDefaults": {
-                "maxTokens": true
+                "reasoningEffort": "high"
               },
               "system": "{{system}}",
               "tools": [
@@ -3909,11 +3895,7 @@
               "config": {
                 "provider": "deepseek-official",
                 "model": "smoke-model",
-                "reasoningEffort": "high",
-                "maxTokens": 256000
-              },
-              "adapterDefaults": {
-                "maxTokens": true
+                "reasoningEffort": "high"
               },
               "system": "{{system}}",
               "tools": [
@@ -4548,12 +4530,10 @@
               "config": {
                 "provider": "deepseek-official",
                 "model": "smoke-model",
-                "maxTokens": 256000,
                 "reasoningEffort": "high"
               },
               "adapterDefaults": {
-                "reasoningEffort": true,
-                "maxTokens": true
+                "reasoningEffort": true
               },
               "system": "{{system}}",
               "tools": [
