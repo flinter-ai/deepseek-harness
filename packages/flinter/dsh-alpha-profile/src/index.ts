@@ -7,6 +7,8 @@
  * once; a later UTC boundary affects only a new session.
  */
 
+export * from './worker.ts'
+
 export const FLINTER_CREDENTIAL_REFS = Object.freeze({
   arkAgentPlan: 'ARK_PLAN_API_KEY',
   modelflare: 'MODELFLARE_API_KEY',
