@@ -1,0 +1,21 @@
+{
+  "name": "@flinter/agentic-control",
+  "description": "Scaffold-only boundary from DSH session/control state to existing FLINTER contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run --root ../../.. packages/flinter/agentic-control/tests"
+  }
+}
