@@ -183,6 +183,13 @@ describe('SessionEventArchiveSegmentV1', () => {
     expect(() => decodeSessionEventArchiveSegmentV1({ ...segment, eventCount: 1 }))
       .toThrow('event metadata does not match')
   })
+
+  it('rejects a non-empty segment whose declared high-water mark is not its final event', () => {
+    expect(() => encodeSessionEventArchiveSegmentV1(
+      { ...snapshot, highWatermarkSeq: 10 },
+      ARCHIVE_FIXTURE,
+    )).toThrow('expected highWatermarkSeq 10')
+  })
 })
 
 function sha256(value: Uint8Array): string {
