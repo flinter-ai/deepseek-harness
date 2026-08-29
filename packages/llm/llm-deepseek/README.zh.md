@@ -54,7 +54,7 @@ kind: "package-reference"
 | `baseURL` | `https://api.deepseek.com` | 端点基址；设置了 `$DEEPSEEK_BASE_URL` 时优先 |
 | `thinking` | `enabled` | 部署策略；`disabled` 把所有请求锁定为 `off` |
 | `reasoningEffort` | `high` | 默认强度：`off`、`low`、`high` 或 `max` |
-| `maxTokens` | `256,000` | 单次请求输出上限；模型自身上限与显式请求值优先 |
+| `maxTokens` | 省略 | 可选的单次请求输出上限；模型自身上限与显式请求值优先 |
 | `defaultContextWindow` | `1,000,000` | 无精确值模型的容量回退 |
 | `models` | V4 Flash + V4 Pro + V4 Flash Vision Exp | 供发现消费方查看的建议性目录 |
 | `streamIdleTimeoutMs` | `300,000` | 单次流读取未完成的最大提供方空闲时间 |

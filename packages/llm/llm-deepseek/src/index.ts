@@ -31,7 +31,6 @@ import {
   DEFAULT_IMAGE_OFFLOAD_COUNT_QUANTUM,
   DEFAULT_INLINE_IMAGE_OFFLOAD_BYTE_QUANTUM,
   DEFAULT_MAX_INLINE_REQUEST_IMAGE_BYTES,
-  DEFAULT_MAX_TOKENS,
   DEFAULT_STREAM_IDLE_TIMEOUT_MS,
   DeepSeekAdapter,
 } from './adapter.ts'
@@ -54,7 +53,6 @@ export {
   DEFAULT_IMAGE_OFFLOAD_COUNT_QUANTUM,
   DEFAULT_INLINE_IMAGE_OFFLOAD_BYTE_QUANTUM,
   DEFAULT_MAX_INLINE_REQUEST_IMAGE_BYTES,
-  DEFAULT_MAX_TOKENS,
   DEFAULT_STREAM_IDLE_TIMEOUT_MS,
   DeepSeekAdapter,
 } from './adapter.ts'
@@ -130,7 +128,7 @@ export interface Config {
   thinking?: 'enabled' | 'disabled'
   /** Default thinking effort (default `high`); `off` disables thinking per request. */
   reasoningEffort?: 'off' | 'low' | 'high' | 'max'
-  /** Default per-request output cap (default 256,000); a model's own cap and explicit request values win. */
+  /** Optional per-request output cap; a model's own cap and explicit request values win. */
   maxTokens?: number
   /** Positive context capacity used when the selected model has no exact value (default 1,000,000). */
   defaultContextWindow?: number
@@ -178,7 +176,7 @@ export const Config: z<Config> = z.object({
   baseURL: z.string(),
   thinking: z.union(['enabled', 'disabled']),
   reasoningEffort: z.union(['off', 'low', 'high', 'max']),
-  maxTokens: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER).default(DEFAULT_MAX_TOKENS),
+  maxTokens: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER),
   defaultContextWindow: z.number().step(1).min(1).default(DEFAULT_CONTEXT_WINDOW),
   models: z.array(catalogModel).default(DEFAULT_MODELS),
   streamIdleTimeoutMs: z.number().min(Number.MIN_VALUE).max(MAX_TIMER_DELAY_MS).default(DEFAULT_STREAM_IDLE_TIMEOUT_MS),
@@ -381,7 +379,7 @@ export function resolveAdapterOptions(config: Config, environment?: LaunchEnviro
       thinking: config.thinking,
       reasoningEffort: config.reasoningEffort,
     },
-    maxTokens: config.maxTokens ?? DEFAULT_MAX_TOKENS,
+    ...config.maxTokens === undefined ? {} : { maxTokens: config.maxTokens },
     defaultContextWindow: config.defaultContextWindow ?? DEFAULT_CONTEXT_WINDOW,
     models: resolveModels(config.models),
     streamIdleTimeoutMs,

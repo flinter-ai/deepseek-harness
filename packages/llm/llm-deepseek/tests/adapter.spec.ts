@@ -351,11 +351,11 @@ describe('DeepSeekAdapter against a mock server', () => {
     // The wire request carried the auth header contents we configured.
     expect(server.requests[0]).toMatchObject({
       model: 'deepseek-v4-flash',
-      max_tokens: 256_000,
       reasoning_effort: 'high',
       stream: true,
       stream_options: { include_usage: true },
     })
+    expect(server.requests[0]).not.toHaveProperty('max_tokens')
     // App attribution and DeepSeek request identity are independent wire facts.
     expect(server.headers[0]?.['user-agent']).toBe(userAgent())
     expect(server.headers[0]?.['x-deepseek-harness-user-id']).toBe(getOrCreateAnonymousUserId())
@@ -1215,6 +1215,17 @@ describe('DeepSeekAdapter against a mock server', () => {
     expect(server.requests[1]).toMatchObject({ max_tokens: 8_192 })
   })
 
+  it('omits max_tokens and resolved metadata when no output cap is configured', async () => {
+    const server = await mockServer([{ kind: 'sse', events: textEvents }])
+    const ctx = await harness(server.url, { maxTokens: undefined })
+
+    await assemble(ctx, { model: 'deepseek-v4-flash', messages: [] })
+
+    expect(server.requests[0]).not.toHaveProperty('max_tokens')
+    await expect(ctx.llm.resolveModelInfo('deepseek-official', 'deepseek-v4-flash'))
+      .resolves.not.toHaveProperty('defaultMaxTokens')
+  })
+
   it('publishes only off and omits the wire effort when thinking is disabled', async () => {
     const server = await mockServer([{ kind: 'sse', events: textEvents }])
     const ctx = await harness(server.url, { thinking: 'disabled' })
@@ -1719,7 +1730,6 @@ describe('plugin registration and config', () => {
         id: 'deepseek-v4-flash',
         name: 'DeepSeek-V4-Flash',
         context: { contextWindow: 1_000_000 },
-        defaultMaxTokens: 256_000,
         reasoning: {
           efforts: [
             { id: ReasoningEffortId('off'), name: 'Off', description: 'Use for simple tasks that do not need reasoning.' },
@@ -1737,7 +1747,6 @@ describe('plugin registration and config', () => {
         name: 'DeepSeek-V4-Flash-Vision-Exp',
         inputModalities: ['text', 'image'],
         context: { contextWindow: 1_000_000 },
-        defaultMaxTokens: 256_000,
       })
   })
 
@@ -1887,10 +1896,9 @@ describe('plugin registration and config', () => {
         inputModalities: ['text', 'image'],
       })
     await expect(ctx.llm.resolveModelInfo('deepseek-official', 'arbitrary-unlisted'))
-      .resolves.toMatchObject({
-        context: { contextWindow: 1_000_000 },
-        defaultMaxTokens: 256_000,
-      })
+      .resolves.toMatchObject({ context: { contextWindow: 1_000_000 } })
+    await expect(ctx.llm.resolveModelInfo('deepseek-official', 'arbitrary-unlisted'))
+      .resolves.not.toHaveProperty('defaultMaxTokens')
   })
 
   it('uses exact model capacity before the adapter-wide default', async () => {

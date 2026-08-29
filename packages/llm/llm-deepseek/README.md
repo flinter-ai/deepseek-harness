@@ -54,7 +54,7 @@ A request selects the route with `provider: deepseek-official`; the model id pas
 | `baseURL` | `https://api.deepseek.com` | Endpoint base; `$DEEPSEEK_BASE_URL` wins when set |
 | `thinking` | `enabled` | Deployment policy; `disabled` locks every request to `off` |
 | `reasoningEffort` | `high` | Default effort: `off`, `low`, `high`, or `max` |
-| `maxTokens` | `256,000` | Per-request output cap; a model's own cap and explicit request values win |
+| `maxTokens` | omitted | Optional per-request output cap; a model's own cap and explicit request values win |
 | `defaultContextWindow` | `1,000,000` | Capacity fallback for models without an exact value |
 | `models` | V4 Flash + V4 Pro + V4 Flash Vision Exp | Advisory catalog shown by discovery consumers |
 | `streamIdleTimeoutMs` | `300,000` | Maximum provider idle time per outstanding stream read |

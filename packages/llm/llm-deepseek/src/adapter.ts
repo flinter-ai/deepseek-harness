@@ -83,8 +83,8 @@ export interface DeepSeekConnectionOptions {
   apiKeyEnv: CredentialRef
   /** Request defaults applied to every call (thinking mode, effort). */
   defaults: RequestDefaults
-  /** Default per-request output cap; explicit request values win. */
-  maxTokens: number
+  /** Optional per-request output cap; explicit request values win. Omitted when unset so the provider's own default applies. */
+  maxTokens?: number
   /** Positive context capacity used when the selected model has no exact value. */
   defaultContextWindow: number
   /** Advisory models exposed to discovery consumers; requests remain unrestricted. */
@@ -138,8 +138,6 @@ export interface DeepSeekAdapterOptions {
 export const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 300_000
 /** Default combined request/response context capacity. */
 export const DEFAULT_CONTEXT_WINDOW = 1_000_000
-/** Default per-request output-token cap. */
-export const DEFAULT_MAX_TOKENS = 256_000
 /** Default bound on accumulated base64 image payload after Files API fallback. */
 export const DEFAULT_MAX_INLINE_REQUEST_IMAGE_BYTES = 20 * 1024 * 1024
 /** Deterministic raw-byte removal step. */
@@ -406,7 +404,9 @@ export class DeepSeekAdapter extends LlmAdapter {
         ? { provider, id: model, name: model, inputModalities: ['text' as const] }
         : modelInfo(provider, configured),
       context: { contextWindow },
-      defaultMaxTokens: configured?.maxTokens ?? connection.maxTokens,
+      ...configured?.maxTokens === undefined && connection.maxTokens === undefined
+        ? {}
+        : { defaultMaxTokens: configured?.maxTokens ?? connection.maxTokens },
       ...connection.defaults.thinking === 'disabled'
         ? {
           reasoning: {
