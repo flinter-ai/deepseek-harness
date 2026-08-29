@@ -187,6 +187,19 @@ describe('CI workflow', () => {
     }
   })
 
+  it('runs the runner policy independently on a standard hosted runner', () => {
+    const policy = loadWorkflow('.github/workflows/runner-policy.yml')
+    const job = workflowJob(policy, 'runner-policy')
+
+    expect(policy.on).toMatchObject({ pull_request: null, workflow_dispatch: null })
+    expect(job).toMatchObject({
+      'runs-on': 'ubuntu-latest',
+      name: 'standard hosted runner policy',
+    })
+    const verifyStep = (job.steps as unknown[]).find(step => isRecord(step) && step.name === 'Verify all workflow runner selectors')
+    expect(verifyStep).toMatchObject({ run: 'pnpm run verify-ci-runner-policy' })
+  })
+
   it('gives the Wine Host TypeScript compile the repository heap budget', () => {
     const wineGates = readFileSync(resolve(root, 'scripts/wine-windows-gates.sh'), 'utf8')
 
