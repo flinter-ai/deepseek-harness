@@ -43,8 +43,19 @@ export type FlinterReasoningEffort = 'off' | 'minimal' | 'low' | 'medium' | 'hig
 /** Map a user-facing level to the provider's wire spelling. */
 export type FlinterReasoningEfforts = Partial<Record<FlinterReasoningEffort, string | null>>
 
-/** Only level currently verified for both ARK and Modelflare in this migration. */
-export const FLINTER_DEFAULT_REASONING_EFFORTS: FlinterReasoningEfforts = Object.freeze({ high: 'high' })
+/**
+ * Levels currently verified for both ARK and Modelflare in this migration.
+ *
+ * `off: null` is required by the alpha model-map validator even when a
+ * deployment advertises only the verified `high` wire value. Additional
+ * user-selectable levels remain available through the explicit per-model
+ * `reasoningEfforts` option below; this default does not claim live-provider
+ * support for them.
+ */
+export const FLINTER_DEFAULT_REASONING_EFFORTS: FlinterReasoningEfforts = Object.freeze({
+  off: null,
+  high: 'high',
+})
 
 export const FLINTER_DEFAULT_PROVIDER = 'ark-agent-plan' as const
 export const FLINTER_ROTATION_PROVIDER = 'modelflare' as const
@@ -113,7 +124,9 @@ function profile(
       name: model,
       contextWindow: capacity.contextWindow,
       ...capacity.maxTokens === undefined ? {} : { maxTokens: capacity.maxTokens },
-      ...reasoningEfforts === undefined ? {} : { reasoningEfforts },
+      ...reasoningEfforts === undefined
+        ? {}
+        : { reasoningEfforts: reasoningEfforts === false ? false : { ...reasoningEfforts } },
     }],
   }
 }
