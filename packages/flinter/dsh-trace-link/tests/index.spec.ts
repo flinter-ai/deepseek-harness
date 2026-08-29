@@ -175,6 +175,20 @@ describe('@flinter/dsh-trace-link checkpoint contract', () => {
       .rejects.toThrow(/hash mismatch/)
   })
 
+  it('preserves native replacement surface operations', async () => {
+    const replacement = {
+      ...event('assistant/message', 1, { content: 'replacement' }),
+      sourceEventSeqs: [0],
+      surfaceOp: { op: 'replace', start: 0, end: 0 },
+    } as unknown as SessionEvent
+    const receipt = await new LocalTraceCheckpointSink().checkpoint(input([
+      event('session', 0),
+      replacement,
+    ]))
+
+    expect(receipt.descriptor.eventTypes).toEqual(['session', 'assistant/message'])
+  })
+
   it('consumes the Phase 1 native-event probe output without changing event order', async () => {
     const nativeEvents = [
       event('session', 0),

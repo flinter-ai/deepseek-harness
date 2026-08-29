@@ -399,6 +399,11 @@ function validateNativeEventEnvelope(value: unknown, index: number): asserts val
   if (typeof type !== 'string' || type.trim().length === 0) {
     throw new Error(`event ${index} must have a non-empty type`)
   }
+  const isSurfaceEvent = type === 'user/message' || type === 'assistant/message' || type === 'tool/result'
+  if (!isSurfaceEvent && (Object.prototype.hasOwnProperty.call(value, 'sourceEventSeqs')
+    || Object.prototype.hasOwnProperty.call(value, 'surfaceOp'))) {
+    throw new Error(`event ${index} surface fields are not valid for ${type}`)
+  }
   const seq = (value as { seq: unknown }).seq
   if (!Number.isSafeInteger(seq) || (seq as number) < 0) {
     throw new Error(`event ${index} sequence must be a safe non-negative integer`)
@@ -415,8 +420,18 @@ function validateNativeEventEnvelope(value: unknown, index: number): asserts val
   }
   if (Object.prototype.hasOwnProperty.call(value, 'surfaceOp')) {
     const surfaceOp = (value as { surfaceOp: unknown }).surfaceOp
-    if (typeof surfaceOp !== 'string' || surfaceOp.trim().length === 0) {
-      throw new Error(`event ${index} surfaceOp must be a non-empty string`)
+    const validReplacement = surfaceOp !== null
+      && typeof surfaceOp === 'object'
+      && !Array.isArray(surfaceOp)
+      && (Object.getPrototypeOf(surfaceOp) === Object.prototype || Object.getPrototypeOf(surfaceOp) === null)
+      && Object.keys(surfaceOp).length === 3
+      && (surfaceOp as { op?: unknown }).op === 'replace'
+      && Number.isSafeInteger((surfaceOp as { start?: unknown }).start)
+      && Number.isSafeInteger((surfaceOp as { end?: unknown }).end)
+      && ((surfaceOp as { start: number }).start >= 0)
+      && ((surfaceOp as { end: number }).end >= (surfaceOp as { start: number }).start)
+    if (surfaceOp !== 'append' && !validReplacement) {
+      throw new Error(`event ${index} surfaceOp must be append or a valid replace operation`)
     }
   }
 }
