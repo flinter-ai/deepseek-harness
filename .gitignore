@@ -1,5 +1,9 @@
 CLAUDE.local.md
 .env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
 node_modules/
 lib/
 *.tsbuildinfo

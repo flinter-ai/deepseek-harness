@@ -1449,7 +1449,7 @@ describe('apiKeyFailure', () => {
   })
 
   it.each([
-    ['a printable-ASCII key', 'sk-0123456789'],
+    ['a printable-ASCII key', 'sk-0123456789'], // gitleaks:allow — synthetic validation fixture; never a credential
     ['a padded key, which the caller trims', '  sk-abc  '],
     ['the printable-ASCII boundary characters', '!~'],
     ['a hyphenated key carrying an equals sign', 'sk-ABC=xyz'],
