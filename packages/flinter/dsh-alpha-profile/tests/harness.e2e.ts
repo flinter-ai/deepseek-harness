@@ -57,6 +57,10 @@ describe('Phase 1 DSH harness/provider connection', () => {
 
     expect(modelflare.message.content).toEqual([{ type: 'text', text: 'hello' }])
     expect(gmi.message.content).toEqual([{ type: 'text', text: 'hello' }])
+    await expect(ctx.llm.resolveModelInfo('modelflare', 'gpt-5.6-sol'))
+      .resolves.toMatchObject({ context: { contextWindow: 1_000_000 } })
+    await expect(ctx.llm.resolveModelInfo('gmi-serving', 'deepseek-ai/DeepSeek-V4-Flash-0731'))
+      .resolves.toMatchObject({ context: { contextWindow: 1_000_000 } })
     expect(server.headers.map(header => header.authorization)).toEqual([
       'Bearer modelflare-test-key',
       'Bearer gmi-test-key',

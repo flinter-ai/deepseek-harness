@@ -27,6 +27,16 @@ export const PI_AI_DEFAULTS = Object.freeze({
   maxTokens: 32_768,
 } as const)
 
+/**
+ * Model-level capacities reported by the preserved FLINTER deployment line.
+ * These are explicit profile inputs; they are not live-provider validation.
+ */
+export const FLINTER_MODEL_CAPACITIES = Object.freeze({
+  arkCodeLatest: { contextWindow: 1_048_576, maxTokens: 131_072 },
+  modelflareGpt56Sol: { contextWindow: 1_000_000 },
+  gmiDeepSeekV4Flash: { contextWindow: 1_000_000, maxTokens: 384_000 },
+} as const)
+
 export const FLINTER_DEFAULT_PROVIDER = 'ark-agent-plan' as const
 export const FLINTER_ROTATION_PROVIDER = 'modelflare' as const
 
@@ -42,7 +52,7 @@ export interface FlinterModelProfile {
   id: string
   name: string
   contextWindow: number
-  maxTokens: number
+  maxTokens?: number
 }
 
 export interface FlinterProviderProfile {
@@ -69,6 +79,7 @@ function profile(
   apiKeyEnv: string,
   baseURL: string,
   model: string,
+  capacity: { contextWindow: number; maxTokens?: number },
 ): FlinterProviderProfile {
   return {
     displayName,
@@ -80,8 +91,8 @@ function profile(
     models: [{
       id: model,
       name: model,
-      contextWindow: PI_AI_DEFAULTS.contextWindow,
-      maxTokens: PI_AI_DEFAULTS.maxTokens,
+      contextWindow: capacity.contextWindow,
+      ...capacity.maxTokens === undefined ? {} : { maxTokens: capacity.maxTokens },
     }],
   }
 }
@@ -97,18 +108,21 @@ export function buildFlinterProviderSettings(
         FLINTER_CREDENTIAL_REFS.arkAgentPlan,
         endpoints.arkAgentPlan,
         'ark-code-latest',
+        FLINTER_MODEL_CAPACITIES.arkCodeLatest,
       ),
       modelflare: profile(
         'Modelflare',
         FLINTER_CREDENTIAL_REFS.modelflare,
         endpoints.modelflare,
         'gpt-5.6-sol',
+        FLINTER_MODEL_CAPACITIES.modelflareGpt56Sol,
       ),
       'gmi-serving': profile(
         'GMI Serving',
         FLINTER_CREDENTIAL_REFS.gmiServing,
         endpoints.gmiServing,
         'deepseek-ai/DeepSeek-V4-Flash-0731',
+        FLINTER_MODEL_CAPACITIES.gmiDeepSeekV4Flash,
       ),
     },
   }

@@ -5,6 +5,7 @@ import {
   DIRECT_DEEPSEEK_ROUTE,
   FLINTER_AWS_SECRET_NAMES,
   FLINTER_CREDENTIAL_REFS,
+  FLINTER_MODEL_CAPACITIES,
   freshSessionProvider,
   PI_AI_DEFAULTS,
 } from '../src/index.ts'
@@ -29,10 +30,12 @@ describe('FLINTER alpha provider/profile layer', () => {
 
   it('uses verified alpha pi-ai numeric defaults', () => {
     const settings = buildFlinterProviderSettings(endpoints)
-    for (const route of Object.values(settings.providers)) {
-      expect(route.defaultContextWindow).toBe(PI_AI_DEFAULTS.contextWindow)
-      expect(route.defaultMaxTokens).toBe(PI_AI_DEFAULTS.maxTokens)
-    }
+    expect(settings.providers['ark-agent-plan'].defaultContextWindow).toBe(PI_AI_DEFAULTS.contextWindow)
+    expect(settings.providers['ark-agent-plan'].models[0]).toMatchObject(FLINTER_MODEL_CAPACITIES.arkCodeLatest)
+    expect(settings.providers.modelflare.models[0]).toMatchObject(FLINTER_MODEL_CAPACITIES.modelflareGpt56Sol)
+    expect(settings.providers['gmi-serving'].models[0]).toMatchObject(FLINTER_MODEL_CAPACITIES.gmiDeepSeekV4Flash)
+    expect(settings.providers.modelflare.models[0]).not.toHaveProperty('maxTokens')
+    expect(settings.providers.modelflare.defaultMaxTokens).toBe(PI_AI_DEFAULTS.maxTokens)
   })
 
   it('rotates only fresh-session defaults at the UTC boundary', () => {
