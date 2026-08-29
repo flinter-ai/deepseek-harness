@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolveExampleLaunch } from '@deepseek-ai/dsh-loader-smoke'
 import { closeMockServers, mockServer, textEvents } from '../../../llm/llm-pi-ai/tests/mock-server.ts'
+import { assertNativeDshEvents } from '../../dsh-native-event-consumer/src/index.ts'
 
 const REPO_ROOT = fileURLToPath(new URL('../../../..', import.meta.url))
 const DSH_SOURCE_BIN = join(REPO_ROOT, 'apps/cli/src/bin.ts')
@@ -179,10 +180,8 @@ function expectNativeSession(
   model: string,
   reasoningEffort: string,
 ): void {
-  const types = records.map(record => record.type)
-  for (const type of ['session', 'turn/start', 'request/header', 'request/context', 'user/message', 'assistant/message', 'turn/end']) {
-    expect(types, `missing native session event ${type}`).toContain(type)
-  }
+  const consumed = assertNativeDshEvents(records)
+  expect(consumed.accepted).toBe(records.length)
   const context = records.find(record => record.type === 'request/context')
   expect(context?.data).toMatchObject({ provider, model, contextWindow: 1_000_000 })
   const header = records.find(record => record.type === 'request/header')
