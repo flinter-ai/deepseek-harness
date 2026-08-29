@@ -28,6 +28,6 @@
   },
   "scripts": {
     "build": "tsc -b",
-    "test": "vitest run tests"
+    "test": "vitest run --root ../../.. packages/flinter/dsh-alpha-profile/tests"
   }
 }
