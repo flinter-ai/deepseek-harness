@@ -34,6 +34,16 @@ export type {
   DecodedSessionEventArchiveSegmentV1,
   SessionEventArchiveSegmentV1,
 } from './archive-segment.ts'
+export {
+  ArchiveSinkError,
+} from './archive-sink.ts'
+export type {
+  ArchiveFenceToken,
+  ArchiveSegmentWrite,
+  ArchiveSinkFailureCode,
+  ArchiveSinkPutResult,
+  SessionEventArchiveSink,
+} from './archive-sink.ts'
 
 /** Lightweight immutable source identity returned without loading a full log. */
 export interface SessionPersistenceSnapshot {
