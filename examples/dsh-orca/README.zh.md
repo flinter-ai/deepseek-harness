@@ -196,6 +196,36 @@ API key 从 `~/.dsh/.credentials.yaml`（由 harness 管理）和 GMI-serving �
 
 如果你误把 key 文件加进了仓库，确保它在 `.gitignore` 中并且绝不提交。
 
+## 更新 Orca worker 的 `opencode-go` 路由
+
+`opencode-go` 的凭据引用名是 `OPENCODE_GO_API_KEY`。`~/.dsh/settings.yaml`
+中的 provider 配置只包含 `apiKeyEnv: OPENCODE_GO_API_KEY` 这个引用；请通过
+DSH 管理的凭据界面保存或轮换实际值，不要把密钥写入仓库文件或
+`settings.yaml`。
+
+Orca worker 启动时，`worker-home.mjs` 会把受管凭据文件复制到新的隔离
+`DSH_HOME`。轮换密钥或修改 worker 路由后，必须重新启动 worker；已经运行的
+worker 会继续使用启动时的快照。
+
+如果出现 `401 CreditsError` 或 `Insufficient balance`，这是
+`opencode-go` 账户／workspace 的余额问题。修改 provider 名称、模型卡片或
+`agent-default-model` 不会增加余额。请为 `opencode-go` 账户充值或换用有余额
+的账户，然后重新启动 worker。临时绕过该 provider 时，可以直接使用已经配置的
+GMI fallback：
+
+```bash
+node examples/dsh-orca/spawn-dsh-worker.mjs \
+  --model easy-backup \
+  --objective "your task" \
+  --spec "your task" \
+  --dest /absolute/path/to/repository
+```
+
+要修改 subagent 使用的 provider、模型或 endpoint，编辑
+`examples/dsh-orca/worker-home.mjs` 中对应的 `MODELS` 条目和生成的 provider
+配置。编辑 `~/.dsh/settings.yaml` 只会改变直接运行的本地 DSH/Web 会话，不会
+替换 `worker-home.mjs` 为每个 worker 生成的独立 settings。
+
 ## `~/deepseek-harness` 的三个角色
 
 | 角色 | 它是什么 | 所在位置 |
