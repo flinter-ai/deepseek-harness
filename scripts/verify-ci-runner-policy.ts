@@ -47,7 +47,12 @@ export function validateWorkflowSource(
     if (typeof selector === 'string') {
       const matrixMatch = selector.match(MATRIX_RUNNER)
       if (matrixMatch) {
-        const values = resolveMatrixValues(job, matrixMatch[1], source, repositoryRoot)
+        const dimension = matrixMatch[1]
+        if (!dimension) {
+          violations.push({ file, message: `${jobName}: ${selector} has no matrix dimension` })
+          continue
+        }
+        const values = resolveMatrixValues(job, dimension, source, repositoryRoot)
         if (values.length === 0) {
           violations.push({ file, message: `${jobName}: dynamic ${selector} has no statically verifiable standard values` })
         } else {
@@ -88,19 +93,21 @@ function resolveMatrixValues(
       .filter((value): value is string => typeof value === 'string')
   }
 
-  const matrixExpression = isRecord(strategy) && (
-    typeof strategy.matrix === 'string'
+  const matrixExpression = isRecord(strategy)
+    ? typeof strategy.matrix === 'string'
       ? strategy.matrix
       : isRecord(strategy.matrix) && typeof strategy.matrix.include === 'string'
         ? strategy.matrix.include
         : ''
-  )
+    : ''
   if (!GENERATED_MATRIX.test(matrixExpression)) return []
 
   // The SDK matrix is assembled in the workflow's shell case statement. Every
   // runner assignment must be a literal from the standard allowlist.
   if (/needs\.plan\.outputs\.matrix/i.test(matrixExpression)) {
-    const workflowAssignments = [...workflowSource.matchAll(/\brunner=([A-Za-z0-9_.-]+)/g)].map(match => match[1])
+    const workflowAssignments = [...workflowSource.matchAll(/\brunner=([A-Za-z0-9_.-]+)/g)]
+      .map(match => match[1])
+      .filter((value): value is string => typeof value === 'string')
     if (workflowAssignments.length > 0) return workflowAssignments
     return []
   }
@@ -111,7 +118,9 @@ function resolveMatrixValues(
   const generator = resolve(repositoryRoot, 'native/landlock-run/scripts/github-matrix.mjs')
   try {
     const generatorSource = readFileSync(generator, 'utf8')
-    return [...generatorSource.matchAll(/'[^']+'\s*:\s*'([^']+)'/g)].map(match => match[1])
+    return [...generatorSource.matchAll(/'[^']+'\s*:\s*'([^']+)'/g)]
+      .map(match => match[1])
+      .filter((value): value is string => typeof value === 'string')
   } catch {
     return []
   }

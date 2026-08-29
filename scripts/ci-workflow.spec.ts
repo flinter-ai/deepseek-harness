@@ -171,7 +171,8 @@ describe('CI workflow', () => {
     // PR preview uses the same standard hosted Linux boundary.
     expect(JSON.stringify(workflow)).not.toMatch(/dsh-(?:ubuntu|windows)|vm-backup|dsh-win-ci|DSH_CI_FAILOVER|self-hosted/)
     expect(JSON.stringify(masterWorkflow)).not.toMatch(/dsh-(?:ubuntu|windows)|vm-backup|dsh-win-ci|DSH_CI_FAILOVER|self-hosted/)
-    expect(previewWorkflow.jobs?.preview?.['runs-on']).toBe('ubuntu-latest')
+    const preview = workflowJob(previewWorkflow, 'preview')
+    expect(preview['runs-on']).toBe('ubuntu-latest')
   })
 
   it('keeps every workflow on standard GitHub-hosted runner selectors', () => {
