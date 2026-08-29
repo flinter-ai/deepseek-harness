@@ -1,0 +1,13 @@
+# Repository-specific false-positive policy for the default Gitleaks rules.
+# Keep exceptions tied to generated metadata or an explicitly marked fixture;
+# never allowlist a directory broadly.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Generated bilingual-pair records contain documentation blob hashes, not credentials."
+condition = "AND"
+paths = ['''(?i)\.i18n\.yaml$''']
+regexTarget = "match"
+regexes = ['''(?i)^\+?[^:\r\n]+\.md(?:\.zh)?\s*:\s*(?:[0-9a-f]{40}|REDACTED)\s*$''']
