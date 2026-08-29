@@ -1,6 +1,9 @@
+import { createHash } from 'node:crypto'
+import { zstdCompressSync } from 'node:zlib'
 import { describe, expect, it } from 'vitest'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import {
+  MAX_SESSION_EVENT_ARCHIVE_PAYLOAD_BYTES,
   SessionPersistenceRevision,
   decodeSessionEventArchiveSegmentV1,
   encodeSessionEventArchiveSegmentV1,
@@ -55,6 +58,56 @@ describe('SessionEventArchiveSegmentV1', () => {
     })).toThrow('payload SHA-256 mismatch')
   })
 
+  it('rejects malformed base64 before attempting checksum validation', () => {
+    const segment = encodeSessionEventArchiveSegmentV1(snapshot, ARCHIVE_FIXTURE)
+    expect(() => decodeSessionEventArchiveSegmentV1({
+      ...segment,
+      payloadBase64: '%%%=',
+    })).toThrow('archive payload is not valid base64')
+  })
+
+  it('fails closed when a truncated payload has a recomputed payload checksum', () => {
+    const segment = encodeSessionEventArchiveSegmentV1(snapshot, ARCHIVE_FIXTURE)
+    const payload = Buffer.from(segment.payloadBase64, 'base64').subarray(0, 1)
+    expect(() => decodeSessionEventArchiveSegmentV1({
+      ...segment,
+      payloadBase64: payload.toString('base64'),
+      payloadSha256: sha256(payload),
+    })).toThrow('archive decoded event-stream SHA-256 mismatch')
+  })
+
+  it('rejects a decoded stream with a conflicting checksum', () => {
+    const segment = encodeSessionEventArchiveSegmentV1(snapshot, ARCHIVE_FIXTURE)
+    expect(() => decodeSessionEventArchiveSegmentV1({
+      ...segment,
+      decodedEventStreamSha256: '0'.repeat(64),
+    })).toThrow('archive decoded event-stream SHA-256 mismatch')
+  })
+
+  it('rejects a decoded stream that omits the final JSONL newline', () => {
+    const segment = encodeSessionEventArchiveSegmentV1(
+      { ...snapshot, highWatermarkSeq: 0 },
+      [ARCHIVE_FIXTURE[0]],
+    )
+    const decodedBytes = Buffer.from(JSON.stringify(ARCHIVE_FIXTURE[0]), 'utf8')
+    const payload = zstdCompressSync(decodedBytes)
+    expect(() => decodeSessionEventArchiveSegmentV1({
+      ...segment,
+      payloadBase64: payload.toString('base64'),
+      payloadSha256: sha256(payload),
+      decodedEventStreamSha256: sha256(decodedBytes),
+    })).toThrow('archive decoded event stream is missing its final newline')
+  })
+
+  it('rejects a compressed payload over the local capacity limit', () => {
+    const segment = encodeSessionEventArchiveSegmentV1(snapshot, ARCHIVE_FIXTURE)
+    const oversizedPayload = Buffer.alloc(MAX_SESSION_EVENT_ARCHIVE_PAYLOAD_BYTES + 1)
+    expect(() => decodeSessionEventArchiveSegmentV1({
+      ...segment,
+      payloadBase64: oversizedPayload.toString('base64'),
+    })).toThrow(`archive payload exceeds ${MAX_SESSION_EVENT_ARCHIVE_PAYLOAD_BYTES} bytes`)
+  })
+
   it.each([
     ['gap', [{ ...ARCHIVE_FIXTURE[0], seq: 1 }]],
     ['overlap', [{ ...ARCHIVE_FIXTURE[0], seq: 0 }, { ...ARCHIVE_FIXTURE[1], seq: 0 }]],
@@ -72,3 +125,7 @@ describe('SessionEventArchiveSegmentV1', () => {
     )).toThrow('expected highWatermarkSeq 10')
   })
 })
+
+function sha256(value: Uint8Array): string {
+  return createHash('sha256').update(value).digest('hex')
+}
