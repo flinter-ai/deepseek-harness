@@ -24,6 +24,16 @@ export type {
   SessionArchivePage,
   SessionArchiveSnapshot,
 } from './archive.ts'
+export {
+  MAX_SESSION_EVENT_ARCHIVE_PAYLOAD_BYTES,
+  SESSION_EVENT_ARCHIVE_SEGMENT_VERSION,
+  decodeSessionEventArchiveSegmentV1,
+  encodeSessionEventArchiveSegmentV1,
+} from './archive-segment.ts'
+export type {
+  DecodedSessionEventArchiveSegmentV1,
+  SessionEventArchiveSegmentV1,
+} from './archive-segment.ts'
 
 /** Lightweight immutable source identity returned without loading a full log. */
 export interface SessionPersistenceSnapshot {
