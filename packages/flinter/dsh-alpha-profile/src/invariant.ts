@@ -3,7 +3,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { InvariantInstaller } from '@deepseek-ai/dsh-invariants'
 
-const PACKAGE_NAME = '@flinter/dsh-alpha-profile'
+const PACKAGE_NAME = '@deepseek-ai/dsh-alpha-profile'
 
 export const name = 'flinter-dsh-alpha-profile-invariant'
 export const inject = ['invariants']
