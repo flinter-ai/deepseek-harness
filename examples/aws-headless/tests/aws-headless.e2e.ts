@@ -72,6 +72,7 @@ describe('aws-headless profile composition smoke', () => {
       expect(occurrences(stdout, "name: '@deepseek-ai/dsh-credentials-aws-secrets-manager'")).toBe(1)
       expect(occurrences(stdout, 'ark-agent-plan:')).toBe(1)
       expect(occurrences(stdout, 'modelflare:')).toBe(1)
+      expect(stdout).toMatch(/- id: gpt-5\.6-sol[\s\S]*?contextWindow: 1000000[\s\S]*?reasoningEfforts:[\s\S]*?high: high/)
       expect(occurrences(stdout, 'amazon-bedrock')).toBe(0)
       expect(occurrences(stdout, "name: '@flinter/dsh-segment'")).toBe(1)
       expect(occurrences(stdout, "name: '@flinter/dsh-pes'")).toBe(1)

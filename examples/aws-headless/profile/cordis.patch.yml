@@ -41,7 +41,10 @@
         models:
           - id: gpt-5.6-sol
             name: GPT-5.6 Sol
+            contextWindow: 1000000
             input: [text]
+            reasoningEfforts:
+              high: high
 
 # ARK is the AWS default. The worker-home helper and local time-of-day
 # selector can choose Modelflare explicitly for a new session.
