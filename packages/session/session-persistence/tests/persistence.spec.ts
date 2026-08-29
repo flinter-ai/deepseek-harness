@@ -4,6 +4,7 @@ import SessionStore, { Session, SessionId, isJsonValue } from '@deepseek-ai/dsh-
 import type { SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
 import {
   DEFAULT_PREPARED_SESSION_CACHE_SIZE, DEFAULT_WRITE_BATCH_MAX_DELAY_MS, MAX_WRITE_BATCH_DELAY_MS,
+  MAX_ARCHIVE_PAGE_EVENTS,
   SessionPersistence, SessionPersistenceRevision, PersistenceCoordinator,
   type PersistenceBackend, type SessionArchivePage, type SessionArchiveSnapshot,
   type SessionPersistenceSnapshot, type StoredPrefix, type StoredSuffix,
@@ -383,6 +384,58 @@ describe('the archive snapshot seam', () => {
     } finally {
       await secondFiber.dispose()
       await secondCtx.fiber.dispose()
+    }
+  })
+
+  it('fails closed for token, cursor, and page-limit corruption', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const fiber = await ctx.plugin(MemoryPersistence)
+    try {
+      const id = SessionId('archive-invalid-input')
+      await ctx.sessionPersistence.create(meta(id))
+      await ctx.sessionPersistence.append(id, oneTurnLog())
+      const snapshot = await ctx.sessionPersistence.beginArchiveSnapshot(id)
+      expect(snapshot).toBeDefined()
+
+      await expect(
+        ctx.sessionPersistence.readArchiveSnapshotPage({ ...snapshot!, opaquePrefixToken: 'corrupt' }, -1, 1),
+      ).rejects.toMatchObject({ code: 'STALE_SNAPSHOT' })
+      await expect(
+        ctx.sessionPersistence.readArchiveSnapshotPage(snapshot!, -2, 1),
+      ).rejects.toThrow('afterSeq')
+      await expect(
+        ctx.sessionPersistence.readArchiveSnapshotPage(snapshot!, -1, 0),
+      ).rejects.toThrow('page limit')
+      await expect(
+        ctx.sessionPersistence.readArchiveSnapshotPage(snapshot!, -1, MAX_ARCHIVE_PAGE_EVENTS + 1),
+      ).rejects.toThrow('page limit')
+      await expect(
+        ctx.sessionPersistence.readArchiveSnapshotPage(snapshot!, snapshot!.highWatermarkSeq + 1, 1),
+      ).rejects.toThrow('past highWatermarkSeq')
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('returns STALE_SNAPSHOT when the checkpointed session disappears', async () => {
+    const store: MemoryStore = new Map()
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const fiber = await ctx.plugin(MemoryPersistence, { store })
+    try {
+      const id = SessionId('archive-deleted')
+      await ctx.sessionPersistence.create(meta(id))
+      await ctx.sessionPersistence.append(id, oneTurnLog())
+      const snapshot = await ctx.sessionPersistence.beginArchiveSnapshot(id)
+      store.delete(id)
+      await expect(
+        ctx.sessionPersistence.readArchiveSnapshotPage(snapshot!, -1, 2),
+      ).rejects.toMatchObject({ code: 'STALE_SNAPSHOT' })
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
     }
   })
 })

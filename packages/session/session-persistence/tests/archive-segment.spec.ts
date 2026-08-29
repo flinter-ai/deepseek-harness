@@ -54,4 +54,21 @@ describe('SessionEventArchiveSegmentV1', () => {
       payloadBase64: changedPayload.toString('base64'),
     })).toThrow('payload SHA-256 mismatch')
   })
+
+  it.each([
+    ['gap', [{ ...ARCHIVE_FIXTURE[0], seq: 1 }]],
+    ['overlap', [{ ...ARCHIVE_FIXTURE[0], seq: 0 }, { ...ARCHIVE_FIXTURE[1], seq: 0 }]],
+  ])('rejects a %s in the canonical sequence', (_label, events) => {
+    expect(() => encodeSessionEventArchiveSegmentV1(
+      { ...snapshot, highWatermarkSeq: events.length - 1 },
+      events,
+    )).toThrow('invalid envelope')
+  })
+
+  it('rejects a non-empty segment whose declared high-water mark is not its final event', () => {
+    expect(() => encodeSessionEventArchiveSegmentV1(
+      { ...snapshot, highWatermarkSeq: 10 },
+      ARCHIVE_FIXTURE,
+    )).toThrow('expected highWatermarkSeq 10')
+  })
 })
