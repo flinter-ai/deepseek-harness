@@ -383,6 +383,10 @@ describe('Issue lifecycle workflow', () => {
     const lifecycleJob = workflowJob(lifecycle, 'lifecycle')
     const policy = loadWorkflow('.github/workflows/issue-policy.yml')
     const policyPullRequest = workflowEvent(policy, 'pull_request')
+    if (!Array.isArray(lifecycleJob.steps)) throw new TypeError('Issue lifecycle job must define steps')
+    const tokenStep = lifecycleJob.steps.find(
+      (step: unknown) => isRecord(step) && step.name === 'Create project token',
+    )
 
     expect(lifecyclePullRequest.types).not.toContain('ready_for_review')
     expect(lifecyclePullRequest.types).toContain('review_requested')
@@ -390,6 +394,12 @@ describe('Issue lifecycle workflow', () => {
     expect(lifecycleJob.if).toBe(
       "${{ github.event_name != 'pull_request_review' || (github.event.action == 'submitted' && github.event.review.state == 'changes_requested') }}",
     )
+    expect(tokenStep).toMatchObject({
+      with: {
+        owner: '${{ github.repository_owner }}',
+        repositories: '${{ github.event.repository.name }}',
+      },
+    })
     expect(policyPullRequest.types).toContain('ready_for_review')
   })
 })
