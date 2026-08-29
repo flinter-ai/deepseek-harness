@@ -7,6 +7,7 @@ import {
   SessionPersistenceRevision,
   decodeSessionEventArchiveSegmentV1,
   encodeSessionEventArchiveSegmentV1,
+  type SessionArchiveEvent,
   type SessionArchiveSnapshot,
 } from '../src/index.ts'
 import { ARCHIVE_FIXTURE } from './fixtures/archive-fixture.ts'
@@ -40,8 +41,8 @@ describe('SessionEventArchiveSegmentV1', () => {
   })
 
   it('canonicalizes object keys before hashing and compression', () => {
-    const left = [{ ...ARCHIVE_FIXTURE[0], data: { z: 1, a: { y: 2, x: 3 } } }]
-    const right = [{ ...ARCHIVE_FIXTURE[0], data: { a: { x: 3, y: 2 }, z: 1 } }]
+    const left: SessionArchiveEvent[] = [{ ...ARCHIVE_FIXTURE[0]!, data: { z: 1, a: { y: 2, x: 3 } } }]
+    const right: SessionArchiveEvent[] = [{ ...ARCHIVE_FIXTURE[0]!, data: { a: { x: 3, y: 2 }, z: 1 } }]
     const leftSegment = encodeSessionEventArchiveSegmentV1({ ...snapshot, highWatermarkSeq: 0 }, left)
     const rightSegment = encodeSessionEventArchiveSegmentV1({ ...snapshot, highWatermarkSeq: 0 }, right)
     expect(rightSegment.payloadBase64).toBe(leftSegment.payloadBase64)
@@ -87,7 +88,7 @@ describe('SessionEventArchiveSegmentV1', () => {
   it('rejects a decoded stream that omits the final JSONL newline', () => {
     const segment = encodeSessionEventArchiveSegmentV1(
       { ...snapshot, highWatermarkSeq: 0 },
-      [ARCHIVE_FIXTURE[0]],
+      [ARCHIVE_FIXTURE[0]!],
     )
     const decodedBytes = Buffer.from(JSON.stringify(ARCHIVE_FIXTURE[0]), 'utf8')
     const payload = zstdCompressSync(decodedBytes)
@@ -114,7 +115,7 @@ describe('SessionEventArchiveSegmentV1', () => {
   ])('rejects a %s in the canonical sequence', (_label, events) => {
     expect(() => encodeSessionEventArchiveSegmentV1(
       { ...snapshot, highWatermarkSeq: events.length - 1 },
-      events,
+      events as readonly SessionArchiveEvent[],
     )).toThrow('invalid envelope')
   })
 
