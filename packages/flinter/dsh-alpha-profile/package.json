@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-alpha-profile",
   "description": "FLINTER Phase 1 provider/profile layer over the pinned DeepSeek Harness alpha",
-  "version": "0.1.0",
+  "version": "0.1.2-alpha.1",
   "private": true,
   "type": "module",
   "main": "lib/index.js",
