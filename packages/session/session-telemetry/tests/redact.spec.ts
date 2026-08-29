@@ -14,7 +14,7 @@ import {
   type SessionTelemetryRecord,
 } from '../src/index.ts'
 
-const FIXTURE_SECRET = 'sk-fixture1234567890'
+const FIXTURE_SECRET = 'sk-fixture1234567890' // gitleaks:allow — synthetic redaction fixture; never a credential
 
 class CollectingBackend implements SessionTelemetrySink {
   records: SessionTelemetryRecord[] = []
