@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import { assertNativeDshEvents } from '../../dsh-native-event-consumer/src/index.ts'
 import {
   InMemoryImmutableSegmentStore,
   LocalTraceCheckpointSink,
@@ -115,5 +116,23 @@ describe('@flinter/dsh-trace-link checkpoint contract', () => {
     const invalid = event('session', 0, { invalid: undefined })
     await expect(new LocalTraceCheckpointSink().checkpoint(input([invalid])))
       .rejects.toThrow(/JSON-serializable/)
+  })
+
+  it('consumes the Phase 1 native-event probe output without changing event order', async () => {
+    const nativeEvents = [
+      event('session', 0),
+      event('turn/start', 1),
+      event('request/header', 2),
+      event('request/context', 3),
+      event('user/message', 4, { content: 'hello' }),
+      event('assistant/message', 5, { content: 'hi' }),
+      event('turn/end', 6),
+    ]
+    const consumption = assertNativeDshEvents(nativeEvents)
+    const receipt = await new LocalTraceCheckpointSink().checkpoint(input(nativeEvents))
+
+    expect(consumption.missing).toEqual([])
+    expect(receipt.descriptor.eventTypes).toEqual(nativeEvents.map(record => record.type))
+    expect(receipt.descriptor.eventCount).toBe(nativeEvents.length)
   })
 })
