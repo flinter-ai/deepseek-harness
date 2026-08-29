@@ -87,6 +87,24 @@ describe('SessionEventArchiveSegmentV1', () => {
     }
   })
 
+  it('rejects malformed base64 before attempting checksum validation', () => {
+    const segment = encodeSessionEventArchiveSegmentV1(snapshot, ARCHIVE_FIXTURE)
+    expect(() => decodeSessionEventArchiveSegmentV1({
+      ...segment,
+      payloadBase64: '%%%=',
+    })).toThrow('archive payload is not valid base64')
+  })
+
+  it('fails closed when a truncated payload has a recomputed payload checksum', () => {
+    const segment = encodeSessionEventArchiveSegmentV1(snapshot, ARCHIVE_FIXTURE)
+    const payload = Buffer.from(segment.payloadBase64, 'base64').subarray(0, 1)
+    expect(() => decodeSessionEventArchiveSegmentV1({
+      ...segment,
+      payloadBase64: payload.toString('base64'),
+      payloadSha256: sha256(payload),
+    })).toThrow('archive decoded event-stream SHA-256 mismatch')
+  })
+
   it('rejects a payload whose decoded stream checksum is wrong', () => {
     const segment = encodeSessionEventArchiveSegmentV1(snapshot, ARCHIVE_FIXTURE)
     expect(() => decodeSessionEventArchiveSegmentV1({
@@ -100,12 +118,22 @@ describe('SessionEventArchiveSegmentV1', () => {
     const decodedBytes = Buffer.from(JSON.stringify(event), 'utf8')
     const payload = zstdCompressSync(decodedBytes)
     const segment = encodeSessionEventArchiveSegmentV1({ ...snapshot, highWatermarkSeq: 0 }, [event])
+    })).toThrow('decoded event-stream SHA-256 mismatch')
+  })
+
+  it('rejects a decoded stream that omits the final JSONL newline', () => {
+    const segment = encodeSessionEventArchiveSegmentV1(
+      { ...snapshot, highWatermarkSeq: 0 },
+      [ARCHIVE_FIXTURE[0]!],
+    )
+    const decodedBytes = Buffer.from(JSON.stringify(ARCHIVE_FIXTURE[0]), 'utf8')
+    const payload = zstdCompressSync(decodedBytes)
     expect(() => decodeSessionEventArchiveSegmentV1({
       ...segment,
       payloadBase64: payload.toString('base64'),
       payloadSha256: sha256(payload),
       decodedEventStreamSha256: sha256(decodedBytes),
-    })).toThrow('missing its final newline')
+    })).toThrow('archive decoded event stream is missing its final newline')
   })
 
   it('rejects a compressed payload over the local capacity limit', () => {
