@@ -125,18 +125,15 @@ worker home（`worker-home.mjs`）配置 DSH 可以调用的模型。当前路�
 
 | label | provider / model | 用途 |
 |---|---|---|
-| `easy`（默认） | opencode-go / `deepseek-v4-flash` | 快速/低成本工作（经网关使用 DeepSeek） |
-| `easy-backup`、`backup` | gmi-serving / `deepseek-ai/DeepSeek-V4-Flash-0731` | `easy` 的运营 fallback |
-| `hard` | ark-plan / `kimi-k3` | 强力编程模型，走 Ark Plan 路线 |
-| `hard-backup` | opencode-go / `glm-5.3` | Kimi 失败时的 fallback |
-| `glm-5.3` | opencode-go / `glm-5.3` | 显式 GLM 档位 |
-| `nadirclaw` 等 | NadirClaw localhost router | 本地验证 agent |
+| `easy`（默认） | ark-agent-plan / `ark-code-latest` | 主编程路由 |
+| `backup` | modelflare / `gpt-5.6-sol` | 备用路由 |
+| `deepseek` | deepseek-official / `deepseek-v4-flash` | 直连 DeepSeek 路由 |
 
 `dsh-agent` 只对 provider、配额、404/未授权、not-supported 和 transport 失败（`stream ended`、`finish_reason`、`transport`）重试一次。`NO_ADAPTER` 和本地配置错误 **不会** 触发 fallback。
 
 ### 混合协议 provider
 
-DSH `llm-pi-ai` 支持按模型 `api` 选择（`model.api ?? provider.api`），因此单个 provider 路由可以托管使用不同 wire protocol 的模型。`opencode-go` 路由保持 `api: openai-completions` 作为默认值，并可在需要时将单个模型声明为 `api: openai-responses`。这使 provider 身份与 wire protocol 保持分离，无需捏造伪 provider 路由。
+DSH `llm-pi-ai` 支持按模型 `api` 选择（`model.api ?? provider.api`），因此单个 provider 路由可以托管使用不同 wire protocol 的模型。AWS profile 将 ARK 与 Modelflare 声明为独立的 OpenAI 兼容路由，同时保留独立可用的直连 DeepSeek 适配器。
 
 ## 本地运行与切换模型
 
@@ -173,14 +170,11 @@ pnpm dsh web
 ### 以指定模型运行 headless
 
 ```bash
-# easy (default): opencode-go / deepseek-v4-flash
+# easy (default): ark-agent-plan / ark-code-latest
 pnpm dsh --profile headless "your task here"
 
-# hard: ark-plan / kimi-k3
-pnpm dsh --profile headless --model hard "your task here"
-
-# explicit GLM tier: opencode-go / glm-5.3
-pnpm dsh --profile headless --model glm-5.3 "your task here"
+# backup: modelflare / gpt-5.6-sol
+pnpm dsh --profile headless --model backup "your task here"
 ```
 
 ### 在 Web UI 中切换模型
@@ -193,8 +187,8 @@ pnpm dsh --profile headless --model glm-5.3 "your task here"
 
 ```yaml
 agent-default-model:
-  provider: opencode-go
-  model: deepseek-v4-flash
+  provider: ark-agent-plan
+  model: ark-code-latest
 ```
 
 重启 DSH 后生效。
@@ -204,17 +198,11 @@ agent-default-model:
 对每个 provider 运行一行 headless prompt：
 
 ```bash
-# opencode-go / deepseek-v4-flash
+# ark-agent-plan / ark-code-latest
 pnpm dsh --profile headless --model easy "Say OK"
 
-# gmi-serving / deepseek-ai/DeepSeek-V4-Flash-0731
-pnpm dsh --profile headless --model easy-backup "Say OK"
-
-# ark-plan / kimi-k3
-pnpm dsh --profile headless --model hard "Say OK"
-
-# opencode-go / glm-5.3
-pnpm dsh --profile headless --model glm-5.3 "Say OK"
+# modelflare / gpt-5.6-sol
+pnpm dsh --profile headless --model backup "Say OK"
 ```
 
 每个都应打印简短回复。`QUOTA` 或 `AUTH` 错误表示密钥缺失或已耗尽；`NO_ADAPTER` 错误表示 `settings.yaml` 中未声明该 provider。

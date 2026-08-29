@@ -177,7 +177,10 @@ describe('aws-headless agentic-control trajectory', () => {
         // The profile composition is intact beside the investigation seam.
         const credentials: unknown = ctx.get('credentials')
         expect((credentials as object).constructor.name).toBe('AwsSecretsManagerCredentialProvider')
-        expect(ctx.llm.listProviders().map(provider => provider.id)).toContain('amazon-bedrock')
+        expect(ctx.llm.listProviders().map(provider => provider.id)).toEqual(expect.arrayContaining([
+          'ark-agent-plan',
+          'modelflare',
+        ]))
         const tools = ctx.tools.schemas().map(schema => schema.name)
         for (const tool of ORCA_TOOL_NAMES) expect(tools).toContain(tool)
         for (const tool of ['run_physical_assessment', 'finish_investigation', 'stop_unknown']) {

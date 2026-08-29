@@ -70,7 +70,9 @@ describe('aws-headless profile composition smoke', () => {
       expect(code).toBe(0)
       expect(occurrences(stdout, "name: '@flinter/dsh-orca'")).toBe(1)
       expect(occurrences(stdout, "name: '@deepseek-ai/dsh-credentials-aws-secrets-manager'")).toBe(1)
-      expect(occurrences(stdout, 'amazon-bedrock')).toBe(1)
+      expect(occurrences(stdout, 'ark-agent-plan:')).toBe(1)
+      expect(occurrences(stdout, 'modelflare:')).toBe(1)
+      expect(occurrences(stdout, 'amazon-bedrock')).toBe(0)
       expect(occurrences(stdout, "name: '@flinter/dsh-segment'")).toBe(1)
       expect(occurrences(stdout, "name: '@flinter/dsh-pes'")).toBe(1)
       expect(occurrences(stdout, "name: '@deepseek-ai/dsh-agentic-control'")).toBe(1)
@@ -107,7 +109,11 @@ describe('aws-headless profile composition smoke', () => {
         // facade while the Loader resolves the package exports → lib.
         const credentials: unknown = ctx.get('credentials')
         expect((credentials as object).constructor.name).toBe('AwsSecretsManagerCredentialProvider')
-        expect(ctx.llm.listProviders().map(provider => provider.id)).toContain('amazon-bedrock')
+        expect(ctx.llm.listProviders().map(provider => provider.id)).toEqual(expect.arrayContaining([
+          'ark-agent-plan',
+          'deepseek-official',
+          'modelflare',
+        ]))
         const tools = ctx.tools.schemas().map(schema => schema.name)
         for (const tool of ORCA_TOOL_NAMES) expect(tools).toContain(tool)
         // The shipped profile activates the H0 macro-actions beside the

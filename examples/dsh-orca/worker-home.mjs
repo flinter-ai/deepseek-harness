@@ -8,15 +8,9 @@
  *     mode) preset default
  *
  * Model routing:
- *   easy          -> opencode-go / deepseek-v4-flash (OPERATIVE; OPENCODE_GO_API_KEY live. Gateway route, opencode.ai/zen/go/v1)
- *   deepseek      -> deepseek / deepseek-v4-flash   (DIRECT api.deepseek.com via DEEPSEEK_API_KEY — used once the key is configured)
- *   opencode      -> alias of easy
- *   easy-backup   -> gmi-serving / deepseek-ai/DeepSeek-V4-Flash-0731
- *   backup        -> alias of easy-backup
- *   hard          -> ark-plan / kimi-k3            (Kimi K3 on the Ark Plan route)
- *   hard-backup   -> opencode-go / glm-5.3         (backup if K3 unavailable)
- *   glm-5.3       -> opencode-go / glm-5.3
- *   kimi          -> alias of hard
+ *   easy          -> ark-agent-plan / ark-code-latest
+ *   backup        -> modelflare / gpt-5.6-sol
+ *   deepseek      -> deepseek-official / deepseek-v4-flash (direct DeepSeek)
  *   nadirclaw     -> NadirClaw difficulty router (localhost only)
  *
  * Usage:
@@ -32,29 +26,9 @@ import { join } from 'node:path'
 import { homedir } from 'node:os'
 
 const MODELS = {
-  // easy primary: opencode-go gateway (OPENCODE_GO_API_KEY live; see SKILL routing table).
-  easy: { provider: 'opencode-go', model: 'deepseek-v4-flash' },
-  // deepseek: DIRECT api.deepseek.com via DEEPSEEK_API_KEY; use only when the key is configured.
-  deepseek: { provider: 'deepseek', model: 'deepseek-v4-flash' },
-  // opencode: alias of easy.
-  opencode: { provider: 'opencode-go', model: 'deepseek-v4-flash' },
-  'easy-backup': { provider: 'gmi-serving', model: 'deepseek-ai/DeepSeek-V4-Flash-0731' },
-  backup: { provider: 'gmi-serving', model: 'deepseek-ai/DeepSeek-V4-Flash-0731' },
-  // hard primary: Kimi K3 over the Ark Plan route. The previous target
-  // (kimi-coding / k3-256k on api.kimi.com) resolved KIMI_CODING_API_KEY,
-  // which has never been present in the credentials file this script copies —
-  // so every `hard` and `kimi` dispatch authenticated against nothing.
-  hard: { provider: 'ark-plan', model: 'kimi-k3' },
-  kimi: { provider: 'ark-plan', model: 'kimi-k3' },
-  // hard backup when K3-256K is 404 / out of credit / unresponsive.
-  'hard-backup': { provider: 'opencode-go', model: 'glm-5.3' },
-  'glm-5.3': { provider: 'opencode-go', model: 'glm-5.3' },
-  // NadirClaw difficulty router — LOCAL DISPATCHES ONLY.
-  nadirclaw: { provider: 'nadirclaw', model: 'auto' },
-  'nadir-auto': { provider: 'nadirclaw', model: 'nadir-auto' },
-  'nadir-eco': { provider: 'nadirclaw', model: 'nadir-eco' },
-  'nadir-premium': { provider: 'nadirclaw', model: 'nadir-premium' },
-  'nadir-reasoning': { provider: 'nadirclaw', model: 'nadir-reasoning' },
+  easy: { provider: 'ark-agent-plan', model: 'ark-code-latest' },
+  backup: { provider: 'modelflare', model: 'gpt-5.6-sol' },
+  deepseek: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
 }
 
 function flag(name, fallback) {
@@ -72,7 +46,7 @@ const sourceSettings = flag('settings', join(homedir(), '.dsh', 'settings.yaml')
 
 const selection = MODELS[model]
 if (selection === undefined) {
-  console.error(`worker-home: unknown --model "${model}" (use easy|deepseek|opencode|easy-backup|backup|hard|kimi|hard-backup|glm-5.3|nadirclaw|nadir-auto|nadir-eco|nadir-premium|nadir-reasoning)`)
+  console.error(`worker-home: unknown --model "${model}" (use easy|backup|deepseek)`)
   process.exit(1)
 }
 if (!home) {
@@ -103,46 +77,18 @@ copyFileSync(sourceCreds, join(home, '.credentials.yaml'))
 // 3. settings.yaml — declare only the models this worker may actually call.
 // Real card values come from the provider's models.json / GET /v1/models, not
 // invented numbers.
-const OPENCODE_GO_MODELS = [
-  ['deepseek-v4-flash', 'DeepSeek V4 Flash', 1000000, 384000, 'text', 'thinkingFormat: deepseek', null],
-  // gpt-5.6-luna terminates correctly only on the OpenAI Responses API; DSH
-  // supports per-model api, so it is listed with api: openai-responses while
-  // the route keeps openai-completions for the other models.
-  // Real card input is text/image/pdf; DSH's modality gate models text/image
-  // today, so pdf is documented here but omitted from the generated entry.
-  ['gpt-5.6-luna', 'GPT-5.6 Luna', 1050000, 128000, 'text, image', null, 'openai-responses'],
-  ['glm-5.3', 'GLM-5.3', 1000000, 131072, 'text', null, null],
-  ['kimi-k3', 'Kimi K3 (2x usage)', 1048576, 131072, 'text, image', null, null],
-  ['kimi-k2.7-code', 'Kimi K2.7 Code', 262144, 262144, 'text, image', null, null],
-].map(([id, name, ctx, maxTok, input, compat, api]) =>
-  (id === 'gpt-5.6-luna'
-    ? `        # gpt-5.6-luna speaks the OpenAI Responses API, not chat/completions.\n        - id: ${id}\n          name: ${name}\n          api: ${api}\n          contextWindow: ${ctx}\n          maxTokens: ${maxTok}\n          input: [${input}]`
-    : `        - id: ${id}\n          name: ${name}\n          contextWindow: ${ctx}\n          maxTokens: ${maxTok}\n          input: [${input}]`)
-  + (compat ? `\n          compat:\n            ${compat}` : ''))
-// Ark Plan serves Kimi K3 on an OpenAI-compatible route. maxTokens is the
-// server's own stated ceiling: api/plan/v3 rejects a larger value with
-// "integer above maximum value, expected a value <= 131072". contextWindow is
-// the plan route's declared default rather than a per-model figure — the plan
-// endpoint exposes no /models listing to read one from.
 const ARK_PLAN_MODELS = [
-  ['kimi-k3', 'Kimi K3 (Ark Plan)', 1048576, 131072, 'text', null],
-].map(([id, name, ctx, maxTok, input, compat]) =>
-  `        - id: ${id}\n          name: ${name}\n          contextWindow: ${ctx}\n          maxTokens: ${maxTok}\n          input: [${input}]`
-  + (compat ? `\n          compat:\n            ${compat}` : ''))
-
-const GMI_SERVING_MODELS = [
-  ['deepseek-ai/DeepSeek-V4-Flash-0731', 'GMI DeepSeek V4 Flash 0731', 1000000, 384000, 'text', null],
-].map(([id, name, ctx, maxTok, input, compat]) =>
-  `        - id: ${id}\n          name: ${name}\n          contextWindow: ${ctx}\n          maxTokens: ${maxTok}\n          input: [${input}]`
-  + (compat ? `\n          compat:\n            ${compat}` : ''))
-const NADIRCLAW_MODELS = [
-  ['nadir-auto', 'NadirClaw Auto', 1000000, 384000, 'text', null],
-  ['nadir-eco', 'NadirClaw Eco', 1000000, 384000, 'text', null],
-  ['nadir-premium', 'NadirClaw Premium', 1000000, 384000, 'text', null],
-  ['nadir-reasoning', 'NadirClaw Reasoning', 1000000, 384000, 'text', null],
-].map(([id, name, ctx, maxTok, input, compat]) =>
-  `        - id: ${id}\n          name: ${name}\n          contextWindow: ${ctx}\n          maxTokens: ${maxTok}\n          input: [${input}]`
-  + (compat ? `\n          compat:\n            ${compat}` : ''))
+  '        - id: ark-code-latest',
+  '          name: ARK Code Latest',
+  '          contextWindow: 1048576',
+  '          maxTokens: 131072',
+  '          input: [text]',
+]
+const MODELFLARE_MODELS = [
+  '        - id: gpt-5.6-sol',
+  '          name: GPT-5.6 Sol',
+  '          input: [text]',
+]
 const settings = [
   'ui-onboarding:',
   '  welcomeNoticeVersion: 2026-08-13.1',
@@ -150,31 +96,18 @@ const settings = [
   '  default: cordis',
   'llm-pi-ai:',
   '  providers:',
-  '    opencode-go:',
-  '      apiKeyEnv: OPENCODE_GO_API_KEY',
-  '      api: openai-completions',
-  '      baseURL: https://opencode.ai/zen/go/v1',
-  '      models:',
-  ...OPENCODE_GO_MODELS,
-  '    gmi-serving:',
-  '      apiKeyEnv: GMI_SERVING_API_KEY',
-  '      api: openai-completions',
-  '      baseURL: https://api.gmi-serving.com/v1',
-  '      models:',
-  ...GMI_SERVING_MODELS,
-  '    ark-plan:',
+  '    ark-agent-plan:',
   '      apiKeyEnv: ARK_PLAN_API_KEY',
   '      api: openai-completions',
-  // NOT api/v3 — that is the postpaid endpoint and bills separately.
   '      baseURL: https://ark.cn-beijing.volces.com/api/plan/v3',
   '      models:',
   ...ARK_PLAN_MODELS,
-  '    nadirclaw:',
-  '      apiKeyEnv: NADIRCLAW_API_KEY',
+  '    modelflare:',
+  '      apiKeyEnv: MODELFLARE_API_KEY',
   '      api: openai-completions',
-  '      baseURL: http://localhost:8856/v1',
+  '      baseURL: https://modelflare.dev/v1',
   '      models:',
-  ...NADIRCLAW_MODELS,
+  ...MODELFLARE_MODELS,
   'agent-default-model:',
   `  provider: ${selection.provider}`,
   `  model: ${selection.model}`,

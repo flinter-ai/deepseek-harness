@@ -145,12 +145,9 @@ Current routing:
 
 | label | provider / model | use |
 |---|---|---|
-| `easy` (default) | opencode-go / `deepseek-v4-flash` | fast/cheap work (DeepSeek via gateway) |
-| `easy-backup`, `backup` | gmi-serving / `deepseek-ai/DeepSeek-V4-Flash-0731` | operational fallback for `easy` |
-| `hard` | ark-plan / `kimi-k3` | strong coding model, on the Ark Plan route |
-| `hard-backup` | opencode-go / `glm-5.3` | fallback when Kimi fails |
-| `glm-5.3` | opencode-go / `glm-5.3` | explicit GLM tier |
-| `nadirclaw` etc. | NadirClaw localhost router | local verification agents |
+| `easy` (default) | ark-agent-plan / `ark-code-latest` | primary coding route |
+| `backup` | modelflare / `gpt-5.6-sol` | fallback route |
+| `deepseek` | deepseek-official / `deepseek-v4-flash` | direct DeepSeek route |
 
 `dsh-agent` retries once with the configured fallback only for provider,
 quota, 404/unauthorized, not-supported, and transport failures (`stream ended`,
@@ -161,10 +158,8 @@ NOT trigger a fallback.
 
 DSH `llm-pi-ai` supports per-model `api` selection (`model.api ?? provider.api`),
 so a single provider route can host models that speak different wire protocols.
-The `opencode-go` route keeps `api: openai-completions` as its default and can
-declare individual models with `api: openai-responses` when needed. This keeps
-provider identity separate from wire protocol and avoids inventing pseudo-provider
-routes.
+The AWS profile declares ARK and Modelflare as separate OpenAI-compatible routes,
+while the direct DeepSeek adapter remains independently available.
 
 ## Running locally and switching models
 
@@ -201,14 +196,11 @@ Open `http://127.0.0.1:3080`. The model selector shows every configured provider
 ### Run headless with a specific model
 
 ```bash
-# easy (default): opencode-go / deepseek-v4-flash
+# easy (default): ark-agent-plan / ark-code-latest
 pnpm dsh --profile headless "your task here"
 
-# hard: ark-plan / kimi-k3
-pnpm dsh --profile headless --model hard "your task here"
-
-# explicit GLM tier: opencode-go / glm-5.3
-pnpm dsh --profile headless --model glm-5.3 "your task here"
+# backup: modelflare / gpt-5.6-sol
+pnpm dsh --profile headless --model backup "your task here"
 ```
 
 ### Switch models in the Web UI
@@ -221,8 +213,8 @@ Edit `~/.dsh/settings.yaml` and change `agent-default-model`:
 
 ```yaml
 agent-default-model:
-  provider: opencode-go
-  model: deepseek-v4-flash
+  provider: ark-agent-plan
+  model: ark-code-latest
 ```
 
 Restart DSH for the change to take effect.
@@ -232,17 +224,11 @@ Restart DSH for the change to take effect.
 Run a one-line headless prompt against each provider:
 
 ```bash
-# opencode-go / deepseek-v4-flash
+# ark-agent-plan / ark-code-latest
 pnpm dsh --profile headless --model easy "Say OK"
 
-# gmi-serving / deepseek-ai/DeepSeek-V4-Flash-0731
-pnpm dsh --profile headless --model easy-backup "Say OK"
-
-# ark-plan / kimi-k3
-pnpm dsh --profile headless --model hard "Say OK"
-
-# opencode-go / glm-5.3
-pnpm dsh --profile headless --model glm-5.3 "Say OK"
+# modelflare / gpt-5.6-sol
+pnpm dsh --profile headless --model backup "Say OK"
 ```
 
 Each should print a short reply. A `QUOTA` or `AUTH` error means the key is missing or exhausted; a `NO_ADAPTER` error means the provider is not declared in `settings.yaml`.

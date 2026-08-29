@@ -16,10 +16,10 @@ Three independently developed capabilities — the Bedrock LLM provider (`flinte
 
 ### Composition is proven by a keyless structural smoke
 
-`examples/aws-headless/` holds a profile template (`profile/package.json` listing the `@deepseek-ai/dsh-base` and `@flinter/dsh-orca` bundles, `profile/cordis.patch.yml` swapping the credential store and enabling the catalog `amazon-bedrock` route) and `tests/aws-headless.e2e.ts`, which materializes the profile into a temp `DSH_HOME` — profile-local `node_modules` symlinks stand in for `dsh plugin add` — and runs two gates:
+`examples/aws-headless/` holds a profile template (`profile/package.json` listing the `@deepseek-ai/dsh-base` and `@flinter/dsh-orca` bundles, `profile/cordis.patch.yml` swapping the credential store and declaring the `ark-agent-plan` and `modelflare` routes) and `tests/aws-headless.e2e.ts`, which materializes the profile into a temp `DSH_HOME` — profile-local `node_modules` symlinks stand in for `dsh plugin add` — and runs two gates:
 
 - **Composition gate**: the real `--dump-config` CLI path prints each capability's rows exactly once, with the local credential row present but disabled.
-- **Boot gate**: an in-process `boot()` over the real profile layers activates all three capabilities (`ctx.credentials` is the Secrets Manager provider, `amazon-bedrock` is a registered LLM route, the five Orca tools are registered) and disposes cleanly. The environment is stripped of every `AWS_*` variable with IMDS disabled, so any AWS call during boot would fail loud; a green boot is the zero-network-call proof.
+- **Boot gate**: an in-process `boot()` over the real profile layers activates the AWS credentials provider, the `ark-agent-plan`, `deepseek-official`, and `modelflare` LLM routes, and the five Orca tools, then disposes cleanly. The environment is stripped of every `AWS_*` variable with IMDS disabled, so any AWS call during boot would fail loud; a green boot is the zero-network-call proof.
 
 Neither gate requires credentials, and neither dispatches an AWS request. A credential-aware live smoke is a separate, later, gated test.
 
