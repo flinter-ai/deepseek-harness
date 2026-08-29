@@ -371,6 +371,56 @@ function assertTenantReferences(
   }
 }
 
+const NATIVE_EVENT_ENVELOPE_KEYS = new Set(['type', 'seq', 'time', 'data', 'sourceEventSeqs', 'surfaceOp'])
+
+function validateNativeEventEnvelope(value: unknown, index: number): asserts value is SessionEvent {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`event ${index} is a malformed envelope`)
+  }
+  const prototype = Object.getPrototypeOf(value)
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error(`event ${index} is a malformed envelope`)
+  }
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string' || !NATIVE_EVENT_ENVELOPE_KEYS.has(key)) {
+      throw new Error(`event ${index} is a malformed envelope: unknown field`)
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(value, key)
+    if (descriptor === undefined || descriptor.get || descriptor.set) {
+      throw new Error(`event ${index} is a malformed envelope: accessor field`)
+    }
+  }
+  for (const key of ['type', 'seq', 'time', 'data']) {
+    if (!Object.prototype.hasOwnProperty.call(value, key)) {
+      throw new Error(`event ${index} is malformed: ${key} is required`)
+    }
+  }
+  const type = (value as { type: unknown }).type
+  if (typeof type !== 'string' || type.trim().length === 0) {
+    throw new Error(`event ${index} must have a non-empty type`)
+  }
+  const seq = (value as { seq: unknown }).seq
+  if (!Number.isSafeInteger(seq) || (seq as number) < 0) {
+    throw new Error(`event ${index} sequence must be a safe non-negative integer`)
+  }
+  const time = (value as { time: unknown }).time
+  if (!Number.isSafeInteger(time) || (time as number) < 0) {
+    throw new Error(`event ${index} time must be a safe non-negative integer`)
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'sourceEventSeqs')) {
+    const sourceEventSeqs = (value as { sourceEventSeqs: unknown }).sourceEventSeqs
+    if (!Array.isArray(sourceEventSeqs) || sourceEventSeqs.some(seq => !Number.isSafeInteger(seq) || seq < 0)) {
+      throw new Error(`event ${index} sourceEventSeqs must be safe non-negative integers`)
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'surfaceOp')) {
+    const surfaceOp = (value as { surfaceOp: unknown }).surfaceOp
+    if (typeof surfaceOp !== 'string' || surfaceOp.trim().length === 0) {
+      throw new Error(`event ${index} surfaceOp must be a non-empty string`)
+    }
+  }
+}
+
 function deriveStreamKey(identity: TraceCheckpointIdentity): string {
   return `stream:${hashBytes(canonicalJson(identity))}`
 }
@@ -519,16 +569,7 @@ export class LocalTraceCheckpointSink implements TraceCheckpointSink {
     for (let index = 0; index < events.length; index++) {
       const current = events[index]
       if (current === undefined) throw new Error(`event ${index} is missing`)
-      if (typeof current.type !== 'string' || current.type.length === 0) {
-        throw new Error(`event ${index} must have a non-empty type`)
-      }
-      if (!Object.prototype.hasOwnProperty.call(current, 'data')) {
-        throw new Error(`event ${index} is malformed: data is required`)
-      }
-      if (!Number.isSafeInteger(current.seq) || current.seq < 0) {
-        throw new Error(`event ${index} sequence must be a safe non-negative integer`)
-      }
-      if (!Number.isFinite(current.time)) throw new Error(`event ${index} time must be finite`)
+      validateNativeEventEnvelope(current, index)
       if (index > 0) {
         const previous = events[index - 1]
         if (previous === undefined || current.seq !== previous.seq + 1) {

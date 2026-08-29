@@ -92,6 +92,10 @@ describe('@flinter/dsh-trace-link checkpoint contract', () => {
       .rejects.toThrow(/contiguous/)
     await expect(sink.checkpoint(input([{ type: 'session', seq: 0, time: 1 } as SessionEvent])))
       .rejects.toThrow(/data is required/)
+    await expect(sink.checkpoint(input([{ ...event('session', 0), time: 1.5 } as SessionEvent])))
+      .rejects.toThrow(/time must be a safe non-negative integer/)
+    await expect(sink.checkpoint(input([{ ...event('session', 0), extra: true } as unknown as SessionEvent])))
+      .rejects.toThrow(/unknown field/)
 
     await sink.checkpoint(input([event('session', 0)]))
     await expect(sink.checkpoint(input([event('turn/start', 1)], { tenantId: 'other-tenant' })))
