@@ -149,6 +149,10 @@ Current routing:
 | `backup` | modelflare / `gpt-5.6-sol` | fallback route |
 | `deepseek` | deepseek-official / `deepseek-v4-flash` | direct DeepSeek route |
 
+The Modelflare model is declared with a 1,000,000-token combined context
+capacity and `high` reasoning. Its output cap is left unset so the provider
+decides the model-specific default.
+
 `dsh-agent` retries once with the configured fallback only for provider,
 quota, 404/unauthorized, not-supported, and transport failures (`stream ended`,
 `finish_reason`, `transport`). `NO_ADAPTER` and local configuration errors do

@@ -87,7 +87,10 @@ const ARK_PLAN_MODELS = [
 const MODELFLARE_MODELS = [
   '        - id: gpt-5.6-sol',
   '          name: GPT-5.6 Sol',
+  '          contextWindow: 1000000',
   '          input: [text]',
+  '          reasoningEfforts:',
+  '            high: high',
 ]
 const settings = [
   'ui-onboarding:',

@@ -129,6 +129,9 @@ worker home（`worker-home.mjs`）配置 DSH 可以调用的模型。当前路�
 | `backup` | modelflare / `gpt-5.6-sol` | 备用路由 |
 | `deepseek` | deepseek-official / `deepseek-v4-flash` | 直连 DeepSeek 路由 |
 
+Modelflare 模型声明了 1,000,000 token 的请求与响应总上下文容量，并使用
+`high` 推理。其输出上限保持未设置，由提供方决定模型对应的默认值。
+
 `dsh-agent` 只对 provider、配额、404/未授权、not-supported 和 transport 失败（`stream ended`、`finish_reason`、`transport`）重试一次。`NO_ADAPTER` 和本地配置错误 **不会** 触发 fallback。
 
 ### 混合协议 provider
