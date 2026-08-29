@@ -5259,6 +5259,10 @@ importers:
         specifier: workspace:^
         version: link:../../typert/protocol
 
+  packages/flinter/agentic-control: {}
+
+  packages/flinter/dsh-agent-teams-profile: {}
+
   packages/flinter/dsh-alpha-profile:
     dependencies:
       '@deepseek-ai/dsh-invariants':
@@ -5277,6 +5281,20 @@ importers:
       '@deepseek-ai/dsh-session':
         specifier: workspace:^
         version: link:../../core/session
+
+  packages/flinter/dsh-aws-worker-profile: {}
+
+  packages/flinter/dsh-executor: {}
+
+  packages/flinter/dsh-integration-contracts: {}
+
+  packages/flinter/dsh-native-event-consumer: {}
+
+  packages/flinter/dsh-pes: {}
+
+  packages/flinter/dsh-segment: {}
+
+  packages/flinter/dsh-trace-link: {}
 
   packages/fs/fs:
     devDependencies:
