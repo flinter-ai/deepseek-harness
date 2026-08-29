@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import {
   countVisibleUnits,
+  resolveRepositoryIdentity,
   nextResolvingIssueStatus,
   parseReferences,
   retainIssueReferences,
@@ -36,6 +37,17 @@ const canonicalKinds = [
   'kind/cleanup',
   'kind/dependency',
 ]
+
+test('resolves the renamed canonical repository from the workflow identity', () => {
+  assert.deepEqual(
+    resolveRepositoryIdentity({ GITHUB_REPOSITORY: 'flinter-ai/deepseek-harness' }),
+    { organization: 'flinter-ai', repository: 'deepseek-harness' },
+  )
+  assert.deepEqual(
+    resolveRepositoryIdentity({}),
+    { organization: 'flinter-ai', repository: 'deepseek-harness' },
+  )
+})
 
 // Keep an independent oracle rather than importing the implementation's reserved set.
 const legacyLabels = [
