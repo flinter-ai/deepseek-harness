@@ -37,6 +37,15 @@ export const FLINTER_MODEL_CAPACITIES = Object.freeze({
   gmiDeepSeekV4Flash: { contextWindow: 1_000_000, maxTokens: 384_000 },
 } as const)
 
+/** The selectable reasoning ids accepted by the alpha pi-ai catalog seam. */
+export type FlinterReasoningEffort = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+
+/** Map a user-facing level to the provider's wire spelling. */
+export type FlinterReasoningEfforts = Partial<Record<FlinterReasoningEffort, string | null>>
+
+/** Only level currently verified for both ARK and Modelflare in this migration. */
+export const FLINTER_DEFAULT_REASONING_EFFORTS: FlinterReasoningEfforts = Object.freeze({ high: 'high' })
+
 export const FLINTER_DEFAULT_PROVIDER = 'ark-agent-plan' as const
 export const FLINTER_ROTATION_PROVIDER = 'modelflare' as const
 
@@ -48,12 +57,21 @@ export interface FlinterProviderEndpointConfig {
   gmiServing: string
 }
 
+export interface FlinterProviderSettingsOptions {
+  /**
+   * Optional per-model reasoning menu. Omitted routes retain the verified
+   * `high` compatibility default; an explicit map lets a deployment expose
+   * only the levels its endpoint has actually confirmed.
+   */
+  reasoningEfforts?: Partial<Record<FlinterProviderId, FlinterReasoningEfforts | false>>
+}
+
 export interface FlinterModelProfile {
   id: string
   name: string
   contextWindow: number
   maxTokens?: number
-  reasoningEfforts?: { high: string }
+  reasoningEfforts?: FlinterReasoningEfforts | false
 }
 
 export interface FlinterProviderProfile {
@@ -81,7 +99,7 @@ function profile(
   baseURL: string,
   model: string,
   capacity: { contextWindow: number; maxTokens?: number },
-  reasoningEfforts?: { high: string },
+  reasoningEfforts?: FlinterReasoningEfforts | false,
 ): FlinterProviderProfile {
   return {
     displayName,
@@ -103,7 +121,9 @@ function profile(
 /** Build the settings section consumed by @deepseek-ai/dsh-llm-pi-ai. */
 export function buildFlinterProviderSettings(
   endpoints: FlinterProviderEndpointConfig,
+  options: FlinterProviderSettingsOptions = {},
 ): FlinterProviderSettings {
+  const reasoningEfforts = options.reasoningEfforts ?? {}
   return {
     providers: {
       'ark-agent-plan': profile(
@@ -112,7 +132,7 @@ export function buildFlinterProviderSettings(
         endpoints.arkAgentPlan,
         'ark-code-latest',
         FLINTER_MODEL_CAPACITIES.arkCodeLatest,
-        { high: 'high' },
+        reasoningEfforts['ark-agent-plan'] ?? FLINTER_DEFAULT_REASONING_EFFORTS,
       ),
       modelflare: profile(
         'Modelflare',
@@ -120,7 +140,7 @@ export function buildFlinterProviderSettings(
         endpoints.modelflare,
         'gpt-5.6-sol',
         FLINTER_MODEL_CAPACITIES.modelflareGpt56Sol,
-        { high: 'high' },
+        reasoningEfforts.modelflare ?? FLINTER_DEFAULT_REASONING_EFFORTS,
       ),
       'gmi-serving': profile(
         'GMI Serving',
@@ -128,6 +148,7 @@ export function buildFlinterProviderSettings(
         endpoints.gmiServing,
         'deepseek-ai/DeepSeek-V4-Flash-0731',
         FLINTER_MODEL_CAPACITIES.gmiDeepSeekV4Flash,
+        reasoningEfforts['gmi-serving'],
       ),
     },
   }

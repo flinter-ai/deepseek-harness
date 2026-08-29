@@ -22,16 +22,23 @@ import re
 import tempfile
 
 
-ARK = ("ark-agent-plan", "ark-code-latest", "high")
-MODELFLARE = ("modelflare", "gpt-5.6-sol", "high")
+REASONING_EFFORTS = ("off", "minimal", "low", "medium", "high", "xhigh", "max")
+DEFAULT_REASONING_EFFORT = "high"
+ARK = ("ark-agent-plan", "ark-code-latest")
+MODELFLARE = ("modelflare", "gpt-5.6-sol")
 BLOCK_RE = re.compile(r"^agent-default-model:\n(?:[ \t].*\n|\n)*", re.MULTILINE)
 
 
-def pick(hour: int) -> tuple[str, str, str]:
+def pick(hour: int, reasoning_effort: str = DEFAULT_REASONING_EFFORT) -> tuple[str, str, str]:
     """Return the provider/model/reasoning route for one UTC hour."""
     if not 0 <= hour <= 23:
         raise ValueError(f"hour must be between 0 and 23, got {hour}")
-    return ARK if 16 <= hour < 24 else MODELFLARE
+    if reasoning_effort not in REASONING_EFFORTS:
+        raise ValueError(
+            f"reasoning_effort must be one of {', '.join(REASONING_EFFORTS)}, got {reasoning_effort}"
+        )
+    provider, model = ARK if 16 <= hour < 24 else MODELFLARE
+    return provider, model, reasoning_effort
 
 
 def block(choice: tuple[str, str, str]) -> str:
@@ -92,16 +99,25 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="UTC hour for a deterministic probe; defaults to TOD_HOUR or the current hour",
     )
+    parser.add_argument(
+        "--reasoning-effort",
+        choices=REASONING_EFFORTS,
+        default=None,
+        help="select the model reasoning level; defaults to TOD_REASONING_EFFORT or high",
+    )
     parser.add_argument("--selftest", action="store_true")
     return parser.parse_args()
 
 
 def selftest() -> None:
-    assert {hour for hour in range(24) if pick(hour) == ARK} == set(range(16, 24))
-    assert {hour for hour in range(24) if pick(hour) == MODELFLARE} == set(range(16))
-    for choice in (MODELFLARE, ARK):
+    assert {hour for hour in range(24) if pick(hour)[:2] == ARK} == set(range(16, 24))
+    assert {hour for hour in range(24) if pick(hour)[:2] == MODELFLARE} == set(range(16))
+    for effort in REASONING_EFFORTS:
+        assert pick(15, effort)[2] == effort
+        assert pick(16, effort)[2] == effort
+    for choice in (MODELFLARE + (DEFAULT_REASONING_EFFORT,), ARK + (DEFAULT_REASONING_EFFORT,)):
         assert BLOCK_RE.match(block(choice) + "agent-presets:\n").group(0) == block(choice)
-    print("alpha tod: selftest ok (24/24 UTC hours covered)")
+    print("alpha tod: selftest ok (24/24 UTC hours and 7 reasoning options covered)")
 
 
 def main() -> None:
@@ -113,9 +129,11 @@ def main() -> None:
     if hour is None:
         raw_hour = os.environ.get("TOD_HOUR")
         hour = int(raw_hour) if raw_hour is not None else dt.datetime.now(dt.timezone.utc).hour
+    reasoning_effort = args.reasoning_effort or os.environ.get("TOD_REASONING_EFFORT", DEFAULT_REASONING_EFFORT)
     settings = args.home / "settings.yaml"
-    changed = apply(settings, pick(hour))
-    provider, model, _ = pick(hour)
+    choice = pick(hour, reasoning_effort)
+    changed = apply(settings, choice)
+    provider, model, _ = choice
     suffix = "" if changed else " (already set)"
     print(f"alpha tod: {hour:02d}:00Z -> {provider}/{model}{suffix}")
 

@@ -31,12 +31,14 @@ describe('Phase 1 local DSH_HOME rotation seam', () => {
       await execFileAsync('python3', [tod, '--home', home, '--hour', '15'])
       const outsideArk = await readFile(settings, 'utf8')
       expect(outsideArk).toContain('  model: gpt-5.6-sol\n  provider: modelflare\n')
+      expect(outsideArk).toContain('  reasoningEffort: high\n')
       expect(outsideArk).toContain('  keep: true')
       expect(outsideArk).toContain('contextWindow: 1000000')
 
-      await execFileAsync('python3', [tod, '--home', home, '--hour', '16'])
+      await execFileAsync('python3', [tod, '--home', home, '--hour', '16', '--reasoning-effort', 'low'])
       const insideArk = await readFile(settings, 'utf8')
       expect(insideArk).toContain('  model: ark-code-latest\n  provider: ark-agent-plan\n')
+      expect(insideArk).toContain('  reasoningEffort: low\n')
       expect(insideArk).toContain('  keep: true')
       expect(insideArk).toContain('contextWindow: 1000000')
       expect(JSON.stringify({ outsideArk, insideArk })).not.toContain('test-key')
@@ -60,7 +62,7 @@ describe('Phase 1 local DSH_HOME rotation seam', () => {
 
   it('covers every UTC hour in the script self-test', async () => {
     await expect(execFileAsync('python3', [tod, '--selftest']))
-      .resolves.toMatchObject({ stdout: expect.stringContaining('24/24 UTC hours covered') })
+      .resolves.toMatchObject({ stdout: expect.stringContaining('24/24 UTC hours and 7 reasoning options covered') })
   })
 
   it('removes known DSH credential exports from the launch child', async () => {

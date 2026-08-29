@@ -3,6 +3,7 @@ import {
   bindFreshSession,
   buildFlinterProviderSettings,
   DIRECT_DEEPSEEK_ROUTE,
+  FLINTER_DEFAULT_REASONING_EFFORTS,
   FLINTER_AWS_SECRET_NAMES,
   FLINTER_CREDENTIAL_REFS,
   FLINTER_MODEL_CAPACITIES,
@@ -32,12 +33,30 @@ describe('FLINTER alpha provider/profile layer', () => {
     const settings = buildFlinterProviderSettings(endpoints)
     expect(settings.providers['ark-agent-plan'].defaultContextWindow).toBe(PI_AI_DEFAULTS.contextWindow)
     expect(settings.providers['ark-agent-plan'].models[0]).toMatchObject(FLINTER_MODEL_CAPACITIES.arkCodeLatest)
-    expect(settings.providers['ark-agent-plan'].models[0].reasoningEfforts).toEqual({ high: 'high' })
+    expect(settings.providers['ark-agent-plan'].models[0].reasoningEfforts).toEqual(FLINTER_DEFAULT_REASONING_EFFORTS)
     expect(settings.providers.modelflare.models[0]).toMatchObject(FLINTER_MODEL_CAPACITIES.modelflareGpt56Sol)
-    expect(settings.providers.modelflare.models[0].reasoningEfforts).toEqual({ high: 'high' })
+    expect(settings.providers.modelflare.models[0].reasoningEfforts).toEqual(FLINTER_DEFAULT_REASONING_EFFORTS)
     expect(settings.providers['gmi-serving'].models[0]).toMatchObject(FLINTER_MODEL_CAPACITIES.gmiDeepSeekV4Flash)
     expect(settings.providers.modelflare.models[0]).not.toHaveProperty('maxTokens')
     expect(settings.providers.modelflare.defaultMaxTokens).toBe(PI_AI_DEFAULTS.maxTokens)
+  })
+
+  it('exposes an explicit per-model reasoning menu without changing other routes', () => {
+    const settings = buildFlinterProviderSettings(endpoints, {
+      reasoningEfforts: {
+        modelflare: { off: null, low: 'low', high: 'high', max: 'ultra' },
+        'gmi-serving': false,
+      },
+    })
+    expect(settings.providers.modelflare.models[0].reasoningEfforts).toEqual({
+      off: null,
+      low: 'low',
+      high: 'high',
+      max: 'ultra',
+    })
+    expect(settings.providers['ark-agent-plan'].models[0].reasoningEfforts)
+      .toEqual(FLINTER_DEFAULT_REASONING_EFFORTS)
+    expect(settings.providers['gmi-serving'].models[0].reasoningEfforts).toBe(false)
   })
 
   it('rotates only fresh-session defaults at the UTC boundary', () => {

@@ -33,12 +33,17 @@ function safeEnvironment(root: string, home: string): NodeJS.ProcessEnv {
   }
 }
 
-function settingsFor(provider: 'modelflare' | 'deepseek-official', model: string, endpoint: string): string {
+function settingsFor(
+  provider: 'modelflare' | 'deepseek-official',
+  model: string,
+  endpoint: string,
+  reasoningEffort: string,
+): string {
   return [
     'agent-default-model:',
     `  provider: ${provider}`,
     `  model: ${model}`,
-    '  reasoningEffort: high',
+    `  reasoningEffort: ${reasoningEffort}`,
     'llm-deepseek:',
     '  apiKeyEnv: DEEPSEEK_API_KEY',
     `  baseURL: ${endpoint}`,
@@ -57,12 +62,21 @@ function settingsFor(provider: 'modelflare' | 'deepseek-official', model: string
     '            - text',
     '          contextWindow: 1000000',
     '          reasoningEfforts:',
+    '            off:',
+    '            low: low',
     '            high: high',
+    '            max: ultra',
     '',
   ].join('\n')
 }
 
-async function prepareHome(root: string, provider: 'modelflare' | 'deepseek-official', model: string, endpoint: string): Promise<string> {
+async function prepareHome(
+  root: string,
+  provider: 'modelflare' | 'deepseek-official',
+  model: string,
+  endpoint: string,
+  reasoningEffort: string,
+): Promise<string> {
   const home = join(root, `${provider}-home`)
   const profile = join(home, 'profiles', 'tod')
   const sessions = join(home, 'sessions')
@@ -81,7 +95,7 @@ async function prepareHome(root: string, provider: 'modelflare' | 'deepseek-offi
     '    compression: none',
     '',
   ].join('\n'))
-  await writeFile(join(home, 'settings.yaml'), settingsFor(provider, model, endpoint), { mode: 0o600 })
+  await writeFile(join(home, 'settings.yaml'), settingsFor(provider, model, endpoint, reasoningEffort), { mode: 0o600 })
   await writeFile(join(home, '.credentials.yaml'), [
     'version: 1',
     'refs:',
@@ -122,7 +136,12 @@ async function runHeadless(root: string, home: string, task: string) {
   return { result, records: await sessionRecords(home) }
 }
 
-function expectNativeSession(records: readonly Record<string, unknown>[], provider: string, model: string): void {
+function expectNativeSession(
+  records: readonly Record<string, unknown>[],
+  provider: string,
+  model: string,
+  reasoningEffort: string,
+): void {
   const types = records.map(record => record.type)
   for (const type of ['session', 'turn/start', 'request/header', 'request/context', 'user/message', 'assistant/message', 'turn/end']) {
     expect(types, `missing native session event ${type}`).toContain(type)
@@ -131,7 +150,7 @@ function expectNativeSession(records: readonly Record<string, unknown>[], provid
   expect(context?.data).toMatchObject({ provider, model, contextWindow: 1_000_000 })
   const header = records.find(record => record.type === 'request/header')
   expect(header?.data).toMatchObject({
-    header: { config: { provider, model } },
+    header: { config: { provider, model, reasoningEffort } },
   })
 }
 
@@ -144,12 +163,12 @@ describe('Phase 1 isolated alpha tod process', () => {
         { events: textEvents },
         { events: textEvents },
       ])
-      const modelflareHome = await prepareHome(root, 'modelflare', 'gpt-5.6-sol', modelflareServer.url)
+      const modelflareHome = await prepareHome(root, 'modelflare', 'gpt-5.6-sol', modelflareServer.url, 'low')
       const modelflareRun = await runHeadless(root, modelflareHome, 'prove the isolated alpha Modelflare process')
       expect(modelflareRun.result.exitCode, `stdout:\n${modelflareRun.result.stdout}\nstderr:\n${modelflareRun.result.stderr}`).toBe(0)
       expect(modelflareRun.result.stdout).toContain('hello')
       expect(modelflareRun.result.stderr).toBe('')
-      expectNativeSession(modelflareRun.records, 'modelflare', 'gpt-5.6-sol')
+      expectNativeSession(modelflareRun.records, 'modelflare', 'gpt-5.6-sol', 'low')
       expect(modelflareServer.headers.some(header => header.authorization === 'Bearer modelflare-test-key')).toBe(true)
       expect(modelflareServer.requests.some(request => (request as { model?: string })?.model === 'gpt-5.6-sol')).toBe(true)
 
@@ -158,12 +177,12 @@ describe('Phase 1 isolated alpha tod process', () => {
         { events: textEvents },
         { events: textEvents },
       ])
-      const directHome = await prepareHome(root, 'deepseek-official', 'deepseek-v4-flash', directServer.url)
+      const directHome = await prepareHome(root, 'deepseek-official', 'deepseek-v4-flash', directServer.url, 'high')
       const directRun = await runHeadless(root, directHome, 'prove the isolated alpha direct DeepSeek process')
       expect(directRun.result.exitCode, `stdout:\n${directRun.result.stdout}\nstderr:\n${directRun.result.stderr}`).toBe(0)
       expect(directRun.result.stdout).toContain('hello')
       expect(directRun.result.stderr).toBe('')
-      expectNativeSession(directRun.records, 'deepseek-official', 'deepseek-v4-flash')
+      expectNativeSession(directRun.records, 'deepseek-official', 'deepseek-v4-flash', 'high')
       expect(
         directServer.headers.some(header => header.authorization === 'Bearer deepseek-test-key'),
         `direct paths=${JSON.stringify(directServer.paths)} auth=${JSON.stringify(directServer.headers.map(header => header.authorization))}`,
