@@ -113,7 +113,12 @@ function profile(
       name: model,
       contextWindow: capacity.contextWindow,
       ...capacity.maxTokens === undefined ? {} : { maxTokens: capacity.maxTokens },
-      ...reasoningEfforts === undefined ? {} : { reasoningEfforts },
+      // The alpha config materializer may normalize a dict in place. Keep the
+      // exported default immutable, but hand the schema a mutable plain map so
+      // programmatic profile settings behave like the equivalent YAML input.
+      ...reasoningEfforts === undefined
+        ? {}
+        : { reasoningEfforts: reasoningEfforts === false ? false : { ...reasoningEfforts } },
     }],
   }
 }
