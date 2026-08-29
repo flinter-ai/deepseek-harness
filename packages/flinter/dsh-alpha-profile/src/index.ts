@@ -8,6 +8,8 @@
  */
 
 export * from './worker.ts'
+export * from './attempt.ts'
+export * from './lifecycle.ts'
 
 export const FLINTER_CREDENTIAL_REFS = Object.freeze({
   arkAgentPlan: 'ARK_PLAN_API_KEY',

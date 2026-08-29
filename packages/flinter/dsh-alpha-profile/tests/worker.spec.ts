@@ -180,4 +180,18 @@ describe('alpha worker/session adapter', () => {
     )).rejects.toThrow('not found')
     expect(calls).toEqual({ create: 0, resume: 1 })
   })
+
+  it('rejects callback URLs that embed credentials', () => {
+    expect(() => readDshWorkerEnvironment({
+      DSH_SESSION_ID: 'session-1',
+      DSH_SESSION_ROOT: '/tmp/dsh/session-1',
+      DSH_LEASE_OWNER: 'worker-a',
+      DSH_LEASE_GENERATION: '1',
+      DSH_COMPUTE_TIER: 'cpu',
+      DSH_WORKER_ATTEMPT_COUNT: '0',
+      DSH_CALLBACK_URL: 'https://user:secret@control.example.test/callback',
+      DSH_CALLBACK_HMAC_SECRET_REF: 'flinter/callback-hmac',
+      DSH_IMAGE_DIGEST: 'sha256:abc',
+    })).toThrow(/must not contain credentials/)
+  })
 })
