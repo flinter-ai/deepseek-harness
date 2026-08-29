@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-29-deepseek-optional-max-tokens.md
+2026-08-29-deepseek-optional-max-tokens.md: 39124fd3634e2a05165dbbd673de740aedf55369
+2026-08-29-deepseek-optional-max-tokens.zh.md: 3c2e843930e95fdb931df8087e321dde8c56e899

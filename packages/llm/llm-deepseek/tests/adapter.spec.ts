@@ -75,11 +75,13 @@ describe('DeepSeekAdapter against a mock server', () => {
     // The wire request carried the auth header contents we configured.
     expect(server.requests[0]).toMatchObject({
       model: 'deepseek-v4-flash',
-      max_tokens: 256_000,
       reasoning_effort: 'high',
       stream: true,
       stream_options: { include_usage: true },
     })
+    // No output cap configured: the request omits max_tokens so the provider's
+    // own default applies.
+    expect(server.requests[0]).not.toHaveProperty('max_tokens')
     // App attribution and DeepSeek request identity are independent wire facts.
     expect(server.headers[0]?.['user-agent']).toBe(userAgent())
     expect(server.headers[0]?.['x-deepseek-harness-user-id']).toBe(getOrCreateAnonymousUserId())
@@ -667,7 +669,6 @@ describe('plugin registration and config', () => {
         id: 'deepseek-v4-flash',
         name: 'DeepSeek-V4-Flash',
         context: { contextWindow: 1_000_000 },
-        defaultMaxTokens: 256_000,
         reasoning: {
           efforts: [
             { id: ReasoningEffortId('off'), name: 'Off' },
@@ -787,10 +788,11 @@ describe('plugin registration and config', () => {
         description: 'Higher reasoning budget',
       })
     await expect(ctx.llm.resolveModelInfo('deepseek-official', 'arbitrary-unlisted'))
-      .resolves.toMatchObject({
-        context: { contextWindow: 1_000_000 },
-        defaultMaxTokens: 256_000,
-      })
+      .resolves.toMatchObject({ context: { contextWindow: 1_000_000 } })
+    // No provider or model output cap configured: the resolved maxTokens is
+    // absent so the provider's own default applies.
+    await expect(ctx.llm.resolveModelInfo('deepseek-official', 'arbitrary-unlisted'))
+      .resolves.not.toHaveProperty('defaultMaxTokens')
   })
 
   it('uses exact model capacity before the adapter-wide default', async () => {

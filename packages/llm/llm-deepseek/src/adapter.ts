@@ -58,8 +58,8 @@ export interface DeepSeekConnectionOptions {
   apiKeyEnv: CredentialRef
   /** Request defaults applied to every call (thinking mode, effort). */
   defaults: RequestDefaults
-  /** Default per-request output cap; explicit request values win. */
-  maxTokens: number
+  /** Optional per-request output cap; explicit request values win. Omitted when unset so the provider's own default applies. */
+  maxTokens?: number
   /** Positive context capacity used when the selected model has no exact value. */
   defaultContextWindow: number
   /** Advisory models exposed to discovery consumers; requests remain unrestricted. */
@@ -89,8 +89,6 @@ export interface DeepSeekAdapterOptions {
 export const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 300_000
 /** Default combined request/response context capacity. */
 export const DEFAULT_CONTEXT_WINDOW = 1_000_000
-/** Default per-request output-token cap. */
-export const DEFAULT_MAX_TOKENS = 256_000
 const STREAM_IDLE_TIMEOUT_CODE = 'LLM_STREAM_IDLE_TIMEOUT'
 const OFF_REASONING_EFFORT = ReasoningEffortId('off')
 const LOW_REASONING_EFFORT = ReasoningEffortId('low')
@@ -183,6 +181,7 @@ export class DeepSeekAdapter extends LlmAdapter {
     const configured = connection.models.find(entry => entry.id === model)
     const contextWindow = configured?.contextWindow
       ?? connection.defaultContextWindow
+    const defaultMaxTokens = configured?.maxTokens ?? connection.maxTokens
     return Promise.resolve({
       // The chat-completions wire route is text-only regardless of catalog
       // membership, so the uncatalogued fallback declares the same negative
@@ -192,7 +191,7 @@ export class DeepSeekAdapter extends LlmAdapter {
         ? { provider, id: model, name: model, inputModalities: ['text' as const] }
         : modelInfo(provider, configured),
       context: { contextWindow },
-      defaultMaxTokens: configured?.maxTokens ?? connection.maxTokens,
+      ...defaultMaxTokens === undefined ? {} : { defaultMaxTokens },
       ...connection.defaults.thinking === 'disabled'
         ? {
           reasoning: {
