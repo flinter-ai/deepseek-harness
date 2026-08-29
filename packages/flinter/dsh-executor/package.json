@@ -1,6 +1,6 @@
 {
   "name": "@flinter/dsh-executor",
-  "description": "Scaffold-only executor and Runta adapter contract",
+  "description": "Contract-only executor and Runta adapter boundary",
   "version": "0.1.0",
   "private": true,
   "type": "module",

@@ -1,9 +1,18 @@
 # `@flinter/dsh-executor`
 
-Status: **SCAFFOLD_ONLY**.
+Status: **CONTRACT_ONLY**.
 
-This reserves the executor/Runta adapter boundary for Phase 2. The eventual
-implementation must prove literal delivery, attempt identity, retry lineage,
-fencing, startup watchdogs, canaries, and worktree/evidence isolation. Agent
-Teams remains coordination only until this parity exists. No task is submitted
-and no sandbox or worktree is created by this scaffold.
+This package extracts the safety invariants from the old #37/#38/v3 worker
+line into a new non-Orca boundary. It validates literal JSON task envelopes,
+derives fresh per-attempt workspace/evidence roots, binds an immutable
+secret-free manifest, compares logical fence tokens, checks replacement
+attempt monotonicity, and gates fan-out on a complete canary proof.
+
+It does not submit tasks, launch processes, create directories, call AWS,
+call Orca, or replace Agent Teams. A future Runta/control-plane adapter owns
+those side effects and must satisfy this contract before it is loaded into a
+runtime profile.
+
+The control plane remains authoritative for lease issuance, physical worker
+fencing, callback authentication, image validation, and durable state. DSH
+remains authoritative for the live session and its exact persistence root.
