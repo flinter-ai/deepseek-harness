@@ -348,6 +348,7 @@ export class PiAiAdapter extends LlmAdapter {
       : AbortSignal.any([options.signal, consumer.signal])
     const streamIdleTimeoutMs = profile.streamIdleTimeoutMs
     using watchdog = idleWatchdog(upstream, streamIdleTimeoutMs, 'LLM_STREAM_IDLE_TIMEOUT')
+    let emittedChunks = 0
 
     try {
       const containsImage = options.messages.some(message => contentHasImage(message.content))
@@ -393,6 +394,7 @@ export class PiAiAdapter extends LlmAdapter {
             exhausted = true
             return
           }
+          emittedChunks += 1
           yield result.value
         }
       } finally {
@@ -407,7 +409,14 @@ export class PiAiAdapter extends LlmAdapter {
       }
     } catch (error: unknown) {
       if (timeoutOf(watchdog.signal, 'LLM_STREAM_IDLE_TIMEOUT') !== undefined) {
-        throw new LlmError(`pi-ai stream idle timeout after ${streamIdleTimeoutMs}ms`, 'TIMEOUT', { cause: error })
+        const phase = emittedChunks === 0
+          ? 'before the first translated stream event'
+          : `after ${emittedChunks} translated stream events`
+        throw new LlmError(
+          `pi-ai stream idle timeout after ${streamIdleTimeoutMs}ms ${phase} for provider "${options.provider}", model "${options.model}"`,
+          'TIMEOUT',
+          { cause: error },
+        )
       }
       if (options.signal?.aborted) {
         throw new LlmError('pi-ai request aborted by caller', 'ABORTED', { cause: error })

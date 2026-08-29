@@ -417,7 +417,13 @@ describe('PiAiAdapter provider routing', () => {
     const ctx = await harness(server.url, { streamIdleTimeoutMs: 20 })
 
     const result = await assemble(ctx, { model: 'deepseek-v4-flash', messages: [] })
-    expect(result.finish).toMatchObject({ kind: 'error', failure: { code: 'TIMEOUT' } })
+    expect(result.finish).toMatchObject({
+      kind: 'error',
+      failure: {
+        code: 'TIMEOUT',
+        message: 'pi-ai stream idle timeout after 20ms before the first translated stream event for provider "deepseek", model "deepseek-v4-flash"',
+      },
+    })
     await Promise.race([
       server.responseClosed,
       new Promise<never>((_resolve, reject) => {
@@ -427,6 +433,27 @@ describe('PiAiAdapter provider routing', () => {
 
     expect(server.paths).toEqual(['/chat/completions'])
     expect(server.closedResponses).toBe(1)
+  })
+
+  it('identifies a timeout after translated stream events', async () => {
+    const server = await mockServer([{ events: textEvents, stallAfterEvents: 2 }])
+    const ctx = await harness(server.url, { streamIdleTimeoutMs: 20 })
+
+    const result = await assemble(ctx, { model: 'deepseek-v4-flash', messages: [] })
+    expect(result.finish).toMatchObject({
+      kind: 'error',
+      failure: {
+        code: 'TIMEOUT',
+      },
+    })
+    if (result.finish.kind !== 'error') throw new Error('expected an error finish')
+    expect(result.finish.failure.message).toMatch(
+      /^pi-ai stream idle timeout after 20ms after [1-9][0-9]* translated stream events /,
+    )
+    expect(result.finish.failure.message).toContain(
+      'for provider "deepseek", model "deepseek-v4-flash"',
+    )
+    await server.responseClosed
   })
 })
 
