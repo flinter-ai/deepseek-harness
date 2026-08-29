@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import * as yaml from 'js-yaml'
 import { describe, expect, it } from 'vitest'
@@ -55,9 +55,10 @@ describe('CI workflow', () => {
     }
   })
 
-  it('keeps required Wine and split native Windows jobs with failover, plus a master-only standby', () => {
+  it('keeps required Wine and split native Windows jobs on standard runners, plus a master-only standby', () => {
     const workflow = loadWorkflow('.github/workflows/ci.yml')
     const masterWorkflow = loadWorkflow('.github/workflows/ci-master.yml')
+    const previewWorkflow = loadWorkflow('.github/workflows/build-preview-cloudflare.yml')
     if (!isRecord(workflow.jobs)
       || !isRecord(workflow.jobs.windows)
       || !isRecord(workflow.jobs['windows-build'])
@@ -70,8 +71,9 @@ describe('CI workflow', () => {
       || !isRecord(workflow.jobs['all-checks-passed'])
       || !isRecord(masterWorkflow.jobs)
       || !isRecord(masterWorkflow.jobs['wine-apt-cache'])
-      || !isRecord(masterWorkflow.jobs['serial-windows'])) {
-      throw new TypeError('CI workflow must define windows, windows-build, windows-coverage, windows-native-tests, windows-observational, node-24, node-24-coverage, node-24-consumers, and all-checks-passed; ci-master must define wine-apt-cache and serial-windows')
+      || !isRecord(masterWorkflow.jobs['serial-linux-standard'])
+      || !isRecord(masterWorkflow.jobs['serial-windows-standard'])) {
+      throw new TypeError('CI workflow must define windows, windows-build, windows-coverage, windows-native-tests, windows-observational, node-24, node-24-coverage, node-24-consumers, and all-checks-passed; ci-master must define wine-apt-cache and standard serial references')
     }
 
     const windows = workflow.jobs.windows
@@ -80,7 +82,8 @@ describe('CI workflow', () => {
     const windowsNativeTests = workflow.jobs['windows-native-tests']
     const windowsObservational = workflow.jobs['windows-observational']
     const wineAptCache = masterWorkflow.jobs['wine-apt-cache']
-    const serialWindows = masterWorkflow.jobs['serial-windows']
+    const serialLinux = masterWorkflow.jobs['serial-linux-standard']
+    const serialWindows = masterWorkflow.jobs['serial-windows-standard']
     const node24 = workflow.jobs['node-24']
     const node24Coverage = workflow.jobs['node-24-coverage']
     const node24Consumers = workflow.jobs['node-24-consumers']
@@ -98,14 +101,9 @@ describe('CI workflow', () => {
     expect(windows.if).toBe("github.event_name == 'pull_request'")
     expect(commandSteps.some(step => step.run.includes('wine-windows-gates.sh'))).toBe(true)
 
-    // The split native jobs all resolve their pool through the Windows switch.
+    // The split native jobs use the standard hosted Windows image.
     for (const [jobName, job] of [['windows-build', windowsBuild], ['windows-coverage', windowsCoverage], ['windows-native-tests', windowsNativeTests], ['windows-observational', windowsObservational]] as const) {
-      expect(typeof job['runs-on']).toBe('string')
-      expect(job['runs-on'], `${jobName} runs-on must use the Windows failover switch`).toContain('DSH_CI_FAILOVER_WINDOWS')
-      expect(job['runs-on'], `${jobName} runs-on must not use the Linux failover switch`).not.toContain('DSH_CI_FAILOVER_LINUX')
-      expect(job['runs-on']).toContain('self-hosted')
-      expect(job['runs-on']).toContain('dsh-win-ci')
-      expect(job['runs-on']).toContain('dsh-windows-2025-16core')
+      expect(job['runs-on'], `${jobName} must use the standard Windows runner`).toBe('windows-latest')
       expect(job.if).toBe("github.event_name == 'pull_request'")
     }
 
@@ -146,10 +144,13 @@ describe('CI workflow', () => {
     expect(wineAptCache.if).toBe("github.event_name == 'push' && github.ref == 'refs/heads/master'")
     expect(wineAptCache['runs-on']).toBe('ubuntu-latest')
 
-    // serial-windows: master-only standby, self-hosted, non-blocking, lives in ci-master.
+    // Both serial references are master-only, diagnostic, and standard-hosted.
+    expect(serialLinux.if).toBe("github.event_name == 'push' && github.ref == 'refs/heads/master'")
+    expect(serialLinux['runs-on']).toBe('ubuntu-latest')
+    expect(serialLinux.name).toBe('serial / linux (standard hosted)')
     expect(serialWindows.if).toBe("github.event_name == 'push' && github.ref == 'refs/heads/master'")
-    expect(serialWindows['runs-on']).toEqual(['self-hosted', 'dsh-win-ci', 'windows'])
-    expect(serialWindows.name).toBe('serial / windows (self-hosted standby)')
+    expect(serialWindows['runs-on']).toBe('windows-latest')
+    expect(serialWindows.name).toBe('serial / windows (standard hosted)')
 
     // Aggregate: Wine and the required split native jobs are needed;
     // windows-coverage is temporarily non-blocking while Windows ACP
@@ -159,20 +160,31 @@ describe('CI workflow', () => {
     expect(aggregate.needs).not.toContain('windows-coverage')
     expect(aggregate.needs).toContain('windows-native-tests')
     expect(aggregate.needs).not.toContain('windows-observational')
-    expect(aggregate.needs).not.toContain('serial-windows')
+    expect(aggregate.needs).not.toContain('serial-windows-standard')
 
-    // Linux failover is a separate switch: the three required Linux workers
-    // and the verdict job resolve their pool through DSH_CI_FAILOVER_LINUX,
-    // never the Windows switch.
+    // Automatic PR Linux jobs and the verdict use standard hosted runners.
     for (const [jobName, job] of [['node-24', node24], ['node-24-coverage', node24Coverage], ['node-24-consumers', node24Consumers]] as const) {
-      expect(typeof job['runs-on']).toBe('string')
-      expect(job['runs-on'], `${jobName} runs-on must use the Linux failover switch`).toContain('DSH_CI_FAILOVER_LINUX')
-      expect(job['runs-on'], `${jobName} runs-on must not use the Windows failover switch`).not.toContain('DSH_CI_FAILOVER_WINDOWS')
-      expect(job['runs-on']).toContain('vm-backup')
+      expect(job['runs-on'], `${jobName} must use the standard Linux runner`).toBe('ubuntu-latest')
     }
-    expect(aggregate['runs-on']).toContain('DSH_CI_FAILOVER_LINUX')
-    expect(aggregate['runs-on']).not.toContain('DSH_CI_FAILOVER_WINDOWS')
-    expect(aggregate['runs-on']).toContain('vm-backup')
+    expect(aggregate['runs-on']).toBe('ubuntu-latest')
+
+    // PR preview uses the same standard hosted Linux boundary.
+    expect(JSON.stringify(workflow)).not.toMatch(/dsh-(?:ubuntu|windows)|vm-backup|dsh-win-ci|DSH_CI_FAILOVER|self-hosted/)
+    expect(JSON.stringify(masterWorkflow)).not.toMatch(/dsh-(?:ubuntu|windows)|vm-backup|dsh-win-ci|DSH_CI_FAILOVER|self-hosted/)
+    expect(previewWorkflow.jobs?.preview?.['runs-on']).toBe('ubuntu-latest')
+  })
+
+  it('keeps every workflow on standard GitHub-hosted runner selectors', () => {
+    const forbidden = /dsh-(?:ubuntu|windows)|vm-backup|dsh-win-ci|DSH_CI_FAILOVER|self-hosted/
+    const workflowFiles = readdirSync(resolve(root, '.github/workflows'))
+      .filter(file => file.endsWith('.yml') || file.endsWith('.yaml'))
+
+    expect(workflowFiles.length).toBeGreaterThan(0)
+    for (const file of workflowFiles) {
+      const workflow = loadWorkflow(`.github/workflows/${file}`)
+      expect(JSON.stringify(workflow), `${file} must not select a custom or self-hosted runner`)
+        .not.toMatch(forbidden)
+    }
   })
 
   it('gives the Wine Host TypeScript compile the repository heap budget', () => {
@@ -221,7 +233,7 @@ describe('CI workflow', () => {
 
     // Neither drill may carry a job-level group: it would not exempt the job
     // from run-scoped cancellation.
-    for (const name of ['serial-linux-selfhosted', 'serial-windows']) {
+    for (const name of ['serial-linux-standard', 'serial-windows-standard']) {
       const job = workflow.jobs[name]
       if (!isRecord(job)) throw new TypeError(`${name} must be defined`)
       expect(job.concurrency).toBeUndefined()
@@ -233,8 +245,8 @@ describe('CI workflow', () => {
     // cache seeder and the two drills. Any job reachable on push would start
     // accumulating uncancelled runs, so the set is pinned here.
     const NOT_PUSH_REACHABLE = new Set([
-      "github.event_name == 'workflow_dispatch' && inputs.suite == 'larger-runner-benchmark'",
-      "github.event_name == 'workflow_dispatch' && inputs.suite == 'consolidated-runner-benchmark'",
+      "github.event_name == 'workflow_dispatch' && inputs.suite == 'standard-hosted-benchmark'",
+      "github.event_name == 'workflow_dispatch' && inputs.suite == 'standard-hosted-consolidated'",
     ])
     const pushReachable = Object.entries(workflow.jobs)
       .filter(([, job]) => {
@@ -246,19 +258,19 @@ describe('CI workflow', () => {
       })
       .map(([name]) => name)
       .sort()
-    expect(pushReachable).toEqual(['serial-linux-selfhosted', 'serial-windows', 'wine-apt-cache'])
+    expect(pushReachable).toEqual(['serial-linux-standard', 'serial-windows-standard', 'wine-apt-cache'])
 
-    // Why workflow_dispatch must keep cancelling: each benchmark fans out to a
-    // dozen larger runners at once, in this same group on master. If it stopped
+    // Why workflow_dispatch must keep cancelling: each benchmark fans out to
+    // both platform runners in this same group on master. If it stopped
     // cancelling, a re-dispatch would queue ahead of a drill instead of
     // replacing the stale measurement.
-    for (const name of ['larger-runner-benchmark', 'consolidated-runner-benchmark']) {
+    for (const name of ['standard-hosted-benchmark', 'standard-hosted-consolidated']) {
       const job = workflow.jobs[name]
       if (!isRecord(job) || !isRecord(job.strategy)) {
         throw new TypeError(`${name} must define a matrix strategy`)
       }
-      expect(job.strategy['max-parallel']).toBe(12)
-      expect(job['timeout-minutes']).toBe(15)
+      expect(job.strategy['max-parallel']).toBe(2)
+      expect(job['timeout-minutes']).toBe(30)
     }
   })
 

@@ -8,17 +8,16 @@ on:
       suite:
         description: Manual CI suite to run
         required: true
-        default: larger-runner-benchmark
+        default: standard-hosted-benchmark
         type: choice
         options:
-          - larger-runner-benchmark
-          - consolidated-runner-benchmark
+          - standard-hosted-benchmark
+          - standard-hosted-consolidated
 
-# A master push may carry only the two self-hosted standby drills and the Wine
-# apt cache seeder; those drills outlast the interval between master merges, so
-# push is exempt from cancellation (see ci-failover-runbook). workflow_dispatch
-# keeps cancelling: a re-dispatched runner benchmark holds up to 12 larger
-# runners for 15 minutes in this same group.
+# A master push may carry only the two standard-hosted serial references and the
+# Wine apt cache seeder; the serial references outlast the interval between
+# master merges, so push is exempt from cancellation. workflow_dispatch keeps
+# cancelling so a re-dispatched benchmark replaces its stale measurement.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name != 'push' }}
@@ -62,25 +61,19 @@ jobs:
           cp /var/cache/apt/archives/*.deb "$HOME/wine-debs/"
           du -sh "$HOME/wine-debs"
 
-  # Hot-standby drill for the in-house self-hosted pool: every master move
-  # re-runs the complete unsharded aggregate on the persistent 64-core VM,
-  # continuously proving that environment can take over a required lane if
-  # the hosted pools degrade (the switch is then setting the writer-manageable
-  # DSH_CI_FAILOVER_LINUX variable — see the failover runbook, no merge required).
-  # Push-triggered, so this lane always executes the base branch's own
-  # workflow definition. This workflow never listens to pull_request, so the
-  # drill does not appear in PR checks. No cache steps because the VM's
-  # persistent pnpm store and tool caches make them redundant (and saving here
-  # would poison the hosted cache namespace with self-hosted paths).
-  serial-linux-selfhosted:
+  # Standard-hosted serial reference: every master push re-runs the complete
+  # unsharded aggregate with bounded concurrency. This workflow never listens
+  # to pull_request, so the reference does not appear in PR checks. It uses the
+  # same ephemeral hosted boundary as the required PR jobs and therefore never
+  # depends on repository-specific runner registration.
+  serial-linux-standard:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    name: serial / linux (self-hosted standby)
-    runs-on: [self-hosted, linux, x64, vm-backup]
+    name: serial / linux (standard hosted)
+    runs-on: ubuntu-latest
     steps:
       # DSH_ARCHIVE_BASE_REF below compares the frozen-archive gate against
       # github.event.before, so full history is required: depth 2 would miss it
-      # on multi-commit or force pushes; full fetch is cheap here because
-      # checkout resolves against the VM's local mirror.
+      # on multi-commit or force pushes.
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
@@ -93,16 +86,11 @@ jobs:
         with:
           node-version: ${{ env.PRIMARY_NODE_VERSION }}
 
-      - name: Configure persistent pnpm store
-        run: echo "PNPM_CONFIG_STORE_DIR=$HOME/.local/share/pnpm/store" >> "$GITHUB_ENV"
-
       - name: Install (immutable)
         run: pnpm install --frozen-lockfile
 
-      # The persistent VM image owns Playwright's Linux system packages; this
-      # step also proves that browser provisioning remains usable for failover.
-      - name: Install Playwright Chromium
-        run: pnpm --filter @deepseek-ai/dsh-web-frontend exec playwright install chromium
+      - name: Install Playwright Chromium and hosted dependencies
+        run: pnpm --filter @deepseek-ai/dsh-web-frontend exec playwright install --with-deps chromium
 
       - name: Prepare bubblewrap (unrestrict userns)
         run: bash scripts/prepare-ci-bubblewrap.sh
@@ -149,21 +137,13 @@ jobs:
           DSH_SNAPSHOT_MAX_CONCURRENCY: '1'
         run: pnpm run check:ci
 
-  # Hot-standby drill for the in-house self-hosted Windows pool: every master
-  # move re-runs the complete unsharded Windows gate inventory on the persistent
-  # VM, continuously proving that environment can take over the required
-  # `windows` lane if the hosted pool degrades (the switch is setting the
-  # writer-manageable DSH_CI_FAILOVER_WINDOWS variable — see the failover
-  # runbook, no merge required). Push-triggered, so this lane always executes
-  # the base branch's own workflow definition. This workflow never listens to
-  # pull_request, so the drill does not appear in PR checks. No cache steps
-  # because the VM's persistent pnpm store and tool caches make them redundant
-  # (and saving here would poison the hosted cache namespace with self-hosted
-  # paths).
-  serial-windows:
+  # Standard-hosted Windows serial reference: every master push re-runs the
+  # complete unsharded Windows inventory. This workflow never listens to
+  # pull_request, so the reference does not appear in PR checks.
+  serial-windows-standard:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    name: serial / windows (self-hosted standby)
-    runs-on: [self-hosted, dsh-win-ci, windows]
+    name: serial / windows (standard hosted)
+    runs-on: windows-latest
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v6
@@ -182,12 +162,6 @@ jobs:
         with:
           node-version: ${{ env.PRIMARY_NODE_VERSION }}
 
-      - name: Configure persistent pnpm store
-        shell: pwsh
-        run: |
-          $storeRoot = "$env:LOCALAPPDATA\pnpm\store"
-          echo "PNPM_CONFIG_STORE_DIR=$storeRoot" >> $env:GITHUB_ENV
-
       - name: Install (immutable)
         shell: pwsh
         run: pnpm install --frozen-lockfile
@@ -200,64 +174,23 @@ jobs:
           DSH_PUBLINT_CONCURRENCY: '1'
         run: pnpm run check:ci:windows-complete
 
-  # Manual, bounded comparison of the actual critical Linux and Windows lanes.
-  # The named pools are restricted at the organization level to this repository.
-  larger-runner-benchmark:
-    if: github.event_name == 'workflow_dispatch' && inputs.suite == 'larger-runner-benchmark'
+  # Manual, bounded measurement of the critical Linux and Windows lanes on
+  # standard hosted capacity. This is a timing/capacity observation, not a
+  # dependency on a named runner pool.
+  standard-hosted-benchmark:
+    if: github.event_name == 'workflow_dispatch' && inputs.suite == 'standard-hosted-benchmark'
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 15
+    timeout-minutes: 30
     strategy:
       fail-fast: false
-      max-parallel: 12
+      max-parallel: 2
       matrix:
         include:
           - platform: linux
-            cores: '4'
-            runner: dsh-ubuntu-24-04-4core
-            workload: typecheck
-          - platform: linux
-            cores: '8'
-            runner: dsh-ubuntu-24-04-8core
-            workload: typecheck
-          - platform: linux
-            cores: '16'
-            runner: dsh-ubuntu-24-04-16core
-            workload: typecheck
-          - platform: linux
-            cores: '32'
-            runner: dsh-ubuntu-24-04-32core
-            workload: typecheck
-          - platform: linux
-            cores: '64'
-            runner: dsh-ubuntu-24-04-64core
-            workload: typecheck
-          - platform: linux
-            cores: '96'
-            runner: dsh-ubuntu-24-04-96core
+            runner: ubuntu-latest
             workload: typecheck
           - platform: windows
-            cores: '4'
-            runner: dsh-windows-2025-4core
-            workload: production-site
-          - platform: windows
-            cores: '8'
-            runner: dsh-windows-2025-8core
-            workload: production-site
-          - platform: windows
-            cores: '16'
-            runner: dsh-windows-2025-16core
-            workload: production-site
-          - platform: windows
-            cores: '32'
-            runner: dsh-windows-2025-32core
-            workload: production-site
-          - platform: windows
-            cores: '64'
-            runner: dsh-windows-2025-64core
-            workload: production-site
-          - platform: windows
-            cores: '96'
-            runner: dsh-windows-2025-96core
+            runner: windows-latest
             workload: production-site
     steps:
       - uses: actions/checkout@v6
@@ -266,8 +199,8 @@ jobs:
         with:
           dest: ${{ runner.temp }}/setup-pnpm-${{ github.run_id }}-${{ github.run_attempt }}
 
-      # The benchmark's Windows lanes deliberately skip the store cache like
-      # the independent native Windows job; an empty input disables caching.
+      # Keep the Windows measurement comparable to the independent native
+      # Windows job; an empty input disables caching on that lane.
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.PRIMARY_NODE_VERSION }}
@@ -290,65 +223,23 @@ jobs:
         if: matrix.platform == 'windows'
         run: pnpm run docs:build
 
-  # Manual comparison of the intended low-fanout topology. Linux runs the
-  # complete unsharded primary aggregate with bounded in-runner parallelism;
-  # Windows runs both blocking build targets concurrently through run-gates.
-  consolidated-runner-benchmark:
-    if: github.event_name == 'workflow_dispatch' && inputs.suite == 'consolidated-runner-benchmark'
+  # Manual measurement of the low-fanout standard-hosted topology. Linux runs
+  # the complete unsharded primary aggregate with bounded in-runner parallelism;
+  # Windows runs the blocking build targets through run-gates.
+  standard-hosted-consolidated:
+    if: github.event_name == 'workflow_dispatch' && inputs.suite == 'standard-hosted-consolidated'
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 15
+    timeout-minutes: 30
     strategy:
       fail-fast: false
-      max-parallel: 12
+      max-parallel: 2
       matrix:
         include:
           - platform: linux
-            cores: '4'
-            runner: dsh-ubuntu-24-04-4core
-            workers: '4'
-          - platform: linux
-            cores: '8'
-            runner: dsh-ubuntu-24-04-8core
-            workers: '8'
-          - platform: linux
-            cores: '16'
-            runner: dsh-ubuntu-24-04-16core
-            workers: '16'
-          - platform: linux
-            cores: '32'
-            runner: dsh-ubuntu-24-04-32core
-            workers: '32'
-          - platform: linux
-            cores: '64'
-            runner: dsh-ubuntu-24-04-64core
-            workers: '32'
-          - platform: linux
-            cores: '96'
-            runner: dsh-ubuntu-24-04-96core
-            workers: '32'
-          - platform: windows
-            cores: '4'
-            runner: dsh-windows-2025-4core
+            runner: ubuntu-latest
             workers: '2'
           - platform: windows
-            cores: '8'
-            runner: dsh-windows-2025-8core
-            workers: '2'
-          - platform: windows
-            cores: '16'
-            runner: dsh-windows-2025-16core
-            workers: '2'
-          - platform: windows
-            cores: '32'
-            runner: dsh-windows-2025-32core
-            workers: '2'
-          - platform: windows
-            cores: '64'
-            runner: dsh-windows-2025-64core
-            workers: '2'
-          - platform: windows
-            cores: '96'
-            runner: dsh-windows-2025-96core
+            runner: windows-latest
             workers: '2'
     steps:
       - uses: actions/checkout@v6
@@ -357,8 +248,8 @@ jobs:
         with:
           dest: ${{ runner.temp }}/setup-pnpm-${{ github.run_id }}-${{ github.run_attempt }}
 
-      # Unlike the larger-runner suite, both platforms cache the store here:
-      # the consolidated topology measures cache mechanics as workload.
+      # Both platforms cache the store here: the consolidated topology measures
+      # cache mechanics as part of the workload.
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.PRIMARY_NODE_VERSION }}
