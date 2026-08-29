@@ -53,6 +53,7 @@ export interface FlinterModelProfile {
   name: string
   contextWindow: number
   maxTokens?: number
+  reasoningEfforts?: { high: string }
 }
 
 export interface FlinterProviderProfile {
@@ -80,6 +81,7 @@ function profile(
   baseURL: string,
   model: string,
   capacity: { contextWindow: number; maxTokens?: number },
+  reasoningEfforts?: { high: string },
 ): FlinterProviderProfile {
   return {
     displayName,
@@ -93,6 +95,7 @@ function profile(
       name: model,
       contextWindow: capacity.contextWindow,
       ...capacity.maxTokens === undefined ? {} : { maxTokens: capacity.maxTokens },
+      ...reasoningEfforts === undefined ? {} : { reasoningEfforts },
     }],
   }
 }
@@ -109,6 +112,7 @@ export function buildFlinterProviderSettings(
         endpoints.arkAgentPlan,
         'ark-code-latest',
         FLINTER_MODEL_CAPACITIES.arkCodeLatest,
+        { high: 'high' },
       ),
       modelflare: profile(
         'Modelflare',
@@ -116,6 +120,7 @@ export function buildFlinterProviderSettings(
         endpoints.modelflare,
         'gpt-5.6-sol',
         FLINTER_MODEL_CAPACITIES.modelflareGpt56Sol,
+        { high: 'high' },
       ),
       'gmi-serving': profile(
         'GMI Serving',
