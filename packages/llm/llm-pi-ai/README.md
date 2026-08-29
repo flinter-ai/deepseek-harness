@@ -217,7 +217,7 @@ These limits define where the adapter stops and future work begins. They are cur
 - **An unauthenticated route depends on its protocol** — a route naming no credential resolves as configured-but-keyless, but pi-ai's OpenAI-compatible implementation still requires an API key or an `Authorization` header, so a keyless local server needs a placeholder credential referenced by `apiKeyEnv` or an `Authorization` entry in `headers`.
 - **`GenerateOptions.stop` is unsupported** — pi-ai's common stream options cannot guarantee stop-sequence behavior across providers.
 - **In-history `system` messages use pi-ai's common context conversion** — provider-specific placement follows pi-ai rather than a harness-owned wire override.
-- **Provider HTTP status is unavailable** — pi-ai error events do not expose a stable HTTP status across providers.
+- **Provider HTTP status is unavailable** — pi-ai error events do not expose a stable HTTP status across providers; common transient availability wording such as `temporarily unavailable`, `service unavailable`, or `try again later` is classified as `SERVER` so the composed bounded retry policy can handle it.
 - **Retry policy is provider-owned, not an SDK retry** — pi-ai SDK retries stay disabled so durable agent steps and `llm/retry` events own every visible attempt, and direct `ctx.llm.stream()` calls remain single-attempt.
 
 <a id="dev-note"></a>

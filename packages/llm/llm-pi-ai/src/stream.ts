@@ -14,6 +14,13 @@ import { isContextOverflow } from '@earendil-works/pi-ai'
 import type { AssistantMessage, AssistantMessageEvent, Usage as PiUsage } from '@earendil-works/pi-ai'
 import { toPiReplayState } from './replay.ts'
 
+const TRANSIENT_AVAILABILITY_PATTERNS = [
+  /\b(?:temporarily|currently|momentarily) unavailable\b/i,
+  /\bservice unavailable\b/i,
+  /\b(?:backend|server) (?:is )?(?:busy|overloaded)\b/i,
+  /\btry again later\b/i,
+]
+
 /**
  * Map pi-ai usage (reasoning folded into output by pi-ai).
  * @param usage - cumulative usage from the terminal pi-ai event.
@@ -47,6 +54,12 @@ function classifyPiAiError(message: string): string {
   if (/\b413\b|failed to buffer the request body:\s*length limit exceeded|payload too large|request body too large/i.test(message)) return 'INVALID_REQUEST'
   if (/\b400\b|invalid.?request/i.test(message)) return 'INVALID_REQUEST'
   if (/\b5\d\d\b/.test(message)) return 'SERVER'
+  // Some gateways discard the HTTP status and retain only transient
+  // availability wording. Treat these messages like a 5xx so the composed
+  // dsh-llm-retry policy can schedule its bounded retry.
+  if (TRANSIENT_AVAILABILITY_PATTERNS.some(pattern => pattern.test(message))) {
+    return 'SERVER'
+  }
   if (/\btime(?:d)?\s*out\b|timeout/i.test(message)) return 'TIMEOUT'
   // A stream truncated before the provider's terminal event: each pi-ai provider
   // throws its own wording when the wire closes mid-response without a terminal
