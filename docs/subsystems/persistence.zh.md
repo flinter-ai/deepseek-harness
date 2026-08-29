@@ -277,6 +277,24 @@ abstract locate(meta: SessionHeader): SessionLocation | undefined
 readRaw(_id: SessionId, signal?: AbortSignal): Promise<SessionRawArtifact | undefined>
 
 /**
+ * Begin a serializable, bounded read of the current canonical event prefix.
+ * @param _id - the persisted session id to checkpoint.
+ * @param signal - optional cancellation for the checkpoint read.
+ * @returns the archive snapshot, or `undefined` when the session is absent.
+ */
+beginArchiveSnapshot(_id: SessionId, signal?: AbortSignal): Promise<SessionArchiveSnapshot | undefined>
+
+/**
+ * Read one bounded page from a previously captured archive snapshot.
+ * @param _snapshot - the serializable checkpoint returned by beginArchiveSnapshot.
+ * @param _afterSeq - the last sequence already consumed; use `-1` for the first page.
+ * @param _limit - maximum number of logical events to return.
+ * @param signal - optional cancellation for the page read.
+ * @returns a bounded page and the next cursor, or `STALE_SNAPSHOT` when the prefix changed.
+ */
+readArchiveSnapshotPage( _snapshot: SessionArchiveSnapshot, _afterSeq: number, _limit: number, signal?: AbortSignal, ): Promise<SessionArchivePage>
+
+/**
  * Register a new session's metadata. A backend MAY defer the physical write
  * until the first {@link append} (lazy materialization), in which case a
  * created-but-never-appended session is absent from {@link list}

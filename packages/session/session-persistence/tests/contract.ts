@@ -430,3 +430,76 @@ export function runPersistenceContract(name: string, make: () => Promise<Contrac
     })
   })
 }
+
+/**
+ * Run the archive-prefix contract against a concrete persistence provider.
+ * This deliberately uses only the public service seam, so JSONL and SQLite
+ * prove the same HWM/page behavior despite their different physical formats.
+ */
+export function runArchiveSnapshotContract(name: string, make: () => Promise<ContractBackend>): void {
+  describe(`Session archive snapshot contract: ${name}`, () => {
+    it('keeps pages bounded at the captured HWM while later appends remain selectable', async () => {
+      const { persistence, dispose } = await make()
+      try {
+        const id = SessionId(`archive-${name}`)
+        await persistence.create(meta(id))
+        await persistence.append(id, oneTurnLog())
+        const snapshot = await persistence.beginArchiveSnapshot(id)
+        expect(snapshot?.highWatermarkSeq).toBe(5)
+
+        await persistence.append(id, [{
+          type: 'turn/start',
+          seq: 6,
+          time: 7,
+          data: { turn: 2 },
+        }])
+
+        const first = await persistence.readArchiveSnapshotPage(snapshot!, -1, 2)
+        const second = await persistence.readArchiveSnapshotPage(snapshot!, first.nextAfterSeq!, 2)
+        const third = await persistence.readArchiveSnapshotPage(snapshot!, second.nextAfterSeq!, 2)
+        expect([...first.events, ...second.events, ...third.events].map(event => event.seq))
+          .toEqual([0, 1, 2, 3, 4, 5])
+        expect(third.nextAfterSeq).toBeNull()
+        expect(third.sourceRevision).toBe(snapshot?.sourceRevision)
+
+        const current = await persistence.beginArchiveSnapshot(id)
+        const currentPage = await persistence.readArchiveSnapshotPage(current!, -1, 10)
+        expect(currentPage.events.map(event => event.seq)).toEqual([0, 1, 2, 3, 4, 5, 6])
+      } finally {
+        await dispose()
+      }
+    })
+
+    it('preserves an unknown event type through the archival seam', async () => {
+      const { persistence, dispose } = await make()
+      try {
+        const id = SessionId(`archive-unknown-${name}`)
+        await persistence.create(meta(id))
+        await persistence.append(id, oneTurnLog())
+        await persistence.append(id, [{
+          type: 'plugin/opaque',
+          seq: 6,
+          time: 7,
+          data: {
+            opaque: true,
+            pluginField: { preserved: true },
+          },
+        } as unknown as SessionEvent])
+
+        const snapshot = await persistence.beginArchiveSnapshot(id)
+        const page = await persistence.readArchiveSnapshotPage(snapshot!, -1, 10)
+        expect(page.events.at(-1)).toEqual({
+          type: 'plugin/opaque',
+          seq: 6,
+          time: 7,
+          data: {
+            opaque: true,
+            pluginField: { preserved: true },
+          },
+        })
+      } finally {
+        await dispose()
+      }
+    })
+  })
+}

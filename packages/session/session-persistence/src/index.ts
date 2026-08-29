@@ -9,11 +9,21 @@ import { Context, Service } from '@deepseek-ai/cordis'
 import { SessionPreparation } from '@deepseek-ai/dsh-session'
 import type { Session, SessionEvent, SessionId, SessionHeader } from '@deepseek-ai/dsh-session'
 import type { SessionPersistenceRevision } from './revision.ts'
+import type { SessionArchivePage, SessionArchiveSnapshot } from './archive.ts'
 
 // Re-export the metadata vocabulary so Consumers import it from the Service Definition.
 export type { SessionHeader } from '@deepseek-ai/dsh-session'
 export { SessionPersistenceRevision } from './revision.ts'
+export {
+  MAX_ARCHIVE_PAGE_EVENTS,
+  SessionArchiveSnapshotStaleError,
+} from './archive.ts'
 export { SessionPersistenceNotFoundError } from './errors.ts'
+export type {
+  SessionArchiveEvent,
+  SessionArchivePage,
+  SessionArchiveSnapshot,
+} from './archive.ts'
 
 /** Lightweight immutable source identity returned without loading a full log. */
 export interface SessionPersistenceSnapshot {
@@ -142,6 +152,40 @@ export abstract class SessionPersistence extends Service {
       return Promise.reject(signal.reason instanceof Error ? signal.reason : new Error('aborted'))
     }
     return Promise.reject(new Error('this session persistence backend does not expose raw artifacts'))
+  }
+
+  /**
+   * Begin a serializable, bounded read of the current canonical event prefix.
+   * @param _id - the persisted session id to checkpoint.
+   * @param signal - optional cancellation for the checkpoint read.
+   * @returns the archive snapshot, or `undefined` when the session is absent.
+   */
+  beginArchiveSnapshot(_id: SessionId, signal?: AbortSignal): Promise<SessionArchiveSnapshot | undefined> {
+    return this.rejectUnsupportedArchiveSnapshot(signal)
+  }
+
+  /**
+   * Read one bounded page from a previously captured archive snapshot.
+   * @param _snapshot - the serializable checkpoint returned by beginArchiveSnapshot.
+   * @param _afterSeq - the last sequence already consumed; use `-1` for the first page.
+   * @param _limit - maximum number of logical events to return.
+   * @param signal - optional cancellation for the page read.
+   * @returns a bounded page and the next cursor, or `STALE_SNAPSHOT` when the prefix changed.
+   */
+  readArchiveSnapshotPage(
+    _snapshot: SessionArchiveSnapshot,
+    _afterSeq: number,
+    _limit: number,
+    signal?: AbortSignal,
+  ): Promise<SessionArchivePage> {
+    return this.rejectUnsupportedArchiveSnapshot(signal)
+  }
+
+  private rejectUnsupportedArchiveSnapshot(signal?: AbortSignal): Promise<never> {
+    if (signal?.aborted === true) {
+      return Promise.reject(signal.reason instanceof Error ? signal.reason : new Error('aborted'))
+    }
+    return Promise.reject(new Error('this session persistence backend does not expose archive snapshots'))
   }
 
   /**

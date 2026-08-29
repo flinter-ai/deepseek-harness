@@ -1476,6 +1476,18 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         throws: ['when this backend does not expose per-session raw artifacts.'],
       },
       {
+        signature: 'beginArchiveSnapshot(_id: SessionId, signal?: AbortSignal): Promise<SessionArchiveSnapshot | undefined>',
+        description: 'Begin a serializable, bounded read of the current canonical event prefix.',
+        parameters: [{ name: '_id', description: 'the persisted session id to checkpoint.' }, { name: 'signal', description: 'optional cancellation for the checkpoint read.' }],
+        returns: 'the archive snapshot, or `undefined` when the session is absent.',
+      },
+      {
+        signature: 'readArchiveSnapshotPage( _snapshot: SessionArchiveSnapshot, _afterSeq: number, _limit: number, signal?: AbortSignal, ): Promise<SessionArchivePage>',
+        description: 'Read one bounded page from a previously captured archive snapshot.',
+        parameters: [{ name: '_snapshot', description: 'the serializable checkpoint returned by beginArchiveSnapshot.' }, { name: '_afterSeq', description: 'the last sequence already consumed; use `-1` for the first page.' }, { name: '_limit', description: 'maximum number of logical events to return.' }, { name: 'signal', description: 'optional cancellation for the page read.' }],
+        returns: 'a bounded page and the next cursor, or `STALE_SNAPSHOT` when the prefix changed.',
+      },
+      {
         signature: 'abstract create(meta: SessionHeader): Promise<void>',
         description: 'Register a new session\'s metadata. A backend MAY defer the physical write until the first append (lazy materialization), in which case a created-but-never-appended session is absent from list — abandoned sessions leave nothing behind.',
         parameters: [{ name: 'meta', description: 'the immutable header (id, version, cwd, lineage) to record.' }],
@@ -4745,6 +4757,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SessionAddress',
     declaration: 'export type SessionAddress = {\n    readonly kind: \'session\';\n    readonly sessionId: SessionId;\n} | {\n    readonly kind: \'subagent\';\n    readonly parentSessionId: SessionId;\n    readonly childSessionId: SessionId;\n    readonly mode: \'one-shot\' | \'continuable\';\n};',
+  },
+  {
+    name: 'SessionArchiveEvent',
+    declaration: 'export interface SessionArchiveEvent {\n    readonly type: string;\n    readonly seq: number;\n    readonly time: number;\n    readonly data: unknown;\n    readonly [key: string]: unknown;\n}',
+  },
+  {
+    name: 'SessionArchivePage',
+    declaration: 'export interface SessionArchivePage {\n    readonly events: SessionArchiveEvent[];\n    readonly nextAfterSeq: number | null;\n    readonly sourceRevision: SessionPersistenceRevision;\n    readonly highWatermarkSeq: number;\n}',
+  },
+  {
+    name: 'SessionArchiveSnapshot',
+    declaration: 'export interface SessionArchiveSnapshot {\n    readonly sessionId: SessionId;\n    readonly sourceRevision: SessionPersistenceRevision;\n    readonly highWatermarkSeq: number;\n    readonly opaquePrefixToken: string;\n}',
   },
   {
     name: 'SessionAttachmentRequest',

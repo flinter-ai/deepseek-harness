@@ -18,7 +18,8 @@ import {
   DEFAULT_PREPARED_SESSION_CACHE_SIZE, DEFAULT_WRITE_BATCH_MAX_DELAY_MS, MAX_WRITE_BATCH_DELAY_MS,
   SessionPersistence, SessionPersistenceRevision, PersistenceCoordinator, SessionFormatUnsupportedError,
   type BorrowedSessionSource,
-  type PersistenceBackend, type SessionLocation, type SessionPersistenceSnapshot,
+  type PersistenceBackend, type SessionArchivePage, type SessionArchiveSnapshot,
+  type SessionLocation, type SessionPersistenceSnapshot,
   type SessionInspection,
   type SessionPersistenceRevision as PersistenceRevision, type SessionRawArtifact,
   type StoredPrefix,
@@ -207,6 +208,19 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
   // parses the stored prefix (both encodings) and skips forward to fromSeq.
   readFrom(id: SessionId, fromSeq: number, signal?: AbortSignal): Promise<{ meta: SessionHeader; events: SessionEvent[] }> {
     return this.coordinator.readFrom(id, fromSeq, signal)
+  }
+
+  override beginArchiveSnapshot(id: SessionId, signal?: AbortSignal): Promise<SessionArchiveSnapshot | undefined> {
+    return this.coordinator.beginArchiveSnapshot(id, signal)
+  }
+
+  override readArchiveSnapshotPage(
+    snapshot: SessionArchiveSnapshot,
+    afterSeq: number,
+    limit: number,
+    signal?: AbortSignal,
+  ): Promise<SessionArchivePage> {
+    return this.coordinator.readArchiveSnapshotPage(snapshot, afterSeq, limit, signal)
   }
 
   // One method serves both public `list` and the backend hook; delegating it to

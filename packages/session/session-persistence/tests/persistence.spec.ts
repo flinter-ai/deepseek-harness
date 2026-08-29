@@ -5,7 +5,8 @@ import type { SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
 import {
   DEFAULT_PREPARED_SESSION_CACHE_SIZE, DEFAULT_WRITE_BATCH_MAX_DELAY_MS, MAX_WRITE_BATCH_DELAY_MS,
   SessionPersistence, SessionPersistenceRevision, PersistenceCoordinator,
-  type PersistenceBackend, type SessionPersistenceSnapshot, type StoredPrefix, type StoredSuffix,
+  type PersistenceBackend, type SessionArchivePage, type SessionArchiveSnapshot,
+  type SessionPersistenceSnapshot, type StoredPrefix, type StoredSuffix,
 } from '../src/index.ts'
 import { runPersistenceContract, meta, oneTurnLog } from './contract.ts'
 import { runCoordinatorContract, type CoordinatorFixture } from './coordinator-contract.ts'
@@ -124,6 +125,19 @@ class MemoryPersistence extends SessionPersistence implements PersistenceBackend
 
   readFrom(id: SessionId, fromSeq: number, signal?: AbortSignal): Promise<{ meta: SessionHeader; events: SessionEvent[] }> {
     return this.coordinator.readFrom(id, fromSeq, signal)
+  }
+
+  beginArchiveSnapshot(id: SessionId, signal?: AbortSignal): Promise<SessionArchiveSnapshot | undefined> {
+    return this.coordinator.beginArchiveSnapshot(id, signal)
+  }
+
+  readArchiveSnapshotPage(
+    snapshot: SessionArchiveSnapshot,
+    afterSeq: number,
+    limit: number,
+    signal?: AbortSignal,
+  ): Promise<SessionArchivePage> {
+    return this.coordinator.readArchiveSnapshotPage(snapshot, afterSeq, limit, signal)
   }
 
   // --- PersistenceBackend hooks (the Map storage primitives) ---
@@ -280,6 +294,96 @@ describe('the inherited readRaw default', () => {
     await expect(
       ctx.sessionPersistence.readRaw(SessionId('any-session'), controller.signal),
     ).rejects.toThrow('aborted')
+  })
+})
+
+describe('the archive snapshot seam', () => {
+  it('bounds pages at the captured high-water mark and preserves unknown events', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const fiber = await ctx.plugin(MemoryPersistence)
+    try {
+      const id = SessionId('archive-bounded')
+      await ctx.sessionPersistence.create(meta(id))
+      await ctx.sessionPersistence.append(id, oneTurnLog())
+      const snapshot = await ctx.sessionPersistence.beginArchiveSnapshot(id)
+      expect(snapshot?.highWatermarkSeq).toBe(5)
+
+      const unknown = {
+        type: 'plugin/opaque',
+        seq: 6,
+        time: 7,
+        data: { opaque: true },
+        pluginField: { preserved: 'byte-for-byte at the JSON value level' },
+      } as unknown as SessionEvent
+      await ctx.sessionPersistence.append(id, [unknown])
+
+      const first = await ctx.sessionPersistence.readArchiveSnapshotPage(snapshot!, -1, 2)
+      const second = await ctx.sessionPersistence.readArchiveSnapshotPage(snapshot!, first.nextAfterSeq!, 2)
+      const third = await ctx.sessionPersistence.readArchiveSnapshotPage(snapshot!, second.nextAfterSeq!, 2)
+      expect([...first.events, ...second.events, ...third.events].map(event => event.seq)).toEqual([0, 1, 2, 3, 4, 5])
+      expect(third.nextAfterSeq).toBeNull()
+      expect(third.highWatermarkSeq).toBe(5)
+
+      const current = await ctx.sessionPersistence.beginArchiveSnapshot(id)
+      const currentPage = await ctx.sessionPersistence.readArchiveSnapshotPage(current!, -1, 10)
+      expect(currentPage.events.at(-1)).toEqual(unknown)
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('returns STALE_SNAPSHOT when the captured prefix changes', async () => {
+    const store: MemoryStore = new Map()
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const fiber = await ctx.plugin(MemoryPersistence, { store })
+    try {
+      const id = SessionId('archive-stale')
+      await ctx.sessionPersistence.create(meta(id))
+      await ctx.sessionPersistence.append(id, oneTurnLog())
+      const snapshot = await ctx.sessionPersistence.beginArchiveSnapshot(id)
+      const entry = store.get(id)
+      expect(entry).toBeDefined()
+      entry!.events[1] = {
+        ...(entry!.events[1] as unknown as Record<string, unknown>),
+        data: { changed: true },
+      } as unknown as SessionEvent
+
+      await expect(
+        ctx.sessionPersistence.readArchiveSnapshotPage(snapshot!, -1, 10),
+      ).rejects.toMatchObject({ code: 'STALE_SNAPSHOT' })
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('allows a serialized checkpoint token to resume after a persistence restart', async () => {
+    const store: MemoryStore = new Map()
+    const id = SessionId('archive-restart')
+    const firstCtx = new Context()
+    await firstCtx.plugin(SessionStore)
+    const firstFiber = await firstCtx.plugin(MemoryPersistence, { store })
+    const snapshot = await (async () => {
+      await firstCtx.sessionPersistence.create(meta(id))
+      await firstCtx.sessionPersistence.append(id, oneTurnLog())
+      return await firstCtx.sessionPersistence.beginArchiveSnapshot(id)
+    })()
+    await firstFiber.dispose()
+    await firstCtx.fiber.dispose()
+
+    const secondCtx = new Context()
+    await secondCtx.plugin(SessionStore)
+    const secondFiber = await secondCtx.plugin(MemoryPersistence, { store })
+    try {
+      const page = await secondCtx.sessionPersistence.readArchiveSnapshotPage(snapshot!, -1, 10)
+      expect(page.events.map(event => event.seq)).toEqual([0, 1, 2, 3, 4, 5])
+    } finally {
+      await secondFiber.dispose()
+      await secondCtx.fiber.dispose()
+    }
   })
 })
 

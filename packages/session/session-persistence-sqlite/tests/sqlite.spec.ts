@@ -21,6 +21,7 @@ import {
 } from '../../session-persistence/tests/coordinator-contract.ts'
 import {
   meta,
+  runArchiveSnapshotContract,
   runPersistenceContract,
 } from '../../session-persistence/tests/contract.ts'
 import { MAX_PACKED_DATA_BYTES } from '../src/codec.ts'
@@ -206,6 +207,22 @@ runPersistenceContract('sqlite', async () => {
   return {
     persistence: ctx.sessionPersistence,
     dispose: async () => { await fiber.dispose() },
+  }
+})
+
+runArchiveSnapshotContract('sqlite', async () => {
+  const path = await freshDbPath('dsh-sqlite-archive-')
+  const ctx = new Context()
+  await ctx.plugin(SessionStore)
+  const fiber = await ctx.plugin(SessionPersistenceSqlite, { path })
+  return {
+    persistence: ctx.sessionPersistence,
+    dispose: async () => {
+      await fiber.dispose()
+      await rm(path, { force: true })
+      await rm(join(path, '-wal'), { force: true })
+      await rm(join(path, '-shm'), { force: true })
+    },
   }
 })
 

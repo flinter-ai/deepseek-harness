@@ -18,6 +18,8 @@ import {
   DEFAULT_WRITE_BATCH_MAX_DELAY_MS,
   MAX_WRITE_BATCH_DELAY_MS,
   type BorrowedSessionSource,
+  type SessionArchivePage,
+  type SessionArchiveSnapshot,
   PersistenceCoordinator,
   SessionPersistence,
   type SessionInspection,
@@ -130,6 +132,19 @@ export class SqliteSessionPersistence extends SessionPersistence {
     signal?: AbortSignal,
   ): Promise<{ meta: SessionHeader; events: SessionEvent[] }> {
     return this.coordinator.readFrom(id, fromSeq, signal)
+  }
+
+  override beginArchiveSnapshot(id: SessionId, signal?: AbortSignal): Promise<SessionArchiveSnapshot | undefined> {
+    return this.coordinator.beginArchiveSnapshot(id, signal)
+  }
+
+  override readArchiveSnapshotPage(
+    snapshot: SessionArchiveSnapshot,
+    afterSeq: number,
+    limit: number,
+    signal?: AbortSignal,
+  ): Promise<SessionArchivePage> {
+    return this.coordinator.readArchiveSnapshotPage(snapshot, afterSeq, limit, signal)
   }
 
   list(signal?: AbortSignal): Promise<SessionHeader[]> {

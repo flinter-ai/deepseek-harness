@@ -17,8 +17,19 @@ import {
 } from '@deepseek-ai/dsh-session'
 import type { Session, SessionEvent, SessionId, SessionHeader } from '@deepseek-ai/dsh-session'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
-import type { BorrowedSessionSource, SessionInspection, SessionLocation } from './index.ts'
+import type {
+  BorrowedSessionSource, SessionArchivePage, SessionArchiveSnapshot,
+  SessionInspection, SessionLocation,
+} from './index.ts'
 import { SessionPersistenceNotFoundError } from './errors.ts'
+import {
+  MAX_ARCHIVE_PAGE_EVENTS,
+  SessionArchiveSnapshotStaleError,
+  archivePrefixHash,
+  decodeArchiveToken,
+  encodeArchiveToken,
+  snapshotArchiveEvents,
+} from './archive.ts'
 import type { SessionPersistenceRevision } from './revision.ts'
 import { observeQueuedAbort, SessionPreparations } from './preparations.ts'
 import type { SessionPreparationReservation } from './preparations.ts'
@@ -917,6 +928,101 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     const retired = Promise.resolve(this.retirements.get(id))
     const waited = signal === undefined ? retired : observeQueuedAbort(retired, signal, () => false)
     return waited.then(() => this.serialize(id, () => this.readFromCore(id, fromSeq, signal), signal))
+  }
+
+  /**
+   * Begin a bounded, serializable read of the current stored event prefix.
+   * @param id - the persisted session id to checkpoint.
+   * @param signal - optional cancellation for the checkpoint read.
+   * @returns the archive snapshot, or `undefined` when the session is absent.
+   */
+  beginArchiveSnapshot(id: SessionId, signal?: AbortSignal): Promise<SessionArchiveSnapshot | undefined> {
+    return this.serialize(id, () => this.beginArchiveSnapshotCore(id, signal), signal)
+  }
+
+  private async beginArchiveSnapshotCore(
+    id: SessionId,
+    signal?: AbortSignal,
+  ): Promise<SessionArchiveSnapshot | undefined> {
+    signal?.throwIfAborted()
+    const stored = await this.backend.loadStored(id, signal)
+    signal?.throwIfAborted()
+    if (stored === undefined) return undefined
+    this.assertStoredId(id, stored.meta)
+    this.assertVersion(stored.meta)
+    const events = snapshotArchiveEvents(stored.events, id)
+    const highWatermarkSeq = events.at(-1)?.seq ?? -1
+    const prefixHash = archivePrefixHash(events)
+    return {
+      sessionId: id,
+      sourceRevision: stored.revision,
+      highWatermarkSeq,
+      opaquePrefixToken: encodeArchiveToken(id, stored.revision, highWatermarkSeq, prefixHash),
+    }
+  }
+
+  /**
+   * Read one bounded page while revalidating the captured prefix.
+   * @param snapshot - the checkpoint returned by beginArchiveSnapshot.
+   * @param afterSeq - the last sequence already consumed; use `-1` for the first page.
+   * @param limit - maximum number of logical events to return.
+   * @param signal - optional cancellation for the page read.
+   * @returns a bounded page from the captured prefix.
+   */
+  readArchiveSnapshotPage(
+    snapshot: SessionArchiveSnapshot,
+    afterSeq: number,
+    limit: number,
+    signal?: AbortSignal,
+  ): Promise<SessionArchivePage> {
+    if (!Number.isSafeInteger(afterSeq) || afterSeq < -1) {
+      return Promise.reject(new TypeError(`archive afterSeq must be a safe integer >= -1, got ${String(afterSeq)}`))
+    }
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > MAX_ARCHIVE_PAGE_EVENTS) {
+      return Promise.reject(new RangeError(`archive page limit must be an integer from 1 to ${MAX_ARCHIVE_PAGE_EVENTS}, got ${String(limit)}`))
+    }
+    if (typeof snapshot.sessionId !== 'string' || snapshot.sessionId.length === 0) {
+      return Promise.reject(new TypeError('archive snapshot sessionId must be a non-empty string'))
+    }
+    return this.serialize(
+      snapshot.sessionId as SessionId,
+      () => this.readArchiveSnapshotPageCore(snapshot, afterSeq, limit, signal),
+      signal,
+    )
+  }
+
+  private async readArchiveSnapshotPageCore(
+    snapshot: SessionArchiveSnapshot,
+    afterSeq: number,
+    limit: number,
+    signal?: AbortSignal,
+  ): Promise<SessionArchivePage> {
+    const token = decodeArchiveToken(snapshot)
+    if (afterSeq > snapshot.highWatermarkSeq) {
+      throw new RangeError(`archive afterSeq ${afterSeq} is past highWatermarkSeq ${snapshot.highWatermarkSeq}`)
+    }
+    signal?.throwIfAborted()
+    const stored = await this.backend.loadStored(snapshot.sessionId, signal)
+    signal?.throwIfAborted()
+    if (stored === undefined) throw new SessionArchiveSnapshotStaleError('session no longer exists')
+    this.assertStoredId(snapshot.sessionId, stored.meta)
+    this.assertVersion(stored.meta)
+    const events = snapshotArchiveEvents(stored.events, snapshot.sessionId)
+    if (events.length - 1 < snapshot.highWatermarkSeq) {
+      throw new SessionArchiveSnapshotStaleError('captured high-water mark is no longer present')
+    }
+    if (archivePrefixHash(events.slice(0, snapshot.highWatermarkSeq + 1)) !== token.prefixHash) {
+      throw new SessionArchiveSnapshotStaleError('captured event prefix changed')
+    }
+    const start = afterSeq + 1
+    const end = Math.min(snapshot.highWatermarkSeq + 1, start + limit)
+    const page = events.slice(start, end)
+    return {
+      events: page,
+      nextAfterSeq: end <= snapshot.highWatermarkSeq ? (end - 1) : null,
+      sourceRevision: snapshot.sourceRevision,
+      highWatermarkSeq: snapshot.highWatermarkSeq,
+    }
   }
 
   private async readFromCore(

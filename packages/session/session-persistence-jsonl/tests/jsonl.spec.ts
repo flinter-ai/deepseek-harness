@@ -10,7 +10,7 @@ import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import {
   encodeSegment, eventLines, logPath, projectDir, projectKey, scanLog, sessionDir, SessionLogScanner, toHeaderLine,
 } from '../src/format.ts'
-import { runPersistenceContract, meta, oneTurnLog, appendLog } from '../../session-persistence/tests/contract.ts'
+import { runArchiveSnapshotContract, runPersistenceContract, meta, oneTurnLog, appendLog } from '../../session-persistence/tests/contract.ts'
 import { runCoordinatorContract, type CoordinatorFixture } from '../../session-persistence/tests/coordinator-contract.ts'
 
 const statRace = vi.hoisted(() => ({
@@ -101,6 +101,20 @@ function appendClosedTurn(session: Session): void {
 
 runPersistenceContract('jsonl-none', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'dsh-jsonl-'))
+  const ctx = new Context()
+  await ctx.plugin(SessionStore)
+  const fiber = await ctx.plugin(JsonlSessionPersistence, { root: dir, compression: 'none' })
+  return {
+    persistence: ctx.sessionPersistence,
+    dispose: async () => {
+      await fiber.dispose()
+      await rm(dir, { recursive: true, force: true })
+    },
+  }
+})
+
+runArchiveSnapshotContract('jsonl-none', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'dsh-jsonl-archive-'))
   const ctx = new Context()
   await ctx.plugin(SessionStore)
   const fiber = await ctx.plugin(JsonlSessionPersistence, { root: dir, compression: 'none' })
