@@ -1,6 +1,6 @@
 {
   "name": "@flinter/dsh-trace-link",
-  "description": "Scaffold-only boundary for consuming native DSH events as FLINTER trace input",
+  "description": "Deterministic local checkpoint boundary for native DSH events as FLINTER trace input",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -19,8 +19,14 @@
     "./package.json": "./package.json"
   },
   "files": ["lib/index.js", "lib/invariant.js", "lib/types/**/*.d.ts"],
-  "peerDependencies": { "@deepseek-ai/dsh-invariants": "workspace:^" },
-  "devDependencies": { "@deepseek-ai/dsh-invariants": "workspace:^" },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-invariants": "workspace:^",
+    "@deepseek-ai/dsh-session": "workspace:^"
+  },
+  "devDependencies": {
+    "@deepseek-ai/dsh-invariants": "workspace:^",
+    "@deepseek-ai/dsh-session": "workspace:^"
+  },
   "scripts": {
     "build": "tsc -b",
     "test": "vitest run --root ../../.. packages/flinter/dsh-trace-link/tests"

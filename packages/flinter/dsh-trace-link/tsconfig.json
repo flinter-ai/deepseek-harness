@@ -5,5 +5,8 @@
     "outDir": "lib/types"
   },
   "include": ["src"],
-  "references": [{ "path": "../../runtime-diagnostics/invariants" }]
+  "references": [
+    { "path": "../../core/session" },
+    { "path": "../../runtime-diagnostics/invariants" }
+  ]
 }
