@@ -127,11 +127,11 @@ class MemoryPersistence extends SessionPersistence implements PersistenceBackend
     return this.coordinator.readFrom(id, fromSeq, signal)
   }
 
-  beginArchiveSnapshot(id: SessionId, signal?: AbortSignal): Promise<SessionArchiveSnapshot | undefined> {
+  override beginArchiveSnapshot(id: SessionId, signal?: AbortSignal): Promise<SessionArchiveSnapshot | undefined> {
     return this.coordinator.beginArchiveSnapshot(id, signal)
   }
 
-  readArchiveSnapshotPage(
+  override readArchiveSnapshotPage(
     snapshot: SessionArchiveSnapshot,
     afterSeq: number,
     limit: number,

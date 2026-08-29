@@ -1,6 +1,6 @@
 import { execa } from 'execa'
 import { afterEach, describe, expect, it } from 'vitest'
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { access, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -11,6 +11,12 @@ const REPO_ROOT = fileURLToPath(new URL('../../../..', import.meta.url))
 const DSH_SOURCE_BIN = join(REPO_ROOT, 'apps/cli/src/bin.ts')
 const TSCONFIG = join(REPO_ROOT, 'tsconfig.json')
 const PROCESS_SECRET_MARKERS = ['ark-test-key', 'modelflare-test-key', 'deepseek-test-key']
+const REQUIRED_HOST_BUNDLES = [
+  'packages/interaction/commands/lib/typert.host.js',
+  'packages/goal/goal/lib/typert.host.js',
+  'packages/subagent/subagent/lib/typert.host.js',
+  'packages/llm/llm/lib/typert.host.js',
+] as const
 
 afterEach(async () => {
   await closeMockServers()
@@ -133,7 +139,38 @@ async function runHeadless(root: string, home: string, task: string) {
     killSignal: 'SIGKILL',
     reject: false,
   })
+  if (result.exitCode !== 0) {
+    throw new Error(`headless process failed (exit ${result.exitCode})\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`)
+  }
   return { result, records: await sessionRecords(home) }
+}
+
+/**
+ * A source checkout does not carry generated Typert host bundles. Build them
+ * once before the subprocess gate so the process test exercises the runtime,
+ * not an accidental module-resolution failure in a fresh worktree.
+ */
+async function ensureHostBundles(): Promise<void> {
+  const missing: string[] = []
+  for (const relative of REQUIRED_HOST_BUNDLES) {
+    try {
+      await access(join(REPO_ROOT, relative))
+    } catch {
+      missing.push(relative)
+    }
+  }
+  if (missing.length === 0) return
+  const build = await execa('pnpm', ['run', 'build:lib:host'], {
+    cwd: REPO_ROOT,
+    reject: false,
+    timeout: 120_000,
+  })
+  if (build.exitCode !== 0) {
+    throw new Error(`host bundle build failed (exit ${build.exitCode})\nstdout:\n${build.stdout}\nstderr:\n${build.stderr}`)
+  }
+  for (const relative of REQUIRED_HOST_BUNDLES) {
+    await access(join(REPO_ROOT, relative))
+  }
 }
 
 function expectNativeSession(
@@ -156,6 +193,7 @@ function expectNativeSession(
 
 describe('Phase 1 isolated alpha tod process', () => {
   it('boots both configured routes through the real CLI and persists native events without leaking credentials', async () => {
+    await ensureHostBundles()
     const root = await mkdtemp(join(tmpdir(), 'flinter-dsh-alpha-process-'))
     try {
       const modelflareServer = await mockServer([

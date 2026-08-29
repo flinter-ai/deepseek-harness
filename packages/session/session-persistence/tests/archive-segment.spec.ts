@@ -37,8 +37,8 @@ describe('SessionEventArchiveSegmentV1', () => {
   })
 
   it('canonicalizes object keys before hashing and compression', () => {
-    const left = [{ ...ARCHIVE_FIXTURE[0], data: { z: 1, a: { y: 2, x: 3 } } }]
-    const right = [{ ...ARCHIVE_FIXTURE[0], data: { a: { x: 3, y: 2 }, z: 1 } }]
+    const left = [{ ...ARCHIVE_FIXTURE[0]!, data: { z: 1, a: { y: 2, x: 3 } } }]
+    const right = [{ ...ARCHIVE_FIXTURE[0]!, data: { a: { x: 3, y: 2 }, z: 1 } }]
     const leftSegment = encodeSessionEventArchiveSegmentV1({ ...snapshot, highWatermarkSeq: 0 }, left)
     const rightSegment = encodeSessionEventArchiveSegmentV1({ ...snapshot, highWatermarkSeq: 0 }, right)
     expect(rightSegment.payloadBase64).toBe(leftSegment.payloadBase64)

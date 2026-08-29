@@ -16,6 +16,19 @@ import {
 } from '@deepseek-ai/dsh-agent'
 import { SessionId, type SessionId as SessionIdValue } from '@deepseek-ai/dsh-session'
 
+/** The non-secret environment contract stamped by the control-plane launcher. */
+export const DSH_WORKER_ENV = Object.freeze({
+  sessionId: 'DSH_SESSION_ID',
+  sessionRoot: 'DSH_SESSION_ROOT',
+  leaseOwner: 'DSH_LEASE_OWNER',
+  leaseGeneration: 'DSH_LEASE_GENERATION',
+  computeTier: 'DSH_COMPUTE_TIER',
+  workerAttemptCount: 'DSH_WORKER_ATTEMPT_COUNT',
+  callbackUrl: 'DSH_CALLBACK_URL',
+  callbackHmacSecretRef: 'DSH_CALLBACK_HMAC_SECRET_REF',
+  imageDigest: 'DSH_IMAGE_DIGEST',
+} as const)
+
 /** The identity/fencing fields supplied by the control-plane worker launcher. */
 export interface DshWorkerLaunchContract {
   readonly dshSessionId: string
@@ -23,6 +36,25 @@ export interface DshWorkerLaunchContract {
   readonly leaseOwner: string
   readonly leaseGeneration: number
   readonly workerAttemptCount: number
+}
+
+/** The complete non-secret worker environment consumed by the alpha driver. */
+export interface DshWorkerEnvironment {
+  readonly launch: DshWorkerLaunchContract
+  readonly computeTier: string
+  readonly callbackUrl: string
+  /** A reference, never the callback secret itself. */
+  readonly callbackHmacSecretRef: string
+  readonly imageDigest: string
+}
+
+/** The composition row needed to mount the first-party JSONL persistence backend. */
+export interface WorkerPersistenceConfig {
+  readonly name: '@deepseek-ai/dsh-session-persistence-jsonl'
+  readonly config: {
+    readonly root: string
+    readonly compression: 'zstd'
+  }
 }
 
 /** The alpha Agent calls needed by this adapter; concrete runtime stays injectable. */
@@ -53,6 +85,60 @@ function nonNegativeInteger(value: number, field: string): number {
     throw new Error(`worker ${field} must be a non-negative integer`)
   }
   return value
+}
+
+function requiredEnvironmentValue(env: NodeJS.ProcessEnv, name: string): string {
+  const value = env[name]
+  return nonEmpty(value ?? '', name)
+}
+
+function environmentInteger(env: NodeJS.ProcessEnv, name: string): number {
+  const value = requiredEnvironmentValue(env, name)
+  if (!/^(?:0|[1-9]\d*)$/.test(value)) {
+    throw new Error(`worker ${name} must be a non-negative integer`)
+  }
+  return nonNegativeInteger(Number(value), name)
+}
+
+/**
+ * Parse the launcher environment without reading any credential value. The
+ * callback HMAC field is intentionally a reference name, not a secret.
+ */
+export function readDshWorkerEnvironment(env: NodeJS.ProcessEnv = process.env): DshWorkerEnvironment {
+  const launch = validateWorkerLaunchContract({
+    dshSessionId: requiredEnvironmentValue(env, DSH_WORKER_ENV.sessionId),
+    dshSessionRoot: requiredEnvironmentValue(env, DSH_WORKER_ENV.sessionRoot),
+    leaseOwner: requiredEnvironmentValue(env, DSH_WORKER_ENV.leaseOwner),
+    leaseGeneration: environmentInteger(env, DSH_WORKER_ENV.leaseGeneration),
+    workerAttemptCount: environmentInteger(env, DSH_WORKER_ENV.workerAttemptCount),
+  })
+  const callbackUrl = requiredEnvironmentValue(env, DSH_WORKER_ENV.callbackUrl)
+  let parsedCallbackUrl: URL
+  try {
+    parsedCallbackUrl = new URL(callbackUrl)
+  } catch {
+    throw new Error(`worker ${DSH_WORKER_ENV.callbackUrl} must be an absolute URL`)
+  }
+  if (parsedCallbackUrl.protocol !== 'http:' && parsedCallbackUrl.protocol !== 'https:') {
+    throw new Error(`worker ${DSH_WORKER_ENV.callbackUrl} must use http or https`)
+  }
+  return Object.freeze({
+    launch,
+    computeTier: requiredEnvironmentValue(env, DSH_WORKER_ENV.computeTier),
+    callbackUrl,
+    callbackHmacSecretRef: requiredEnvironmentValue(env, DSH_WORKER_ENV.callbackHmacSecretRef),
+    imageDigest: requiredEnvironmentValue(env, DSH_WORKER_ENV.imageDigest),
+  })
+}
+
+/** Build the persistence row from the same root used by the control plane. */
+export function buildWorkerPersistenceConfig(persistenceRoot: string): WorkerPersistenceConfig {
+  const root = nonEmpty(persistenceRoot, 'persistenceRoot')
+  if (!root.startsWith('/')) throw new Error('worker persistenceRoot must be an absolute path')
+  return Object.freeze({
+    name: '@deepseek-ai/dsh-session-persistence-jsonl',
+    config: Object.freeze({ root, compression: 'zstd' as const }),
+  })
 }
 
 /** Validate and normalize a launcher contract without exposing secret material. */
@@ -169,4 +255,44 @@ export async function resumeWorkerAgent(
     agentOptions: selection,
     setup: setupSelection(selection),
   })
+}
+
+/**
+ * Launch from the stamped environment. Attempt zero is the only create path;
+ * every replacement must supply the previously validated descriptor and uses
+ * `resume` exclusively, so a missing persisted session fails closed.
+ */
+export async function launchWorkerAgentFromEnvironment(
+  agents: WorkerAgentRegistry,
+  options: WorkerAgentOptions,
+  env: NodeJS.ProcessEnv = process.env,
+  previousLaunch?: DshWorkerLaunchContract,
+): Promise<{ handle: AgentHandle; environment: DshWorkerEnvironment; persistence: WorkerPersistenceConfig }> {
+  const environment = readDshWorkerEnvironment(env)
+  const persistence = buildWorkerPersistenceConfig(environment.launch.dshSessionRoot)
+  if (environment.launch.workerAttemptCount === 0) {
+    if (previousLaunch !== undefined) {
+      throw new Error('worker attempt zero cannot resume a previous launch')
+    }
+    const binding = bindWorkerSession(environment.launch, environment.launch.dshSessionRoot)
+    return {
+      handle: await startWorkerAgent(agents, binding, options),
+      environment,
+      persistence,
+    }
+  }
+  if (previousLaunch === undefined) {
+    throw new Error('worker resume requires the previous launch descriptor')
+  }
+  return {
+    handle: await resumeWorkerAgent(
+      agents,
+      previousLaunch,
+      environment.launch,
+      environment.launch.dshSessionRoot,
+      options,
+    ),
+    environment,
+    persistence,
+  }
 }
