@@ -5259,9 +5259,17 @@ importers:
         specifier: workspace:^
         version: link:../../typert/protocol
 
-  packages/flinter/agentic-control: {}
+  packages/flinter/agentic-control:
+    devDependencies:
+      '@deepseek-ai/dsh-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
 
-  packages/flinter/dsh-agent-teams-profile: {}
+  packages/flinter/dsh-agent-teams-profile:
+    devDependencies:
+      '@deepseek-ai/dsh-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
 
   packages/flinter/dsh-alpha-profile:
     dependencies:
@@ -5297,19 +5305,47 @@ importers:
         specifier: workspace:^
         version: link:../../llm/llm-pi-ai
 
-  packages/flinter/dsh-aws-worker-profile: {}
+  packages/flinter/dsh-aws-worker-profile:
+    devDependencies:
+      '@deepseek-ai/dsh-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
 
-  packages/flinter/dsh-executor: {}
+  packages/flinter/dsh-executor:
+    devDependencies:
+      '@deepseek-ai/dsh-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
 
-  packages/flinter/dsh-integration-contracts: {}
+  packages/flinter/dsh-integration-contracts:
+    devDependencies:
+      '@deepseek-ai/dsh-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
 
-  packages/flinter/dsh-native-event-consumer: {}
+  packages/flinter/dsh-native-event-consumer:
+    devDependencies:
+      '@deepseek-ai/dsh-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
 
-  packages/flinter/dsh-pes: {}
+  packages/flinter/dsh-pes:
+    devDependencies:
+      '@deepseek-ai/dsh-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
 
-  packages/flinter/dsh-segment: {}
+  packages/flinter/dsh-segment:
+    devDependencies:
+      '@deepseek-ai/dsh-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
 
-  packages/flinter/dsh-trace-link: {}
+  packages/flinter/dsh-trace-link:
+    devDependencies:
+      '@deepseek-ai/dsh-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
 
   packages/fs/fs:
     devDependencies:

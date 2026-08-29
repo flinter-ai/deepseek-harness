@@ -16,3 +16,20 @@ runtime profile.
 The control plane remains authoritative for lease issuance, physical worker
 fencing, callback authentication, image validation, and durable state. DSH
 remains authoritative for the live session and its exact persistence root.
+
+## Model Experience
+
+### Executor delivery boundary
+
+#### What the model sees
+
+No task is submitted by `@flinter/dsh-executor`, and no model, prompt,
+reasoning, or provider behavior is changed by this contract-only package.
+
+#### Token effect
+
+No tokens are added, removed, or priced by this package.
+
+#### KV Cache effect
+
+No cache policy is registered by this package.
