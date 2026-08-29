@@ -231,6 +231,10 @@
       "@deepseek-ai/dsh-experimental-inspector": ["./packages/experimental/inspector/src"],
       "@deepseek-ai/dsh-experimental-inspector/client": ["./packages/experimental/inspector/src/client/index.ts"],
       "@deepseek-ai/dsh-util-crypto": ["./packages/util/crypto/src"],
+      // flinter/dsh-alpha-profile retains the dsh prefix in its directory,
+      // so its package aliases remain hand-written rather than generated.
+      "@deepseek-ai/dsh-alpha-profile": ["./packages/flinter/dsh-alpha-profile/src"],
+      "@deepseek-ai/dsh-alpha-profile/invariant": ["./packages/flinter/dsh-alpha-profile/src/invariant.ts"],
       // BEGIN generated package aliases — pnpm run gen-tsconfig-paths
       "@deepseek-ai/dsh-acp": ["./packages/acp/acp/src"],
       "@deepseek-ai/dsh-acp/invariant": ["./packages/acp/acp/src/invariant.ts"],
