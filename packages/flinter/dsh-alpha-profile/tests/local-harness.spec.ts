@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { join } from 'node:path'
@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest'
 
 const execFileAsync = promisify(execFile)
 const tod = join(import.meta.dirname, '..', 'local', 'tod.py')
+const launch = join(import.meta.dirname, '..', 'local', 'launch.sh')
 
 describe('Phase 1 local DSH_HOME rotation seam', () => {
   it('updates only the fresh-session default in an isolated home', async () => {
@@ -60,5 +61,56 @@ describe('Phase 1 local DSH_HOME rotation seam', () => {
   it('covers every UTC hour in the script self-test', async () => {
     await expect(execFileAsync('python3', [tod, '--selftest']))
       .resolves.toMatchObject({ stdout: expect.stringContaining('24/24 UTC hours covered') })
+  })
+
+  it('removes known DSH credential exports from the launch child', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'flinter-dsh-alpha-launch-'))
+    const bin = await mkdtemp(join(tmpdir(), 'flinter-dsh-alpha-launch-bin-'))
+    try {
+      await writeFile(join(home, 'settings.yaml'), [
+        'agent-default-model:',
+        '  model: old-model',
+        '  provider: old-provider',
+        'agent-presets:',
+        '  keep: true',
+        '',
+      ].join('\n'), { mode: 0o600 })
+      const marker = join(home, 'launch-marker')
+      const fakePnpm = join(bin, 'pnpm')
+      await writeFile(fakePnpm, [
+        '#!/bin/sh',
+        'set -eu',
+        'if [ "${DEEPSEEK_API_KEY+x}" = x ] || [ "${ARK_API_KEY+x}" = x ] ||',
+        '   [ "${ARK_PLAN_API_KEY+x}" = x ] || [ "${MODELFLARE_API_KEY+x}" = x ] ||',
+        '   [ "${GMI_SERVING_API_KEY+x}" = x ]; then',
+        '  exit 7',
+        'fi',
+        'touch "$LAUNCH_MARKER"',
+        '',
+      ].join('\n'), { mode: 0o700 })
+      await chmod(fakePnpm, 0o700)
+
+      await execFileAsync('sh', [launch], {
+        env: {
+          ...process.env,
+          DSH_HOME: home,
+          DSH_ROOT: home,
+          DSH_PROFILE: 'tod',
+          DSH_PORT: '4310',
+          TOD_HOUR: '15',
+          LAUNCH_MARKER: marker,
+          PATH: `${bin}:${process.env.PATH ?? ''}`,
+          DEEPSEEK_API_KEY: 'must-not-reach-child',
+          ARK_API_KEY: 'must-not-reach-child',
+          ARK_PLAN_API_KEY: 'must-not-reach-child',
+          MODELFLARE_API_KEY: 'must-not-reach-child',
+          GMI_SERVING_API_KEY: 'must-not-reach-child',
+        },
+      })
+      await expect(readFile(marker, 'utf8')).resolves.toBe('')
+    } finally {
+      await rm(home, { recursive: true, force: true })
+      await rm(bin, { recursive: true, force: true })
+    }
   })
 })
