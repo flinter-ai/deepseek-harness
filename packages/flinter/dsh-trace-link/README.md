@@ -5,8 +5,9 @@ Status: **P2_LOCAL_IMPLEMENTATION**.
 This package checkpoints native DeepSeek Harness `SessionEvent` records into
 deterministic, immutable local segment descriptors and manifests. The
 `LocalTraceCheckpointSink` is the Phase 2 `DSH-ALPHA-TRACE-01` gate: it proves
-ordered ranges, stable hashes, idempotent retries, identity boundaries, and
-credential redaction without changing the DSH Session codec.
+ordered ranges, stable hashes, idempotent retries/finalization, identity and
+cross-tenant boundaries, malformed-input rejection, and credential redaction
+without changing the DSH Session codec.
 
 Native DSH events remain the L0 source. Unknown, missing, null, provenance,
 and abstention values are preserved as data. The package owns no scientific

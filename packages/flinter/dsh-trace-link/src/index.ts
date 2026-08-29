@@ -18,6 +18,7 @@ export interface TraceCheckpointIdentity {
   readonly episodeId: string
   readonly runId: string
   readonly sessionId: string
+  readonly producerId: string
 }
 
 export interface TraceCheckpointMetadata {
@@ -96,6 +97,7 @@ export type TraceEventRedactor = (event: SessionEvent) => SessionEvent
 
 export interface TraceCheckpointSink {
   checkpoint(input: TraceCheckpointInput): Promise<TraceCheckpointReceipt>
+  finalize(identity: TraceCheckpointIdentity): Promise<TraceCheckpointManifest>
 }
 
 const REDACTED = '[REDACTED]'
@@ -189,6 +191,25 @@ function canonicalJson(value: unknown): string {
   return JSON.stringify(canonicalize(value))
 }
 
+function detachValue(value: unknown, seen = new Map<object, unknown>()): unknown {
+  if (value === null || typeof value !== 'object') return value
+  const existing = seen.get(value)
+  if (existing !== undefined) return existing
+
+  const output: object = Array.isArray(value)
+    ? []
+    : Object.create(Object.getPrototypeOf(value)) as object
+  seen.set(value, output)
+  for (const key of Reflect.ownKeys(value)) {
+    if (Array.isArray(value) && key === 'length') continue
+    const descriptor = Object.getOwnPropertyDescriptor(value, key)
+    if (descriptor === undefined) continue
+    if ('value' in descriptor) descriptor.value = detachValue(descriptor.value, seen)
+    Object.defineProperty(output, key, descriptor)
+  }
+  return output
+}
+
 function hashBytes(bytes: string): string {
   return `sha256:${createHash('sha256').update(bytes, 'utf8').digest('hex')}`
 }
@@ -279,6 +300,7 @@ function copyIdentity(input: TraceCheckpointIdentity): TraceCheckpointIdentity {
     episodeId: input.episodeId,
     runId: input.runId,
     sessionId: input.sessionId,
+    producerId: input.producerId,
   })
 }
 
@@ -288,6 +310,7 @@ function sameIdentity(left: TraceCheckpointIdentity, right: TraceCheckpointIdent
     && left.episodeId === right.episodeId
     && left.runId === right.runId
     && left.sessionId === right.sessionId
+    && left.producerId === right.producerId
 }
 
 function validateIdentity(input: TraceCheckpointIdentity): TraceCheckpointIdentity {
@@ -299,12 +322,53 @@ function validateIdentity(input: TraceCheckpointIdentity): TraceCheckpointIdenti
   return copyIdentity(input)
 }
 
-function safeMetadata(metadata: TraceCheckpointMetadata | undefined): TraceCheckpointMetadata {
+function safeMetadata(metadata: TraceCheckpointMetadata | undefined, tenantId: string): TraceCheckpointMetadata {
   if (metadata === undefined) return Object.freeze({})
   const redacted = cloneRedacted(metadata, undefined, '$.metadata')
   assertNoRawSecrets(redacted, undefined, '$.metadata')
-  canonicalize(redacted, '$.metadata')
-  return Object.freeze(redacted as TraceCheckpointMetadata)
+  const normalized = canonicalize(redacted, '$.metadata')
+  assertTenantReferences(normalized, tenantId, '$.metadata')
+  return Object.freeze(normalized as TraceCheckpointMetadata)
+}
+
+function assertScopedReferences(
+  references: readonly string[] | undefined,
+  tenantId: string,
+  label: string,
+): void {
+  if (references === undefined) return
+  for (const reference of references) {
+    if (typeof reference !== 'string') throw new Error(`${label} must contain only strings`)
+    const scoped = /^(?:tenant[:/])([^:/]+)(?:[:/])/.exec(reference)
+    if (scoped?.[1] !== undefined && scoped[1] !== tenantId) {
+      throw new Error(`${label} contains a cross-tenant reference`)
+    }
+  }
+}
+
+function assertTenantReferences(
+  value: unknown,
+  tenantId: string,
+  path = '$',
+  ancestors = new Set<object>(),
+): void {
+  if (value === null || typeof value !== 'object') return
+  if (ancestors.has(value)) failJson(path, 'cycles are not supported')
+  ancestors.add(value)
+  try {
+    if (Array.isArray(value)) {
+      value.forEach((entry, index) => assertTenantReferences(entry, tenantId, `${path}[${index}]`, ancestors))
+      return
+    }
+    for (const [key, entry] of Object.entries(value)) {
+      if ((key === 'tenantId' || key === 'tenant_id') && typeof entry === 'string' && entry !== tenantId) {
+        throw new Error(`${path}.${key} contains a cross-tenant reference`)
+      }
+      assertTenantReferences(entry, tenantId, `${path}.${key}`, ancestors)
+    }
+  } finally {
+    ancestors.delete(value)
+  }
 }
 
 function deriveStreamKey(identity: TraceCheckpointIdentity): string {
@@ -362,6 +426,7 @@ interface StreamState {
   readonly identity: TraceCheckpointIdentity
   readonly streamKey: string
   readonly segments: TraceSegmentDescriptor[]
+  finalizedManifest?: TraceCheckpointManifest
 }
 
 /** Deterministic in-memory store used by the Phase 2 local gate. */
@@ -406,6 +471,7 @@ export class LocalTraceCheckpointSink implements TraceCheckpointSink {
       episodeId: input.episodeId,
       runId: input.runId,
       sessionId: input.sessionId,
+      producerId: input.producerId,
     })
     const knownIdentity = this.sessionIdentities.get(identity.sessionId)
     if (knownIdentity !== undefined && !sameIdentity(knownIdentity, identity)) {
@@ -414,8 +480,28 @@ export class LocalTraceCheckpointSink implements TraceCheckpointSink {
     if (knownIdentity === undefined) this.sessionIdentities.set(identity.sessionId, identity)
 
     const streamKey = deriveStreamKey(identity)
+    const snapshot: TraceCheckpointInput = {
+      ...identity,
+      events: detachValue(input.events) as readonly SessionEvent[],
+      ...(input.metadata === undefined ? {} : { metadata: detachValue(input.metadata) as TraceCheckpointMetadata }),
+    }
     const prior = this.chains.get(streamKey) ?? Promise.resolve()
-    const run = prior.then(() => this.checkpointCore(input, identity, streamKey))
+    const run = prior.then(() => this.checkpointCore(snapshot, identity, streamKey))
+    this.chains.set(streamKey, run.then(() => undefined, () => undefined))
+    return run
+  }
+
+  finalize(identityInput: TraceCheckpointIdentity): Promise<TraceCheckpointManifest> {
+    const identity = validateIdentity(identityInput)
+    const knownIdentity = this.sessionIdentities.get(identity.sessionId)
+    if (knownIdentity !== undefined && !sameIdentity(knownIdentity, identity)) {
+      return Promise.reject(new Error('checkpoint identity mismatch for sessionId'))
+    }
+    if (knownIdentity === undefined) this.sessionIdentities.set(identity.sessionId, identity)
+
+    const streamKey = deriveStreamKey(identity)
+    const prior = this.chains.get(streamKey) ?? Promise.resolve()
+    const run = prior.then(() => this.finalizeCore(identity, streamKey))
     this.chains.set(streamKey, run.then(() => undefined, () => undefined))
     return run
   }
@@ -435,6 +521,9 @@ export class LocalTraceCheckpointSink implements TraceCheckpointSink {
       if (current === undefined) throw new Error(`event ${index} is missing`)
       if (typeof current.type !== 'string' || current.type.length === 0) {
         throw new Error(`event ${index} must have a non-empty type`)
+      }
+      if (!Object.prototype.hasOwnProperty.call(current, 'data')) {
+        throw new Error(`event ${index} is malformed: data is required`)
       }
       if (!Number.isSafeInteger(current.seq) || current.seq < 0) {
         throw new Error(`event ${index} sequence must be a safe non-negative integer`)
@@ -465,14 +554,18 @@ export class LocalTraceCheckpointSink implements TraceCheckpointSink {
       }
     }
 
-    const redactedEvents = events.map((event) => {
+    const redactedEvents = events.map((event, index) => {
       const redacted = this.redactor(event)
       assertNoRawSecrets(redacted, undefined)
-      return redacted
+      const normalized = canonicalize(redacted, `$.events[${index}]`)
+      assertTenantReferences(normalized, identity.tenantId, `$.events[${index}]`)
+      return normalized
     })
-    const bytes = redactedEvents.map(event => `${canonicalJson(event)}\n`).join('')
+    const bytes = redactedEvents.map(event => `${JSON.stringify(event)}\n`).join('')
     const contentHash = hashBytes(bytes)
-    const metadata = safeMetadata(input.metadata)
+    const metadata = safeMetadata(input.metadata, identity.tenantId)
+    assertScopedReferences(metadata.evidenceRefs, identity.tenantId, 'evidenceRefs')
+    assertScopedReferences(metadata.capabilityAttemptRefs, identity.tenantId, 'capabilityAttemptRefs')
     const descriptor = freezeDescriptor({
       ...identity,
       schemaVersion: CHECKPOINT_SCHEMA_VERSION,
@@ -505,19 +598,35 @@ export class LocalTraceCheckpointSink implements TraceCheckpointSink {
     if (existingRange !== undefined) {
       if (state === undefined) throw new Error('checkpoint range state is missing')
       if (!sameDescriptor(existingRange, descriptor)) throw new Error('checkpoint retry has different content or metadata')
-      await this.store.putIfAbsent(descriptor.storageRef, bytes)
+      const stored = await this.store.putIfAbsent(descriptor.storageRef, bytes)
+      if (stored.contentHash !== contentHash) throw new Error('immutable segment store hash mismatch')
       return this.receipt(identity, streamKey, state, existingRange)
     }
     if (state?.segments.some(segment => first <= segment.seqEnd && last >= segment.seqStart)) {
       throw new Error('checkpoint range overlap')
     }
+    if (state?.finalizedManifest !== undefined) throw new Error('checkpoint stream is finalized')
 
-    await this.store.putIfAbsent(descriptor.storageRef, bytes)
+    const stored = await this.store.putIfAbsent(descriptor.storageRef, bytes)
+    if (stored.contentHash !== contentHash) throw new Error('immutable segment store hash mismatch')
     const nextState: StreamState = state === undefined
       ? { identity, streamKey, segments: [descriptor] }
       : { ...state, segments: [...state.segments, descriptor] }
     this.streams.set(streamKey, nextState)
     return this.receipt(identity, streamKey, nextState)
+  }
+
+  private async finalizeCore(
+    identity: TraceCheckpointIdentity,
+    streamKey: string,
+  ): Promise<TraceCheckpointManifest> {
+    const state = this.streams.get(streamKey)
+    if (state === undefined) throw new Error('cannot finalize checkpoint stream without a segment')
+    if (!sameIdentity(state.identity, identity)) throw new Error('checkpoint identity mismatch')
+    if (state.finalizedManifest !== undefined) return state.finalizedManifest
+    const manifest = makeManifest(identity, streamKey, state.segments)
+    state.finalizedManifest = manifest
+    return manifest
   }
 
   private receipt(
@@ -528,7 +637,7 @@ export class LocalTraceCheckpointSink implements TraceCheckpointSink {
   ): TraceCheckpointReceipt {
     const descriptor = state.segments[state.segments.length - 1]
     if (descriptor === undefined) throw new Error('checkpoint stream has no segments')
-    const manifest = makeManifest(identity, streamKey, state.segments)
+    const manifest = state.finalizedManifest ?? makeManifest(identity, streamKey, state.segments)
     return Object.freeze({ status: PHASE_STATUS, descriptor: descriptorOverride ?? descriptor, manifest })
   }
 }
