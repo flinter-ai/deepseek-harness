@@ -4,8 +4,9 @@ exports[`aws-headless assembled profile snapshot > records the keyless provider 
 {
   "credentials": "AwsSecretsManagerCredentialProvider",
   "providers": [
-    "amazon-bedrock",
+    "ark-agent-plan",
     "deepseek-official",
+    "modelflare",
   ],
   "tools": [
     {

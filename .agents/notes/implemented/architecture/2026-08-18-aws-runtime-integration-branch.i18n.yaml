@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-18-aws-runtime-integration-branch.md
-2026-08-18-aws-runtime-integration-branch.md: 5737ed89be36aa5147f5c71c938c662061db32d2
-2026-08-18-aws-runtime-integration-branch.zh.md: 704f935e7a44c7bbe67dc423dde5c60891cc3bef
+2026-08-18-aws-runtime-integration-branch.md: 50ab1435aeefc529b9669aae583cd87bca30b37b
+2026-08-18-aws-runtime-integration-branch.zh.md: c90680e4b0bda462f926c10f6c19d6f935b2d4d0

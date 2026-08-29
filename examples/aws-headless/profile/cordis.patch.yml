@@ -1,5 +1,5 @@
 # aws-headless profile layer: swap the credential store for AWS Secrets Manager
-# and turn on the catalog Bedrock route of the dormant pi-ai adapter.
+# and register the deployment's two OpenAI-compatible model routes.
 #
 # Keyless on purpose: no region, profile, or secret names anywhere. Both AWS
 # providers defer to the default AWS credential chain per request, never at
@@ -15,13 +15,41 @@
     - id: credentials-aws-secrets-manager
       name: '@deepseek-ai/dsh-credentials-aws-secrets-manager'
 
-# The base bundle mounts llm-pi-ai dormant (zero routes). Naming the catalog
-# bedrock route with an empty profile registers it; credentials resolve through
-# pi-ai's native AWS chain per request.
+# The base bundle mounts llm-pi-ai dormant (zero routes). These hand-declared
+# routes keep provider names, endpoints, and credential references in the AWS
+# profile rather than in the core bundle. Credentials resolve through the AWS
+# Secrets Manager-backed credential service at request time.
 - id: llm-pi-ai
   config:
     providers:
-      amazon-bedrock: {}
+      ark-agent-plan:
+        displayName: ARK Agent Plan
+        apiKeyEnv: ARK_PLAN_API_KEY
+        api: openai-completions
+        baseURL: https://ark.cn-beijing.volces.com/api/plan/v3
+        models:
+          - id: ark-code-latest
+            name: ARK Code Latest
+            contextWindow: 1048576
+            maxTokens: 131072
+            input: [text]
+      modelflare:
+        displayName: Modelflare
+        apiKeyEnv: MODELFLARE_API_KEY
+        api: openai-completions
+        baseURL: https://modelflare.dev/v1
+        models:
+          - id: gpt-5.6-sol
+            name: GPT-5.6 Sol
+            input: [text]
+
+# ARK is the AWS default. The worker-home helper and local time-of-day
+# selector can choose Modelflare explicitly for a new session.
+- id: agent-default-model
+  config:
+    provider: ark-agent-plan
+    model: ark-code-latest
+    reasoningEffort: high
 
 # The dsh-pes bundle mounts the searchable-trace plugin; this profile pins its
 # engine to the immutable producer SHA so every tool result carries the pin in

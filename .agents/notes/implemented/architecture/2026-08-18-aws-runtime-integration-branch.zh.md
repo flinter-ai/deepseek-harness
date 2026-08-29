@@ -16,10 +16,10 @@
 
 ### 组合正确性由无密钥结构冒烟证明
 
-`examples/aws-headless/` 保存一个 profile 模板（`profile/package.json` 列出 `@deepseek-ai/dsh-base` 与 `@flinter/dsh-orca` 两个 bundle，`profile/cordis.patch.yml` 替换凭证存储并启用 catalog 的 `amazon-bedrock` 路由）以及 `tests/aws-headless.e2e.ts`。测试把该 profile 物化到临时 `DSH_HOME`——profile 本地的 `node_modules` 符号链接代替 `dsh plugin add`——并执行两道闸门：
+`examples/aws-headless/` 保存一个 profile 模板（`profile/package.json` 列出 `@deepseek-ai/dsh-base` 与 `@flinter/dsh-orca` 两个 bundle，`profile/cordis.patch.yml` 替换凭证存储并声明 `ark-agent-plan` 与 `modelflare` 路由）以及 `tests/aws-headless.e2e.ts`。测试把该 profile 物化到临时 `DSH_HOME`——profile 本地的 `node_modules` 符号链接代替 `dsh plugin add`——并执行两道闸门：
 
 - **组合闸门**：真实的 `--dump-config` CLI 路径输出中，每个能力的行恰好出现一次，本地凭证行存在但已禁用。
-- **启动闸门**：基于真实 profile 层的进程内 `boot()` 激活全部三个能力（`ctx.credentials` 是 Secrets Manager provider，`amazon-bedrock` 是已注册的 LLM 路由，五个 Orca 工具已注册）并干净地 dispose。环境被剥去所有 `AWS_*` 变量并禁用 IMDS，因此 boot 期间的任何 AWS 调用都会立即失败；绿色 boot 即零网络调用的证明。
+- **启动闸门**：基于真实 profile 层的进程内 `boot()` 激活 AWS 凭证 provider、`ark-agent-plan`、`deepseek-official` 与 `modelflare` LLM 路由以及五个 Orca 工具，并干净地 dispose。环境被剥去所有 `AWS_*` 变量并禁用 IMDS，因此 boot 期间的任何 AWS 调用都会立即失败；绿色 boot 即零网络调用的证明。
 
 两道闸门都不需要凭证，也都不会发出 AWS 请求。带真实凭证的 live 冒烟是之后单独的、受控的测试。
 

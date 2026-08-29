@@ -8,8 +8,8 @@ dsh-orca worker bridge, the dsh-segment semantic surface
 agentic-control investigation seam (`run_physical_assessment`,
 `finish_investigation`, `stop_unknown`), with the credentials store swapped
 for AWS Secrets Manager and the catalog Bedrock route of the dormant pi-ai
-adapter registered. Boots and runs with ZERO AWS calls: both AWS providers
-defer to the default credential chain per request, never at boot.
+adapter registered. Provider credentials resolve at request time; profile
+composition does not contact either model endpoint.
 
 ## Profile
 
@@ -17,8 +17,9 @@ defer to the default credential chain per request, never at boot.
   order (`@deepseek-ai/dsh-base`, `@flinter/dsh-orca`,
   `@flinter/dsh-segment`, `@flinter/dsh-pes`).
 - `profile/cordis.patch.yml` — disables the local credential store before the
-  AWS Secrets Manager row mounts, registers the Bedrock route with an empty
-  `providers.amazon-bedrock` config, pins the dsh-pes engine to the
+  AWS Secrets Manager row mounts, registers the `ark-agent-plan` and
+  `modelflare` routes with explicit OpenAI-compatible endpoints and model ids,
+  pins the dsh-pes engine to the
   immutable producer SHA `c05c3fc747f0aa0fcb9d0603009add71c59e091b` so every
   tool result carries the pin in `provenance.engine_pin`, and mounts the two
   agentic-control rows (`@deepseek-ai/dsh-agentic-control`,
