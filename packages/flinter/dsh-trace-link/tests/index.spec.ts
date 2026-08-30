@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { consumeFlinterNativeSessionEvents } from '@deepseek-ai/dsh-alpha-profile'
 import {
   referenceFromSessionEvent,
   traceLinkFromSessionEvent,
@@ -52,5 +53,26 @@ describe('public DSH trace-link seam', () => {
       { organizationId: 'org-1', dshSessionId: 'session-1', executionRunId: 'run-1' },
       { linkId: 'link-1', producer: 'test', producerVersion: '1', codeVersion: '1' },
     )).toThrow(/does not match/)
+  })
+
+  it('consumes the native alpha event projection without interpreting event data', () => {
+    const session = { id: 'session-1' } as never
+    const events = [
+      { type: 'turn/start', seq: 0, time: 1, data: { turn: 0 } },
+      { type: 'plugin/opaque', seq: 1, time: 2, data: { opaque: true } },
+    ] as never
+    const consumed = consumeFlinterNativeSessionEvents(session, events)
+    const links = consumed.events.map(event => traceLinkFromSessionEvent(
+      referenceFromSessionEvent({ sessionId: consumed.session.id, seq: event.seq }),
+      { organizationId: 'org-1', dshSessionId: consumed.session.id, executionRunId: 'run-1' },
+      {
+        linkId: `link-${event.seq}`,
+        producer: 'dsh-trace-link',
+        producerVersion: '0.1.2-alpha.1',
+        codeVersion: 'test-code',
+      },
+    ))
+    expect(links.map(link => link.dsh_event_seq)).toEqual([0, 1])
+    expect(JSON.stringify(links)).not.toContain('opaque')
   })
 })
