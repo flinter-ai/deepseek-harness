@@ -5321,6 +5321,12 @@ importers:
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
 
+  packages/flinter/dsh-trace-link:
+    dependencies:
+      '@deepseek-ai/dsh-alpha-profile':
+        specifier: workspace:^
+        version: link:../dsh-alpha-profile
+
   packages/fs/fs:
     devDependencies:
       '@deepseek-ai/cordis':
