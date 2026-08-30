@@ -1,0 +1,297 @@
+name: CI master
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: Manual CI suite to run
+        required: true
+        default: standard-hosted-consolidated
+        type: choice
+        options:
+          - standard-hosted-consolidated
+
+# A master push may carry only the two standard-hosted serial references and the
+# Wine apt cache seeder; the serial references outlast the interval between
+# master merges, so push is exempt from cancellation. workflow_dispatch keeps
+# cancelling so a re-dispatched manual run replaces its stale measurement.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'push' }}
+
+permissions:
+  contents: read
+
+env:
+  PRIMARY_NODE_VERSION: '24'
+  # CI runs must never report to the production telemetry endpoint baked
+  # into apps/cli/cordis.yml (AppCLIEntry disables the row when set).
+  DSH_TELEMETRY_DISABLED: '1'
+
+jobs:
+  # Master seeds the Wine apt-archive cache in the default-branch scope,
+  # which every pull request's windows job can restore; saves from
+  # pull-request runs are scoped to their own merge ref and help nobody
+  # else. Runs in seconds when the image version already has a cache.
+  wine-apt-cache:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    name: wine apt cache
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Compose Wine apt cache key
+        id: wine-cache-key
+        run: echo "key=wine-debs-${ImageOS:-linux}-${ImageVersion:-v0}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        id: wine-cache
+        with:
+          path: ~/wine-debs
+          key: ${{ steps.wine-cache-key.outputs.key }}
+
+      - name: Download the Wine dependency closure
+        if: steps.wine-cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends --download-only wine
+          mkdir -p "$HOME/wine-debs"
+          cp /var/cache/apt/archives/*.deb "$HOME/wine-debs/"
+          du -sh "$HOME/wine-debs"
+
+  # Standard-hosted serial reference: every master push re-runs the complete
+  # unsharded aggregate with bounded concurrency. This workflow never listens
+  # to pull_request, so the reference does not appear in PR checks. It uses the
+  # same ephemeral hosted boundary as the required PR jobs and therefore never
+  # depends on repository-specific runner registration.
+  serial-linux-standard:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    name: serial / linux (standard hosted)
+    runs-on: ubuntu-latest
+    steps:
+      # DSH_ARCHIVE_BASE_REF below compares the frozen-archive gate against
+      # github.event.before, so full history is required: depth 2 would miss it
+      # on multi-commit or force pushes.
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+
+      - name: Install (immutable)
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium and hosted dependencies
+        run: pnpm --filter @deepseek-ai/dsh-web-frontend exec playwright install --with-deps chromium
+
+      - name: Prepare bubblewrap (unrestrict userns)
+        run: bash scripts/prepare-ci-bubblewrap.sh
+
+      - name: Run complete unsharded primary Node CI serially
+        env:
+          DSH_ARCHIVE_BASE_REF: ${{ github.event.before }}
+          DSH_COVERAGE_MAX_WORKERS: '1'
+          DSH_E2E_MAX_WORKERS: '1'
+          DSH_GATE_CONCURRENCY: '1'
+          DSH_OXLINT_THREADS: '1'
+          DSH_PUBLINT_CONCURRENCY: '1'
+          DSH_SNAPSHOT_MAX_CONCURRENCY: '1'
+        run: pnpm run check:ci:linux-primary
+
+  # TODO(hosted-serial-ci): Re-enable the one remaining disabled hosted serial
+  # reference job (serial-macos) before release. Re-enabling serial-macos does
+  # not restore a Linux hosted-cache producer: decide whether to add a master
+  # seeder or remove the restore-only steps if cold starts become a concern.
+  serial-macos:
+    if: false
+    name: serial / macos
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+
+      - name: Install (immutable)
+        run: pnpm install --frozen-lockfile
+
+      - name: Run complete unsharded primary Node CI serially
+        env:
+          DSH_COVERAGE_MAX_WORKERS: '1'
+          DSH_E2E_MAX_WORKERS: '1'
+          DSH_GATE_CONCURRENCY: '1'
+          DSH_PUBLINT_CONCURRENCY: '1'
+          DSH_SNAPSHOT_MAX_CONCURRENCY: '1'
+        run: pnpm run check:ci
+
+  # Standard-hosted Windows serial reference: every master push re-runs the
+  # complete unsharded Windows inventory. This workflow never listens to
+  # pull_request, so the reference does not appear in PR checks.
+  serial-windows-standard:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    name: serial / windows (standard hosted)
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Enable Developer Mode (symlink support)
+        shell: pwsh
+        run: >-
+          reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock"
+          /t REG_DWORD /f /v "AllowDevelopmentWithoutDevLicense" /d "1"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+
+      - name: Install (immutable)
+        shell: pwsh
+        run: pnpm install --frozen-lockfile
+
+      - name: Run complete unsharded Windows gate inventory serially
+        shell: pwsh
+        env:
+          DSH_COVERAGE_MAX_WORKERS: '1'
+          DSH_GATE_CONCURRENCY: '1'
+          DSH_PUBLINT_CONCURRENCY: '1'
+        run: pnpm run check:ci:windows-complete
+
+  # Historical benchmark definition. Benchmark/observational jobs are
+  # permanently skipped; the retained body documents the old measurement
+  # shape without making it a live CI gate.
+  standard-hosted-benchmark:
+    if: false
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include:
+          - platform: linux
+            runner: ubuntu-latest
+            workload: typecheck
+          - platform: windows
+            runner: windows-latest
+            workload: production-site
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm-${{ github.run_id }}-${{ github.run_attempt }}
+
+      # Keep the Windows measurement comparable to the independent native
+      # Windows job; an empty input disables caching on that lane.
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+          cache: ${{ matrix.platform == 'linux' && 'pnpm' || '' }}
+
+      - name: Report runner capacity
+        run: >-
+          node -e "const os = require('node:os');
+          console.log(JSON.stringify({ arch: process.arch, cpus: os.cpus().length,
+          memoryGiB: Math.round(os.totalmem() / 2 ** 30) }))"
+
+      - name: Install (immutable)
+        run: pnpm install --frozen-lockfile
+
+      - name: Run critical Linux typecheck lane
+        if: matrix.platform == 'linux'
+        run: pnpm run typecheck
+
+      - name: Run critical Windows production-site lane
+        if: matrix.platform == 'windows'
+        run: pnpm run docs:build
+
+  # Manual measurement of the low-fanout standard-hosted topology. Linux runs
+  # the complete unsharded primary aggregate with bounded in-runner parallelism;
+  # Windows runs the blocking build targets through run-gates.
+  standard-hosted-consolidated:
+    if: github.event_name == 'workflow_dispatch' && inputs.suite == 'standard-hosted-consolidated'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include:
+          - platform: linux
+            runner: ubuntu-latest
+            workers: '2'
+          - platform: windows
+            runner: windows-latest
+            workers: '2'
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm-${{ github.run_id }}-${{ github.run_attempt }}
+
+      # Both platforms cache the store here: the consolidated topology measures
+      # cache mechanics as part of the workload.
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+          cache: pnpm
+
+      - name: Report runner capacity
+        run: >-
+          node -e "const os = require('node:os');
+          console.log(JSON.stringify({ arch: process.arch, cpus: os.cpus().length,
+          memoryGiB: Math.round(os.totalmem() / 2 ** 30) }))"
+
+      - name: Install and prepare Linux
+        if: matrix.platform == 'linux'
+        run: |
+          pnpm install --frozen-lockfile &
+          install_pid=$!
+          bash scripts/prepare-ci-bubblewrap.sh &
+          sandbox_pid=$!
+          install_status=0
+          wait "$install_pid" || install_status=$?
+          sandbox_status=0
+          wait "$sandbox_pid" || sandbox_status=$?
+          if (( install_status != 0 )); then exit "$install_status"; fi
+          exit "$sandbox_status"
+
+      - name: Install (immutable)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: pnpm install --frozen-lockfile
+
+      - name: Run complete unsharded primary Node CI concurrently
+        if: matrix.platform == 'linux'
+        env:
+          DSH_COVERAGE_MAX_WORKERS: ${{ matrix.workers }}
+          DSH_GATE_CONCURRENCY: ${{ matrix.workers }}
+          DSH_OXLINT_THREADS: ${{ matrix.workers }}
+          DSH_PUBLINT_CONCURRENCY: ${{ matrix.workers }}
+          DSH_SNAPSHOT_MAX_CONCURRENCY: ${{ matrix.workers }}
+        run: pnpm run check:ci
+
+      - name: Run blocking Windows builds concurrently
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        env:
+          DSH_GATE_CONCURRENCY: ${{ matrix.workers }}
+        run: pnpm run check:ci:windows-blocking

@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/flinter/dsh-alpha-profile/README.md
+README.md: f8fd7c07250afda07962c07e9d688fe9d6f8003d
+README.zh.md: 5788f682a09ef6791657ebafacbc2376bbc65bbe

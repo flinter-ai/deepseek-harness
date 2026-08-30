@@ -1,0 +1,118 @@
+import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
+import { describe, expect, it } from 'vitest'
+
+const execFileAsync = promisify(execFile)
+const tod = join(import.meta.dirname, '..', 'local', 'tod.py')
+const launch = join(import.meta.dirname, '..', 'local', 'launch.sh')
+
+describe('Phase 1 local DSH_HOME rotation seam', () => {
+  it('updates only the fresh-session default in an isolated home', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'flinter-dsh-alpha-local-'))
+    try {
+      const settings = join(home, 'settings.yaml')
+      await writeFile(settings, [
+        'agent-default-model:',
+        '  model: old-model',
+        '  provider: old-provider',
+        '  reasoningEffort: low',
+        'agent-presets:',
+        '  keep: true',
+        'providers:',
+        '  modelflare:',
+        '    apiKeyEnv: MODELFLARE_API_KEY',
+        '    contextWindow: 1000000',
+        '',
+      ].join('\n'), { mode: 0o600 })
+
+      await execFileAsync('python3', [tod, '--home', home, '--hour', '15'])
+      const outsideArk = await readFile(settings, 'utf8')
+      expect(outsideArk).toContain('  model: gpt-5.6-sol\n  provider: modelflare\n')
+      expect(outsideArk).toContain('  reasoningEffort: high\n')
+      expect(outsideArk).toContain('  keep: true')
+      expect(outsideArk).toContain('contextWindow: 1000000')
+
+      await execFileAsync('python3', [tod, '--home', home, '--hour', '16', '--reasoning-effort', 'low'])
+      const insideArk = await readFile(settings, 'utf8')
+      expect(insideArk).toContain('  model: ark-code-latest\n  provider: ark-agent-plan\n')
+      expect(insideArk).toContain('  reasoningEffort: low\n')
+      expect(insideArk).toContain('  keep: true')
+      expect(insideArk).toContain('contextWindow: 1000000')
+      expect(JSON.stringify({ outsideArk, insideArk })).not.toContain('test-key')
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('fails closed when the settings file has no default-model block', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'flinter-dsh-alpha-local-missing-'))
+    try {
+      const settings = join(home, 'settings.yaml')
+      await writeFile(settings, 'providers: {}\n', { mode: 0o600 })
+      await expect(execFileAsync('python3', [tod, '--home', home, '--hour', '16']))
+        .rejects.toMatchObject({ code: 1 })
+      await expect(readFile(settings, 'utf8')).resolves.toBe('providers: {}\n')
+    } finally {
+      await rm(home, { recursive: true, force: true })
+    }
+  })
+
+  it('covers every UTC hour in the script self-test', async () => {
+    const result = await execFileAsync('python3', [tod, '--selftest'])
+    expect(result.stdout).toContain('24/24 UTC hours and 7 reasoning options covered')
+  })
+
+  it('removes known DSH credential exports from the launch child', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'flinter-dsh-alpha-launch-'))
+    const bin = await mkdtemp(join(tmpdir(), 'flinter-dsh-alpha-launch-bin-'))
+    try {
+      await writeFile(join(home, 'settings.yaml'), [
+        'agent-default-model:',
+        '  model: old-model',
+        '  provider: old-provider',
+        'agent-presets:',
+        '  keep: true',
+        '',
+      ].join('\n'), { mode: 0o600 })
+      const marker = join(home, 'launch-marker')
+      const fakePnpm = join(bin, 'pnpm')
+      await writeFile(fakePnpm, [
+        '#!/bin/sh',
+        'set -eu',
+        'if [ "${DEEPSEEK_API_KEY+x}" = x ] || [ "${ARK_API_KEY+x}" = x ] ||',
+        '   [ "${ARK_PLAN_API_KEY+x}" = x ] || [ "${MODELFLARE_API_KEY+x}" = x ] ||',
+        '   [ "${GMI_SERVING_API_KEY+x}" = x ]; then',
+        '  exit 7',
+        'fi',
+        'touch "$LAUNCH_MARKER"',
+        '',
+      ].join('\n'), { mode: 0o700 })
+      await chmod(fakePnpm, 0o700)
+
+      await execFileAsync('sh', [launch], {
+        env: {
+          ...process.env,
+          DSH_HOME: home,
+          DSH_ROOT: home,
+          DSH_PROFILE: 'tod',
+          DSH_PORT: '4310',
+          TOD_HOUR: '15',
+          LAUNCH_MARKER: marker,
+          PATH: `${bin}:${process.env.PATH ?? ''}`,
+          DEEPSEEK_API_KEY: 'must-not-reach-child',
+          ARK_API_KEY: 'must-not-reach-child',
+          ARK_PLAN_API_KEY: 'must-not-reach-child',
+          MODELFLARE_API_KEY: 'must-not-reach-child',
+          GMI_SERVING_API_KEY: 'must-not-reach-child',
+        },
+      })
+      await expect(readFile(marker, 'utf8')).resolves.toBe('')
+    } finally {
+      await rm(home, { recursive: true, force: true })
+      await rm(bin, { recursive: true, force: true })
+    }
+  })
+})

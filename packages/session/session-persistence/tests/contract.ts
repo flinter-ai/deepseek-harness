@@ -11,7 +11,7 @@
 import { describe, expect, it } from 'vitest'
 import { SESSION_FORMAT_VERSION, Session, SessionId, TOOL_NOT_STARTED, TOOL_OUTCOME_UNKNOWN } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionHeader, SurfaceEventType, SurfaceIntent } from '@deepseek-ai/dsh-session'
-import { CallId, MessageId, createMessage, freezeMessage } from '@deepseek-ai/dsh-llm'
+import { ToolCallId, MessageId, createMessage, freezeMessage } from '@deepseek-ai/dsh-llm'
 import type { SessionPersistence } from '../src/index.ts'
 
 /** A backend under test plus its teardown. */
@@ -184,7 +184,7 @@ export function runPersistenceContract(name: string, make: () => Promise<Contrac
             message: createMessage({
               role: 'assistant',
               content: [
-                { type: 'tool-call', id: CallId('call-x'), name: 'bash', arguments: '{}' },
+                { type: 'tool-call', id: ToolCallId('call-x'), name: 'bash', arguments: '{}' },
               ],
               source: {
                 kind: 'model',
@@ -205,8 +205,8 @@ export function runPersistenceContract(name: string, make: () => Promise<Contrac
         const synthetic = loaded.events.find(e => e.type === 'tool/result')
         expect(synthetic?.type === 'tool/result' && synthetic.data).toMatchObject({
           message: {
-            source: { kind: 'tool', callId: CallId('call-x') },
-            content: [{ type: 'tool-result', toolCallId: CallId('call-x'), isError: true }],
+            source: { kind: 'tool', callId: ToolCallId('call-x') },
+            content: [{ type: 'tool-result', toolCallId: ToolCallId('call-x'), isError: true }],
           },
           error: { code: TOOL_NOT_STARTED },
         })
@@ -215,7 +215,7 @@ export function runPersistenceContract(name: string, make: () => Promise<Contrac
         const call = loaded.events.findLast(e => e.type === 'assistant/message')
         const callId = call?.type === 'assistant/message'
           && call.data.message.content.find(b => b.type === 'tool-call')
-        expect(callId && callId.type === 'tool-call' && callId.id).toBe(CallId('call-x'))
+        expect(callId && callId.type === 'tool-call' && callId.id).toBe(ToolCallId('call-x'))
       } finally {
         await dispose()
       }
@@ -234,7 +234,7 @@ export function runPersistenceContract(name: string, make: () => Promise<Contrac
             message: createMessage({
               role: 'assistant',
               content: [
-                { type: 'tool-call', id: CallId('call-risk'), name: 'write', arguments: '{}' },
+                { type: 'tool-call', id: ToolCallId('call-risk'), name: 'write', arguments: '{}' },
               ],
               source: {
                 kind: 'model',
@@ -242,7 +242,7 @@ export function runPersistenceContract(name: string, make: () => Promise<Contrac
               },
             }),
           }, surfaceOp: 'append' },
-          { type: 'tool/call', seq: 3, time: 4, data: { turn: 1, step: 1, callId: CallId('call-risk'), name: 'write', arguments: '{}' } },
+          { type: 'tool/call', seq: 3, time: 4, data: { turn: 1, step: 1, callId: ToolCallId('call-risk'), name: 'write', arguments: '{}' } },
         ])
 
         const loaded = await persistence.load(m.id)
@@ -258,7 +258,7 @@ export function runPersistenceContract(name: string, make: () => Promise<Contrac
         const resumed = Session.create(m.id, loaded.events, loaded.meta)
         const resumedResult = resumed.deriveMessages().find(message => message.content.some(block => block.type === 'tool-result'))
         expect(resumedResult?.content[0]).toMatchObject({
-          type: 'tool-result', toolCallId: CallId('call-risk'), isError: true,
+          type: 'tool-result', toolCallId: ToolCallId('call-risk'), isError: true,
         })
       } finally {
         await dispose()
@@ -424,6 +424,79 @@ export function runPersistenceContract(name: string, make: () => Promise<Contrac
           ] as unknown as SessionEvent[]
           await expect(persistence.append(mi.id, events)).rejects.toThrow(/losslessly JSON-serializable/)
         }
+      } finally {
+        await dispose()
+      }
+    })
+  })
+}
+
+/**
+ * Run the archive-prefix contract against a concrete persistence provider.
+ * This deliberately uses only the public service seam, so JSONL and SQLite
+ * prove the same HWM/page behavior despite their different physical formats.
+ */
+export function runArchiveSnapshotContract(name: string, make: () => Promise<ContractBackend>): void {
+  describe(`Session archive snapshot contract: ${name}`, () => {
+    it('keeps pages bounded at the captured HWM while later appends remain selectable', async () => {
+      const { persistence, dispose } = await make()
+      try {
+        const id = SessionId(`archive-${name}`)
+        await persistence.create(meta(id))
+        await persistence.append(id, oneTurnLog())
+        const snapshot = await persistence.beginArchiveSnapshot(id)
+        expect(snapshot?.highWatermarkSeq).toBe(5)
+
+        await persistence.append(id, [{
+          type: 'turn/start',
+          seq: 6,
+          time: 7,
+          data: { turn: 2 },
+        }])
+
+        const first = await persistence.readArchiveSnapshotPage(snapshot!, -1, 2)
+        const second = await persistence.readArchiveSnapshotPage(snapshot!, first.nextAfterSeq!, 2)
+        const third = await persistence.readArchiveSnapshotPage(snapshot!, second.nextAfterSeq!, 2)
+        expect([...first.events, ...second.events, ...third.events].map(event => event.seq))
+          .toEqual([0, 1, 2, 3, 4, 5])
+        expect(third.nextAfterSeq).toBeNull()
+        expect(third.sourceRevision).toBe(snapshot?.sourceRevision)
+
+        const current = await persistence.beginArchiveSnapshot(id)
+        const currentPage = await persistence.readArchiveSnapshotPage(current!, -1, 10)
+        expect(currentPage.events.map(event => event.seq)).toEqual([0, 1, 2, 3, 4, 5, 6])
+      } finally {
+        await dispose()
+      }
+    })
+
+    it('preserves an unknown event type through the archival seam', async () => {
+      const { persistence, dispose } = await make()
+      try {
+        const id = SessionId(`archive-unknown-${name}`)
+        await persistence.create(meta(id))
+        await persistence.append(id, oneTurnLog())
+        await persistence.append(id, [{
+          type: 'plugin/opaque',
+          seq: 6,
+          time: 7,
+          data: {
+            opaque: true,
+            pluginField: { preserved: true },
+          },
+        } as unknown as SessionEvent])
+
+        const snapshot = await persistence.beginArchiveSnapshot(id)
+        const page = await persistence.readArchiveSnapshotPage(snapshot!, -1, 10)
+        expect(page.events.at(-1)).toEqual({
+          type: 'plugin/opaque',
+          seq: 6,
+          time: 7,
+          data: {
+            opaque: true,
+            pluginField: { preserved: true },
+          },
+        })
       } finally {
         await dispose()
       }
