@@ -54,8 +54,5 @@ pre-merge-commit:
 
 pre-push:
   jobs:
-    - name: supported Node runtime
-      run: node scripts/verify-node-runtime.mjs
-
-    - name: typecheck
-      run: pnpm run typecheck
+    - name: supported Node runtime and typecheck
+      run: pnpm run verify-node-runtime && pnpm run typecheck
