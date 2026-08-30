@@ -5323,6 +5323,8 @@ importers:
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
 
+  packages/flinter/dsh-executor: {}
+
   packages/flinter/dsh-pes: {}
 
   packages/flinter/dsh-segment: {}
