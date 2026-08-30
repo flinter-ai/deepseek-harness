@@ -70,7 +70,7 @@
             - text: "131072"
           - text: 最大输出 token 数
           - textbox "最大输出 token 数 3":
-            - /placeholder: 256K
+            - /placeholder: 使用提供方默认值
             - text: 64K
           - button "添加模型":
             - img
