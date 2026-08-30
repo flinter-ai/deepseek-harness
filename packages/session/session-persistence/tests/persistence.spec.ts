@@ -4,6 +4,7 @@ import SessionStore, { Session, SessionId, isJsonValue } from '@deepseek-ai/dsh-
 import type { SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
 import {
   DEFAULT_PREPARED_SESSION_CACHE_SIZE, DEFAULT_WRITE_BATCH_MAX_DELAY_MS, MAX_WRITE_BATCH_DELAY_MS,
+  MAX_ARCHIVE_PAGE_EVENTS,
   SessionPersistence, SessionPersistenceRevision, PersistenceCoordinator,
   type PersistenceBackend, type SessionArchivePage, type SessionArchiveSnapshot,
   type SessionPersistenceSnapshot, type StoredPrefix, type StoredSuffix,
@@ -202,6 +203,47 @@ class MemoryPersistence extends SessionPersistence implements PersistenceBackend
   }
 }
 
+/** Minimal backend used to exercise the Service Definition's unsupported archive defaults. */
+class UnsupportedArchivePersistence extends SessionPersistence {
+  readonly supportsRawArtifacts = false
+
+  locate(): undefined {
+    return undefined
+  }
+
+  create(_meta: SessionHeader): Promise<void> {
+    return Promise.resolve()
+  }
+
+  append(_id: SessionId, _events: readonly SessionEvent[]): Promise<void> {
+    return Promise.resolve()
+  }
+
+  load(_id: SessionId): Promise<never> {
+    return Promise.reject(new Error('unsupported'))
+  }
+
+  inspect(_id: SessionId): Promise<never> {
+    return Promise.reject(new Error('unsupported'))
+  }
+
+  borrowSession(_id: SessionId): Promise<never> {
+    return Promise.reject(new Error('unsupported'))
+  }
+
+  readFrom(_id: SessionId, _fromSeq: number): Promise<never> {
+    return Promise.reject(new Error('unsupported'))
+  }
+
+  list(): Promise<SessionHeader[]> {
+    return Promise.resolve([])
+  }
+
+  listSnapshots(): Promise<SessionPersistenceSnapshot[]> {
+    return Promise.resolve([])
+  }
+}
+
 /** Controllable storage primitive for serialization and retirement failure tests. */
 class ControlledBackend implements PersistenceBackend<never> {
   readonly name = 'session-persistence-controlled'
@@ -297,6 +339,37 @@ describe('the inherited readRaw default', () => {
   })
 })
 
+describe('the inherited archive defaults', () => {
+  it('rejects unsupported snapshots and honors both abort-reason shapes', async () => {
+    const ctx = new Context()
+    const fiber = await ctx.plugin(UnsupportedArchivePersistence)
+    try {
+      await expect(
+        ctx.sessionPersistence.beginArchiveSnapshot(SessionId('unsupported')),
+      ).rejects.toThrow('does not expose archive snapshots')
+      await expect(
+        ctx.sessionPersistence.readArchiveSnapshotPage({} as SessionArchiveSnapshot, -1, 1),
+      ).rejects.toThrow('does not expose archive snapshots')
+      await expect(
+        ctx.sessionPersistence.beginArchiveSnapshot(SessionId('unsupported'), AbortSignal.abort()),
+      ).rejects.toThrow('aborted')
+      const controller = new AbortController()
+      controller.abort('boom')
+      await expect(
+        ctx.sessionPersistence.readArchiveSnapshotPage(
+          {} as SessionArchiveSnapshot,
+          -1,
+          1,
+          controller.signal,
+        ),
+      ).rejects.toThrow('aborted')
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+})
+
 describe('the archive snapshot seam', () => {
   it('bounds pages at the captured high-water mark and preserves unknown events', async () => {
     const ctx = new Context()
@@ -383,6 +456,85 @@ describe('the archive snapshot seam', () => {
     } finally {
       await secondFiber.dispose()
       await secondCtx.fiber.dispose()
+    }
+  })
+
+  it('fails closed for token, cursor, page-limit, and snapshot-id corruption', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const fiber = await ctx.plugin(MemoryPersistence)
+    try {
+      const id = SessionId('archive-invalid-input')
+      await ctx.sessionPersistence.create(meta(id))
+      await ctx.sessionPersistence.append(id, oneTurnLog())
+      const checkpoint = await ctx.sessionPersistence.beginArchiveSnapshot(id)
+      expect(checkpoint).toBeDefined()
+
+      await expect(
+        ctx.sessionPersistence.readArchiveSnapshotPage({ ...checkpoint!, opaquePrefixToken: 'corrupt' }, -1, 1),
+      ).rejects.toMatchObject({ code: 'STALE_SNAPSHOT' })
+      await expect(
+        ctx.sessionPersistence.readArchiveSnapshotPage(checkpoint!, -2, 1),
+      ).rejects.toThrow('afterSeq')
+      await expect(
+        ctx.sessionPersistence.readArchiveSnapshotPage(checkpoint!, -1, 0),
+      ).rejects.toThrow('page limit')
+      await expect(
+        ctx.sessionPersistence.readArchiveSnapshotPage(checkpoint!, -1, MAX_ARCHIVE_PAGE_EVENTS + 1),
+      ).rejects.toThrow('page limit')
+      await expect(
+        ctx.sessionPersistence.readArchiveSnapshotPage(checkpoint!, -1, 1),
+      ).resolves.toBeDefined()
+      await expect(
+        ctx.sessionPersistence.readArchiveSnapshotPage({ ...checkpoint!, sessionId: SessionId('') }, -1, 1),
+      ).rejects.toThrow('sessionId')
+      await expect(
+        ctx.sessionPersistence.readArchiveSnapshotPage(checkpoint!, checkpoint!.highWatermarkSeq + 1, 1),
+      ).rejects.toThrow('past highWatermarkSeq')
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('returns an empty checkpoint for a materialized header with no events', async () => {
+    const store: MemoryStore = new Map()
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const fiber = await ctx.plugin(MemoryPersistence, { store })
+    try {
+      const id = SessionId('archive-empty')
+      store.set(id, { meta: meta(id), events: [] })
+      const checkpoint = await ctx.sessionPersistence.beginArchiveSnapshot(id)
+      expect(checkpoint?.highWatermarkSeq).toBe(-1)
+      const page = await ctx.sessionPersistence.readArchiveSnapshotPage(checkpoint!, -1, 1)
+      expect(page).toMatchObject({ events: [], nextAfterSeq: null, highWatermarkSeq: -1 })
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('returns undefined for an absent checkpointed session and stale for a truncated prefix', async () => {
+    const store: MemoryStore = new Map()
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const fiber = await ctx.plugin(MemoryPersistence, { store })
+    try {
+      const missing = await ctx.sessionPersistence.beginArchiveSnapshot(SessionId('archive-missing'))
+      expect(missing).toBeUndefined()
+
+      const id = SessionId('archive-truncated')
+      await ctx.sessionPersistence.create(meta(id))
+      await ctx.sessionPersistence.append(id, oneTurnLog())
+      const checkpoint = await ctx.sessionPersistence.beginArchiveSnapshot(id)
+      store.get(id)!.events = store.get(id)!.events.slice(0, 2)
+      await expect(
+        ctx.sessionPersistence.readArchiveSnapshotPage(checkpoint!, -1, 10),
+      ).rejects.toMatchObject({ code: 'STALE_SNAPSHOT' })
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
     }
   })
 })

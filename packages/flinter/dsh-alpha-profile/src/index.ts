@@ -193,7 +193,10 @@ export function buildFlinterProviderSettings(
  * @param fallback - Route to retain when the clock is outside the default window.
  * @returns The provider route selected for a new session.
  */
-export function freshSessionProvider(now: Date, fallback = FLINTER_DEFAULT_PROVIDER): FlinterProviderId {
+export function freshSessionProvider(
+  now: Date,
+  fallback: FlinterProviderId = FLINTER_DEFAULT_PROVIDER,
+): FlinterProviderId {
   const hour = now.getUTCHours()
   if (hour >= 16 && hour < 24) return FLINTER_DEFAULT_PROVIDER
   if (fallback === FLINTER_DEFAULT_PROVIDER) return FLINTER_ROTATION_PROVIDER

@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
+import { canonicalArchiveJson } from './archive-json.ts'
 import type { SessionPersistenceRevision } from './revision.ts'
 
 /** Maximum number of logical events returned by one archive page. */
@@ -85,7 +86,7 @@ export function snapshotArchiveEvents(
  * @returns the lowercase SHA-256 digest of the canonical prefix.
  */
 export function archivePrefixHash(events: readonly SessionArchiveEvent[]): string {
-  return createHash('sha256').update(canonicalJson(events)).digest('hex')
+  return createHash('sha256').update(canonicalArchiveJson(events)).digest('hex')
 }
 
 /**
@@ -139,22 +140,6 @@ export function decodeArchiveToken(
     throw new SessionArchiveSnapshotStaleError('checkpoint token does not match its snapshot')
   }
   return parsed as unknown as ArchiveToken
-}
-
-function canonicalJson(value: unknown): string {
-  if (value === null) return 'null'
-  switch (typeof value) {
-    case 'string': return JSON.stringify(value)
-    case 'boolean': return value ? 'true' : 'false'
-    case 'number':
-      if (!Number.isFinite(value)) throw new TypeError('archive event contains a non-finite number')
-      return JSON.stringify(value)
-    case 'object':
-      if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`
-      return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${canonicalJson((value as Record<string, unknown>)[key])}`).join(',')}}`
-    default:
-      throw new TypeError('archive event contains a non-JSON value')
-  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

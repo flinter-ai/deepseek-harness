@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { zstdCompressSync, zstdDecompressSync } from 'node:zlib'
 import type { SessionId } from '@deepseek-ai/dsh-session'
+import { canonicalArchiveJson } from './archive-json.ts'
 import type { SessionPersistenceRevision } from './revision.ts'
 import type { SessionArchiveEvent, SessionArchiveSnapshot } from './archive.ts'
 
@@ -155,7 +156,7 @@ function validateSegmentMetadata(segment: SessionEventArchiveSegmentV1): void {
 }
 
 function canonicalEventStream(events: readonly SessionArchiveEvent[]): string {
-  return events.map(event => canonicalJson(event)).join('\n') + (events.length > 0 ? '\n' : '')
+  return events.map(event => canonicalArchiveJson(event)).join('\n') + (events.length > 0 ? '\n' : '')
 }
 
 function parseEvent(line: string): SessionArchiveEvent {
@@ -169,22 +170,6 @@ function parseEvent(line: string): SessionArchiveEvent {
     throw new Error('archive event line is not an object')
   }
   return value as SessionArchiveEvent
-}
-
-function canonicalJson(value: unknown): string {
-  if (value === null) return 'null'
-  switch (typeof value) {
-    case 'string': return JSON.stringify(value)
-    case 'boolean': return value ? 'true' : 'false'
-    case 'number':
-      if (!Number.isFinite(value)) throw new TypeError('archive event contains a non-finite number')
-      return JSON.stringify(value)
-    case 'object':
-      if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`
-      return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${canonicalJson((value as Record<string, unknown>)[key])}`).join(',')}}`
-    default:
-      throw new TypeError('archive event contains a non-JSON value')
-  }
 }
 
 function sha256(value: Uint8Array): string {
