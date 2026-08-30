@@ -7,6 +7,8 @@
  * once; a later UTC boundary affects only a new session.
  */
 
+import type { SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
+
 export * from './worker.ts'
 export * from './attempt.ts'
 export * from './lifecycle.ts'
@@ -228,6 +230,53 @@ export const DIRECT_DEEPSEEK_ROUTE = Object.freeze({
   model: 'deepseek-v4-flash',
   apiKeyEnv: FLINTER_CREDENTIAL_REFS.deepseekOfficial,
 } as const)
+
+/** The native DSH event types consumed by the Phase 1 FLINTER seam. */
+export const FLINTER_NATIVE_EVENT_TYPES = Object.freeze([
+  'turn/start',
+  'step/start',
+  'request/header',
+  'request/context',
+  'user/message',
+  'assistant/chunk',
+  'assistant/message',
+  'tool/call',
+  'tool/result',
+  'step/end',
+  'turn/end',
+] as const)
+
+/** One lossless item exposed to a future FLINTER trace consumer. */
+export type FlinterNativeSessionItem =
+  | Readonly<{ kind: 'session'; header: SessionHeader }>
+  | Readonly<{ kind: 'event'; event: SessionEvent }>
+
+/** Native DSH session data as consumed by FLINTER, without a parallel codec. */
+export interface FlinterNativeSessionEvents {
+  readonly session: SessionHeader
+  readonly events: readonly SessionEvent[]
+  readonly items: readonly FlinterNativeSessionItem[]
+}
+
+/**
+ * Consume the canonical DSH header and event sequence without re-encoding it.
+ * Unknown/plugin event types remain in `events` and `items` losslessly; the
+ * consumer does not infer scientific meaning or create synthetic records.
+ */
+export function consumeFlinterNativeSessionEvents(
+  session: SessionHeader,
+  events: readonly SessionEvent[],
+): FlinterNativeSessionEvents {
+  const items: FlinterNativeSessionItem[] = [
+    Object.freeze({ kind: 'session', header: session }),
+    ...events.map(event => Object.freeze({ kind: 'event', event })),
+  ]
+  return Object.freeze({
+    session,
+    events,
+    items: Object.freeze(items),
+  })
+}
 
 /**
  * Credential backend selected by a profile. Both backends serve the same

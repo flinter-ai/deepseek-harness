@@ -39,11 +39,14 @@
     "@deepseek-ai/dsh-invariants": "workspace:^"
   },
   "devDependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.0.0",
     "@deepseek-ai/dsh-brand": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/dsh-agent": "workspace:^",
+    "@deepseek-ai/dsh-credentials": "workspace:^",
     "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/dsh-llm": "workspace:^",
+    "@deepseek-ai/dsh-launch-environment": "workspace:^",
     "@deepseek-ai/dsh-session": "workspace:^"
   },
   "scripts": {

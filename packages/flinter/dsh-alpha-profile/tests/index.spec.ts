@@ -3,13 +3,16 @@ import {
   bindFreshSession,
   buildFlinterProviderSettings,
   buildFlinterProfileComposition,
+  consumeFlinterNativeSessionEvents,
   DIRECT_DEEPSEEK_ROUTE,
   FLINTER_AWS_SECRET_NAMES,
   FLINTER_CREDENTIAL_REFS,
+  FLINTER_NATIVE_EVENT_TYPES,
   FLINTER_MODEL_CAPACITIES,
   freshSessionProvider,
   PI_AI_DEFAULTS,
 } from '../src/index.ts'
+import { SessionId } from '@deepseek-ai/dsh-session'
 
 const endpoints = {
   arkAgentPlan: 'http://127.0.0.1:4101/v1',
@@ -109,5 +112,27 @@ describe('FLINTER alpha provider/profile layer', () => {
       },
     ])
     expect(JSON.stringify(aws)).not.toMatch(/(?:api[_-]?key|secret|token)\s*[:=]\s*[^,}]+/i)
+  })
+
+  it('consumes native events without dropping opaque plugin records', () => {
+    const session = {
+      version: 0,
+      id: SessionId('native-consumer'),
+      createdAt: 1,
+      delegationDepth: 0,
+    }
+    const events = [
+      { type: 'turn/start', seq: 0, time: 2, data: { turn: 0 } },
+      { type: 'plugin/opaque', seq: 1, time: 3, data: { value: 'preserve' } },
+      { type: 'turn/end', seq: 2, time: 4, data: { turn: 0, reason: { kind: 'completed' } } },
+    ] as unknown as import('@deepseek-ai/dsh-session').SessionEvent[]
+    const consumed = consumeFlinterNativeSessionEvents(session, events)
+
+    expect(FLINTER_NATIVE_EVENT_TYPES).toContain('turn/start')
+    expect(consumed.session).toBe(session)
+    expect(consumed.events).toBe(events)
+    expect(consumed.items).toHaveLength(4)
+    expect(consumed.items[0]).toEqual({ kind: 'session', header: session })
+    expect(consumed.items[2]).toEqual({ kind: 'event', event: events[1] })
   })
 })
