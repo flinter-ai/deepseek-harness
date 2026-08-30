@@ -9,6 +9,7 @@
 
 export * from './worker.ts'
 
+/** Environment-variable references used by the supported FLINTER routes. */
 export const FLINTER_CREDENTIAL_REFS = Object.freeze({
   arkAgentPlan: 'ARK_PLAN_API_KEY',
   modelflare: 'MODELFLARE_API_KEY',
@@ -16,6 +17,7 @@ export const FLINTER_CREDENTIAL_REFS = Object.freeze({
   deepseekOfficial: 'DEEPSEEK_API_KEY',
 } as const)
 
+/** AWS Secrets Manager names corresponding to the supported route references. */
 export const FLINTER_AWS_SECRET_NAMES = Object.freeze({
   arkAgentPlan: 'flinter/dsh-ark-agent-plan',
   modelflare: 'flinter/dsh-modelflare',
@@ -59,17 +61,22 @@ export const FLINTER_DEFAULT_REASONING_EFFORTS: FlinterReasoningEfforts = Object
   high: 'high',
 })
 
+/** Provider selected during the UTC 16:00–24:00 fresh-session window. */
 export const FLINTER_DEFAULT_PROVIDER = 'ark-agent-plan' as const
+/** Provider selected outside the default provider's fresh-session window. */
 export const FLINTER_ROTATION_PROVIDER = 'modelflare' as const
 
+/** Provider route identifiers owned by the FLINTER profile. */
 export type FlinterProviderId = 'ark-agent-plan' | 'modelflare' | 'gmi-serving'
 
+/** Endpoint values required to construct the three configurable provider routes. */
 export interface FlinterProviderEndpointConfig {
   arkAgentPlan: string
   modelflare: string
   gmiServing: string
 }
 
+/** Optional per-route overrides for the user-visible reasoning menu. */
 export interface FlinterProviderSettingsOptions {
   /**
    * Optional per-model reasoning menu. Omitted routes retain the verified
@@ -79,6 +86,7 @@ export interface FlinterProviderSettingsOptions {
   reasoningEfforts?: Partial<Record<FlinterProviderId, FlinterReasoningEfforts | false>>
 }
 
+/** Model identity and capacity values exposed in a provider profile. */
 export interface FlinterModelProfile {
   id: string
   name: string
@@ -87,6 +95,7 @@ export interface FlinterModelProfile {
   reasoningEfforts?: FlinterReasoningEfforts | false
 }
 
+/** One OpenAI-compatible provider route in the alpha settings schema. */
 export interface FlinterProviderProfile {
   displayName: string
   apiKeyEnv: string
@@ -97,10 +106,12 @@ export interface FlinterProviderProfile {
   models: [FlinterModelProfile]
 }
 
+/** Complete provider settings section emitted by this profile layer. */
 export interface FlinterProviderSettings {
   providers: Record<FlinterProviderId, FlinterProviderProfile>
 }
 
+/** Provider/model pair captured when a fresh DSH session is created. */
 export interface FlinterSessionRoute {
   provider: FlinterProviderId
   model: string
@@ -133,7 +144,12 @@ function profile(
   }
 }
 
-/** Build the settings section consumed by @deepseek-ai/dsh-llm-pi-ai. */
+/**
+ * Build the settings section consumed by @deepseek-ai/dsh-llm-pi-ai.
+ * @param endpoints - OpenAI-compatible endpoint URLs for each route.
+ * @param options - Optional per-route reasoning-menu overrides.
+ * @returns The alpha-compatible provider settings section.
+ */
 export function buildFlinterProviderSettings(
   endpoints: FlinterProviderEndpointConfig,
   options: FlinterProviderSettingsOptions = {},
@@ -173,6 +189,9 @@ export function buildFlinterProviderSettings(
  * Select the route for a fresh session. The production clock is UTC; tests
  * pass an explicit Date so the boundary is deterministic and does not require
  * a global clock mock.
+ * @param now - UTC timestamp used to select the fresh-session route.
+ * @param fallback - Route to retain when the clock is outside the default window.
+ * @returns The provider route selected for a new session.
  */
 export function freshSessionProvider(now: Date, fallback = FLINTER_DEFAULT_PROVIDER): FlinterProviderId {
   const hour = now.getUTCHours()
@@ -181,7 +200,12 @@ export function freshSessionProvider(now: Date, fallback = FLINTER_DEFAULT_PROVI
   return fallback
 }
 
-/** Capture provider and model together so an existing session never rotates. */
+/**
+ * Capture provider and model together so an existing session never rotates.
+ * @param now - UTC timestamp used for fresh-session selection.
+ * @param endpoints - Endpoint URLs used to resolve the selected model id.
+ * @returns The provider/model route captured by the new session.
+ */
 export function bindFreshSession(
   now: Date,
   endpoints: FlinterProviderEndpointConfig,

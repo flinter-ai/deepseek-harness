@@ -8,7 +8,7 @@ const PACKAGE_NAME = '@deepseek-ai/dsh-alpha-profile'
 export const name = 'flinter-dsh-alpha-profile-invariant'
 export const inject = ['invariants']
 
-/** Profile values are pure data; provider/credential behavior is tested at the seam. */
+/** No runtime invariant: profile values are pure data; provider/credential behavior is tested at the seam. */
 const install: InvariantInstaller = () => {}
 
 export const apply = (ctx: Context): Promise<() => void> =>

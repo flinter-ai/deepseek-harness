@@ -103,6 +103,8 @@ function environmentInteger(env: NodeJS.ProcessEnv, name: string): number {
 /**
  * Parse the launcher environment without reading any credential value. The
  * callback HMAC field is intentionally a reference name, not a secret.
+ * @param env - Environment map supplied by the launcher or a test.
+ * @returns The validated non-secret worker environment.
  */
 export function readDshWorkerEnvironment(env: NodeJS.ProcessEnv = process.env): DshWorkerEnvironment {
   const launch = validateWorkerLaunchContract({
@@ -131,7 +133,11 @@ export function readDshWorkerEnvironment(env: NodeJS.ProcessEnv = process.env): 
   })
 }
 
-/** Build the persistence row from the same root used by the control plane. */
+/**
+ * Build the persistence row from the same root used by the control plane.
+ * @param persistenceRoot - Absolute durable session root.
+ * @returns The alpha JSONL persistence composition row.
+ */
 export function buildWorkerPersistenceConfig(persistenceRoot: string): WorkerPersistenceConfig {
   const root = nonEmpty(persistenceRoot, 'persistenceRoot')
   if (!root.startsWith('/')) throw new Error('worker persistenceRoot must be an absolute path')
@@ -141,7 +147,11 @@ export function buildWorkerPersistenceConfig(persistenceRoot: string): WorkerPer
   })
 }
 
-/** Validate and normalize a launcher contract without exposing secret material. */
+/**
+ * Validate and normalize a launcher contract without exposing secret material.
+ * @param launch - Identity and fencing values stamped by the launcher.
+ * @returns A normalized worker launch contract.
+ */
 export function validateWorkerLaunchContract(
   launch: DshWorkerLaunchContract,
 ): DshWorkerLaunchContract {
@@ -164,6 +174,9 @@ export function validateWorkerLaunchContract(
  * Prove the control-plane resume invariant before touching the DSH registry.
  * A replacement may advance only its lease/attempt identity; it never mints
  * a different session or silently switches its durable root.
+ * @param previousLaunch - The failed worker's validated launch descriptor.
+ * @param replacementLaunch - The replacement worker's launch descriptor.
+ * @returns The validated replacement descriptor.
  */
 export function assertWorkerResumeCompatible(
   previousLaunch: DshWorkerLaunchContract,
@@ -190,6 +203,9 @@ export function assertWorkerResumeCompatible(
  * Bind DSH's branded SessionId to the exact persistence root stamped by the
  * control plane. The alpha registry has no root argument, so the host must
  * configure session persistence with this value before calling start/resume.
+ * @param launch - Identity and fencing values stamped by the launcher.
+ * @param persistenceRoot - The configured durable session root.
+ * @returns The validated binding passed to the DSH agent registry.
  */
 export function bindWorkerSession(
   launch: DshWorkerLaunchContract,
@@ -221,7 +237,13 @@ function setupSelection(selection: ModelSelection): AgentSetup {
   }
 }
 
-/** Create a new alpha Agent on the control-plane supplied session identity. */
+/**
+ * Create a new alpha Agent on the control-plane supplied session identity.
+ * @param agents - Injectable alpha agent registry.
+ * @param binding - Validated session and persistence identity.
+ * @param options - Working directory and model selection for the agent.
+ * @returns The newly created agent handle.
+ */
 export async function startWorkerAgent(
   agents: WorkerAgentRegistry,
   binding: WorkerSessionBinding,
@@ -237,7 +259,15 @@ export async function startWorkerAgent(
   })
 }
 
-/** Resume the same alpha Session after a control-plane lease replacement. */
+/**
+ * Resume the same alpha Session after a control-plane lease replacement.
+ * @param agents - Injectable alpha agent registry.
+ * @param previousLaunch - The failed worker's launch descriptor.
+ * @param replacementLaunch - The replacement worker's launch descriptor.
+ * @param persistenceRoot - The durable session root shared by both attempts.
+ * @param options - Working directory and model selection for the agent.
+ * @returns The resumed agent handle.
+ */
 export async function resumeWorkerAgent(
   agents: WorkerAgentRegistry,
   previousLaunch: DshWorkerLaunchContract,
@@ -261,6 +291,11 @@ export async function resumeWorkerAgent(
  * Launch from the stamped environment. Attempt zero is the only create path;
  * every replacement must supply the previously validated descriptor and uses
  * `resume` exclusively, so a missing persisted session fails closed.
+ * @param agents - Injectable alpha agent registry.
+ * @param options - Working directory and model selection for the agent.
+ * @param env - Environment map supplied by the launcher or a test.
+ * @param previousLaunch - Required descriptor when replacing an earlier attempt.
+ * @returns The agent handle and the validated launch/persistence configuration.
  */
 export async function launchWorkerAgentFromEnvironment(
   agents: WorkerAgentRegistry,

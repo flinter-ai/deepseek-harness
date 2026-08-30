@@ -69,6 +69,10 @@ describe('FLINTER alpha provider/profile layer', () => {
     const freshSession = bindFreshSession(new Date('2026-08-29T16:00:00Z'), endpoints)
     expect(oldSession).toEqual({ provider: 'modelflare', model: 'gpt-5.6-sol' })
     expect(freshSession).toEqual({ provider: 'ark-agent-plan', model: 'ark-code-latest' })
+
+    // A caller may retain a non-default route as its explicit fallback; the
+    // rotation window must not rewrite that user choice outside its window.
+    expect(freshSessionProvider(new Date('2026-08-29T10:00:00Z'), 'gmi-serving')).toBe('gmi-serving')
   })
 
   it('keeps AWS secret names separate from model credential references', () => {

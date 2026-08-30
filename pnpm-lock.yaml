@@ -5260,10 +5260,6 @@ importers:
         version: link:../../typert/protocol
 
   packages/flinter/dsh-alpha-profile:
-    dependencies:
-      '@deepseek-ai/dsh-invariants':
-        specifier: workspace:^
-        version: link:../../runtime-diagnostics/invariants
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: workspace:^
@@ -5271,6 +5267,9 @@ importers:
       '@deepseek-ai/dsh-agent':
         specifier: workspace:^
         version: link:../../core/agent
+      '@deepseek-ai/dsh-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
       '@deepseek-ai/dsh-llm':
         specifier: workspace:^
         version: link:../../llm/llm

@@ -70,7 +70,10 @@ def apply(settings: pathlib.Path, choice: tuple[str, str, str]) -> bool:
         prefix=f".{settings.name}.", suffix=".tod-tmp", dir=settings.parent
     )
     try:
-        os.fchmod(fd, 0o600)
+        # mkstemp already creates a private file. chmod is the portable
+        # permission projection: Windows has no os.fchmod, while POSIX keeps
+        # the explicit 0600 assertion for the settings replacement.
+        os.chmod(temporary, 0o600)
         with os.fdopen(fd, "w") as stream:
             stream.write(updated)
             stream.flush()

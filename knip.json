@@ -176,6 +176,17 @@
         "tests/**/*.tsx"
       ]
     },
+    "packages/flinter/dsh-alpha-profile": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts",
+        "tests/fixtures/worker-driver.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
     "packages/client/ui-layout": {
       "entry": [
         "tests/**/*.spec.ts",
