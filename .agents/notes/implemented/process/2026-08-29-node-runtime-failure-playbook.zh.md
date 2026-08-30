@@ -32,7 +32,7 @@ Status: implemented
 | --- | --- | --- |
 | Non-blocking / informational | Cloudflare PR preview 部署（永久跳过；GitHub Pages 是规范的 PR preview）；没有 provider secret 的 fork PR real-provider E2E；Windows PR build/native/coverage/Wine；Python Windows/macOS release-shaped 目标；Node 22.19 兼容性；观察性和 benchmark job | 将每项记录为按策略跳过或不可用；不将其设为合并阻塞项，也不称为已测试证据。只有经过明确策略决定才重新开放。 |
 | Important / blocking | Node 24 static、coverage、snapshots/artifacts；Node 26 兼容性；Python Linux SDK/release contract 检查；aggregate verdict | 这些组成 AWS/Linux PR 门禁。必须通过，或有明确且经过审查的基础设施例外。 |
-| Current blocker | 当前 PR 运行报告 Node 24 snapshots/artifacts 失败；完整 CI 运行结束前 GitHub 尚未释放失败日志 | 将其视为当前唯一失败。在运行完成、检查语义差异且 job 通过或获得明确审查例外前，不更新 snapshot，也不合并。 |
+| Current blocker | 前一个 PR 运行报告 Node 24 snapshots/artifacts 失败；其失败日志要等运行完成后才可获取。当前 head 的替代运行正在重新执行该门禁。 | 将 snapshots/artifacts 视为唯一正在调查的失败。在替代运行完成、检查语义差异且 job 通过或获得明确审查例外前，不更新 snapshot，也不合并。 |
 | Local hook scope | 运行时检查、暂存 lint、空白、翻译配对、vendor manifest；pre-push typecheck | Hook 保留便宜且确定的检查。本地 hook 不运行完整 coverage、snapshots、provider E2E 或云部署。 |
 
 ## Standard local sequence
