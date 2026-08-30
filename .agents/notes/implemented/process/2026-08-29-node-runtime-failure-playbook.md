@@ -30,7 +30,7 @@ The repository contract remains `^22.19.0 || >=24.0.0`. Node 25 is a valid local
 
 | Class | Checks | Merge treatment |
 | --- | --- | --- |
-| Non-blocking / informational | Cloudflare preview upload when the preview build succeeds but upload credentials are absent; real-provider E2E on fork PRs without provider secrets; observational and benchmark jobs | Report the result; do not make it a merge blocker. Do not call a skipped E2E a provider pass. |
+| Non-blocking / informational | Cloudflare PR preview deployment (permanently skipped; GitHub Pages is the canonical PR preview); real-provider E2E on fork PRs without provider secrets; observational and benchmark jobs | Report the result; do not make it a merge blocker. Do not call a skipped E2E a provider pass. |
 | Important / blocking | Node 24 static, coverage, snapshots/artifacts; Node 22.19 and Node 26 compatibility; Windows build/native/coverage; Python contract checks; aggregate verdict | Must pass or have an explicit, reviewed infrastructure exception. Never skip merely because it is slow. |
 | Current exception | Windows native test job: four files passed, but the `workflow-worker-thread` Vitest worker exited unexpectedly | Keep blocking until an isolated rerun proves a platform flake or the owner records an explicit policy decision. |
 | Local hook scope | Runtime guard, staged lint, whitespace, translation pairing, vendor manifest; pre-push typecheck | Keep cheap deterministic checks in hooks. Do not run full coverage, snapshots, provider E2E, or cloud deployment in local hooks. |

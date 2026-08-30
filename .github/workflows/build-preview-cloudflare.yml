@@ -34,6 +34,10 @@ jobs:
   preview:
     runs-on: ubuntu-latest
     name: cloudflare pages preview
+    # GitHub Pages is the canonical PR preview surface. Keep this workflow
+    # visible in Actions, but permanently skip its deployment job so public PR
+    # execution never requires Cloudflare credentials.
+    if: ${{ false }}
     steps:
       - uses: actions/checkout@v6
         with:
