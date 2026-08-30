@@ -124,6 +124,9 @@ export function readDshWorkerEnvironment(env: NodeJS.ProcessEnv = process.env): 
   if (parsedCallbackUrl.protocol !== 'http:' && parsedCallbackUrl.protocol !== 'https:') {
     throw new Error(`worker ${DSH_WORKER_ENV.callbackUrl} must use http or https`)
   }
+  if (parsedCallbackUrl.username !== '' || parsedCallbackUrl.password !== '') {
+    throw new Error(`worker ${DSH_WORKER_ENV.callbackUrl} must not contain credentials`)
+  }
   return Object.freeze({
     launch,
     computeTier: requiredEnvironmentValue(env, DSH_WORKER_ENV.computeTier),

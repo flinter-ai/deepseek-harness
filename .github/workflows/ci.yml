@@ -11,6 +11,31 @@ env:
   # into apps/cli/cordis.yml (AppCLIEntry disables the row when set).
   DSH_TELEMETRY_DISABLED: '1'
 
+# Pull-request execution policy (2026-08-30): keep only fast, deterministic,
+# Linux/package-integrity checks on GitHub-hosted runners. The required remote
+# checks are Node 24 static validation, the keyless Python SDK suite, the
+# Linux release-shaped Python runtime targets, and this workflow's aggregate
+# verdict.
+#
+# The following are intentionally LOCAL_ONLY / MANUAL_ONLY / NIGHTLY_ONLY and
+# must not be added back to the required PR verdict without an explicit policy
+# change:
+#   - full coverage: `pnpm run check:ci:coverage`
+#   - snapshot/artifact composite gates: `pnpm run check:ci:consumers`
+#     (including recorded-session, browser, compatibility, package, and docs
+#     consumers); use `pnpm run test:snapshot` or the focused web gate when
+#     diagnosing one failure.
+#   - extra Node-version compatibility: `pnpm run check:node-compat`
+#   - Windows/macOS build, native, coverage, Wine, and release matrices
+#   - benchmarks/performance: `pnpm run test:web:perf`
+#   - real-provider tests: `pnpm run test:e2e` with explicitly authorized keys
+#   - Cloudflare preview uploads: `.github/workflows/build-preview-cloudflare.yml`
+#   - AWS/Tower/Beam validation and release publishing workflows
+#
+# A skipped remote job is NOT_RUN evidence, not a pass claim. Run local-only
+# gates with the repository's declared Node version before release/cutover
+# decisions; do not put these suites in the pre-commit hook.
+
 # Cancel a superseded pull-request run on a new push so a fresh head does not
 # queue a second full 9-job run behind a stale one (paid enterprise runners
 # would otherwise stack with no auto-cancellation).
@@ -69,7 +94,9 @@ jobs:
         run: pnpm run check:ci:static
 
   node-24-coverage:
-    if: github.event_name == 'pull_request'
+    # LOCAL_ONLY: exhaustive coverage is too broad for every PR and remains
+    # available through the explicit command documented above.
+    if: false
     runs-on: ubuntu-latest
     name: node 24 / coverage
     env:
@@ -125,7 +152,9 @@ jobs:
         run: pnpm run check:ci:coverage
 
   node-24-consumers:
-    if: github.event_name == 'pull_request'
+    # LOCAL_ONLY: this composite includes snapshots, browser execution,
+    # compatibility, package, documentation, and built-artifact consumers.
+    if: false
     runs-on: ubuntu-latest
     name: node 24 / snapshots and artifacts
     env:
@@ -193,7 +222,9 @@ jobs:
 
 
   node-compat:
-    if: github.event_name == 'pull_request'
+    # LOCAL_ONLY: extra Node versions are compatibility evidence, not the
+    # required AWS/Linux PR gate. Run `pnpm run check:node-compat` manually.
+    if: false
     # Each compatibility contract receives an independent standard hosted job.
     runs-on: ${{ matrix.runner }}
     name: ${{ matrix.name }}
@@ -508,10 +539,12 @@ jobs:
 
   # Single stable required check for branch protection: require "all checks
   # passed" instead of enumerating matrix legs whose names change as lanes and
-  # node versions evolve. Every blocking job in THIS workflow must be listed in
-  # `needs`. Windows jobs are intentionally absent because the PR policy is
-  # AWS/Linux-only. (`needs` cannot reach across workflow files; the master-only
-  # jobs in ci-master.yml are intentionally not part of this PR verdict.)
+  # node versions evolve. Every required remote job in THIS workflow must be
+  # listed in `needs`; LOCAL_ONLY jobs above must stay out of this list.
+  # Windows/macOS, benchmark, provider, Cloudflare, AWS/Tower/Beam, and release
+  # workflows are intentionally not part of this PR verdict. (`needs` cannot
+  # reach across workflow files; the master-only jobs in ci-master.yml are also
+  # intentionally not part of this PR verdict.)
   # `if: always()` is load-bearing: without it a failed dependency
   # would SKIP this job, and GitHub counts a skipped required check as passing
   # — so this job always runs and fails on any non-success result, including
@@ -519,7 +552,7 @@ jobs:
   all-checks-passed:
     name: all checks passed
     runs-on: ubuntu-latest
-    needs: [node-24, node-24-coverage, node-24-consumers, node-compat, python-sdk, python-runtime]
+    needs: [node-24, python-sdk, python-runtime]
     if: always() && github.event_name == 'pull_request'
     steps:
       - name: Fail if any needed job did not succeed

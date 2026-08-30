@@ -1,6 +1,6 @@
 ---
-description: "固定 DeepSeek Harness alpha 之上的 FLINTER Phase 1 提供方/profile 与 worker 启动 seam。"
-kind: "package-reference"
+description: "固定 DeepSeek Harness alpha 之上的 FLINTER Phase 1 提供方/profile、worker 启动与 attempt safety seam。"
+kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-alpha-profile
@@ -16,6 +16,8 @@ kind: "package-reference"
 - [使用本包](#use-this-package)
 - [路由与 worker 边界](#route-and-worker-boundaries)
 - [模型体验](#model-experience)
+- [Attempt safety](#attempt-safety)
+- [实现说明](#understand-the-implementation)
 - [已知限制与延期工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
@@ -53,6 +55,20 @@ kind: "package-reference"
 
 新 session 的路由会被捕获。复用 session 会保留其 provider/model 路由；修改时段默认值只影响新 session，因此不会静默改变已有请求前缀。
 
+<a id="attempt-safety"></a>
+## Attempt safety
+
+在 native DSH Agent 和 Session 周围实现非 Orca launch 与 attempt safety 时使用本包。control-plane 或 executor integration 必须提供经过 authentication 的 callback 路径、cloud task identity、stop 操作和 terminal-state observation。
+
+启动流程是 `resolveWorkerAttemptRoots()` → `createWorkerAttemptRoots()` → `writeWorkerAttemptManifest()` → `buildDshAttemptLaunch()`。将返回的 launch spec 传给 `shell: false` 的直接 child-process API；task 始终是一个 literal argument。启动 replacement 前使用 `fenceWorkerAttempt()`，只有在获得 terminal proof 后才能使用 `cleanupWorkerAttempt()`，启用 fan-out 前调用 `assertWorkerCanaryProof()`。
+
+`attempt.ts` 将持久的 `DSH_SESSION_ROOT` 与每个 attempt 的 scratch 和 artifact 根目录分开，以 exclusive、owner-only 的方式创建 launch manifest，清理继承环境中名称像 credential 的变量，并且只在 terminal fence 后移除临时根目录。`lifecycle.ts` 将 physical executor fencing 与 logical lease fencing 保持为两个独立检查。
+
+<a id="understand-the-implementation"></a>
+## 实现说明
+
+完整的 attempt 与 lifecycle contract 从 [src/attempt.ts](src/attempt.ts) 和 [src/lifecycle.ts](src/lifecycle.ts) 导出；DSH identity 以及 create/resume binding 仍由 [src/worker.ts](src/worker.ts) 负责。
+
 <a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 
@@ -66,7 +82,7 @@ kind: "package-reference"
 <details>
 <summary>维护者工作上下文——点击展开</summary>
 
-本开发备注是维护者工作上下文，记录开放问题与延期方向，不是权威规范；已发布行为与限制以本页前文和包代码为准。
+本开发备注是维护者工作上下文，记录开放问题与延期方向，不是权威规范；已发布行为与限制以本页前文和包代码为准。Attempt 与 lifecycle safety 的验收测试见 [tests/attempt.spec.ts](tests/attempt.spec.ts) 和 [tests/lifecycle.spec.ts](tests/lifecycle.spec.ts)。
 
 #### 未来：更丰富的路由能力协商
 

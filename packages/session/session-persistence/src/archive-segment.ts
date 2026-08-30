@@ -78,7 +78,7 @@ export function decodeSessionEventArchiveSegmentV1(
   segment: unknown,
 ): DecodedSessionEventArchiveSegmentV1 {
   validateSegmentMetadata(segment)
-  const payload = Buffer.from(segment.payloadBase64, 'base64')
+  const payload = decodeBase64Payload(segment.payloadBase64)
   if (payload.byteLength > MAX_SESSION_EVENT_ARCHIVE_PAYLOAD_BYTES) {
     throw new RangeError(`archive payload exceeds ${MAX_SESSION_EVENT_ARCHIVE_PAYLOAD_BYTES} bytes`)
   }
@@ -107,6 +107,28 @@ export function decodeSessionEventArchiveSegmentV1(
     throw new Error('archive segment event metadata does not match its payload')
   }
   return { segment, events: detached }
+}
+
+function decodeBase64Payload(value: string): Buffer {
+  // Buffer.from(..., 'base64') is intentionally permissive and silently
+  // discards malformed characters. Archive inputs must be canonical so a
+  // corrupt transport cannot be reinterpreted as a different payload.
+  if (value.length % 4 !== 0) {
+    throw new Error('archive payload is not valid base64')
+  }
+  const padding = value.endsWith('==') ? 2 : value.endsWith('=') ? 1 : 0
+  const estimatedBytes = (value.length / 4) * 3 - padding
+  if (estimatedBytes > MAX_SESSION_EVENT_ARCHIVE_PAYLOAD_BYTES) {
+    throw new RangeError(`archive payload exceeds ${MAX_SESSION_EVENT_ARCHIVE_PAYLOAD_BYTES} bytes`)
+  }
+  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) {
+    throw new Error('archive payload is not valid base64')
+  }
+  const payload = Buffer.from(value, 'base64')
+  if (payload.toString('base64') !== value) {
+    throw new Error('archive payload is not valid base64')
+  }
+  return payload
 }
 
 function validateEvents(

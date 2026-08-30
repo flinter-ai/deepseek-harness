@@ -41,8 +41,8 @@ describe('SessionEventArchiveSegmentV1', () => {
   })
 
   it('canonicalizes object keys before hashing and compression', () => {
-    const left = [{ ...ARCHIVE_FIXTURE[0]!, data: { z: 1, a: { y: 2, x: 3 } } }]
-    const right = [{ ...ARCHIVE_FIXTURE[0]!, data: { a: { x: 3, y: 2 }, z: 1 } }]
+    const left: SessionArchiveEvent[] = [{ ...ARCHIVE_FIXTURE[0]!, data: { z: 1, a: { y: 2, x: 3 } } }]
+    const right: SessionArchiveEvent[] = [{ ...ARCHIVE_FIXTURE[0]!, data: { a: { x: 3, y: 2 }, z: 1 } }]
     const leftSegment = encodeSessionEventArchiveSegmentV1({ ...snapshot, highWatermarkSeq: 0 }, left)
     const rightSegment = encodeSessionEventArchiveSegmentV1({ ...snapshot, highWatermarkSeq: 0 }, right)
     expect(rightSegment.payloadBase64).toBe(leftSegment.payloadBase64)
@@ -87,6 +87,24 @@ describe('SessionEventArchiveSegmentV1', () => {
     }
   })
 
+  it('rejects malformed base64 before attempting checksum validation', () => {
+    const segment = encodeSessionEventArchiveSegmentV1(snapshot, ARCHIVE_FIXTURE)
+    expect(() => decodeSessionEventArchiveSegmentV1({
+      ...segment,
+      payloadBase64: '%%%=',
+    })).toThrow('archive payload is not valid base64')
+  })
+
+  it('fails closed when a truncated payload has a recomputed payload checksum', () => {
+    const segment = encodeSessionEventArchiveSegmentV1(snapshot, ARCHIVE_FIXTURE)
+    const payload = Buffer.from(segment.payloadBase64, 'base64').subarray(0, 1)
+    expect(() => decodeSessionEventArchiveSegmentV1({
+      ...segment,
+      payloadBase64: payload.toString('base64'),
+      payloadSha256: sha256(payload),
+    })).toThrow('archive decoded event-stream SHA-256 mismatch')
+  })
+
   it('rejects a payload whose decoded stream checksum is wrong', () => {
     const segment = encodeSessionEventArchiveSegmentV1(snapshot, ARCHIVE_FIXTURE)
     expect(() => decodeSessionEventArchiveSegmentV1({
@@ -105,7 +123,7 @@ describe('SessionEventArchiveSegmentV1', () => {
       payloadBase64: payload.toString('base64'),
       payloadSha256: sha256(payload),
       decodedEventStreamSha256: sha256(decodedBytes),
-    })).toThrow('missing its final newline')
+    })).toThrow('archive decoded event stream is missing its final newline')
   })
 
   it('rejects a compressed payload over the local capacity limit', () => {
@@ -182,6 +200,13 @@ describe('SessionEventArchiveSegmentV1', () => {
     const segment = encodeSessionEventArchiveSegmentV1(snapshot, ARCHIVE_FIXTURE)
     expect(() => decodeSessionEventArchiveSegmentV1({ ...segment, eventCount: 1 }))
       .toThrow('event metadata does not match')
+  })
+
+  it('rejects a non-empty segment whose declared high-water mark is not its final event', () => {
+    expect(() => encodeSessionEventArchiveSegmentV1(
+      { ...snapshot, highWatermarkSeq: 10 },
+      ARCHIVE_FIXTURE,
+    )).toThrow('expected highWatermarkSeq 10')
   })
 })
 
