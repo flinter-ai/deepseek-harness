@@ -985,7 +985,7 @@ export class PersistenceCoordinator<TornMarker = unknown> {
       return Promise.reject(new TypeError('archive snapshot sessionId must be a non-empty string'))
     }
     return this.serialize(
-      snapshot.sessionId as SessionId,
+      snapshot.sessionId,
       () => this.readArchiveSnapshotPageCore(snapshot, afterSeq, limit, signal),
       signal,
     )

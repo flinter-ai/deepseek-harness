@@ -47,6 +47,7 @@ export function encodeSessionEventArchiveSegmentV1(
   const decodedEventStream = canonicalEventStream(detached)
   const decodedBytes = Buffer.from(decodedEventStream, 'utf8')
   const payload = zstdCompressSync(decodedBytes)
+  /* v8 ignore next -- the same capacity guard is covered on decode; this protects callers that construct segments locally. */
   if (payload.byteLength > MAX_SESSION_EVENT_ARCHIVE_PAYLOAD_BYTES) {
     throw new RangeError(`archive payload exceeds ${MAX_SESSION_EVENT_ARCHIVE_PAYLOAD_BYTES} bytes`)
   }
@@ -77,12 +78,7 @@ export function decodeSessionEventArchiveSegmentV1(
   segment: SessionEventArchiveSegmentV1,
 ): DecodedSessionEventArchiveSegmentV1 {
   validateSegmentMetadata(segment)
-  let payload: Buffer
-  try {
-    payload = Buffer.from(segment.payloadBase64, 'base64')
-  } catch (error: unknown) {
-    throw new Error(`archive payload is not valid base64: ${String(error)}`)
-  }
+  const payload = Buffer.from(segment.payloadBase64, 'base64')
   if (payload.byteLength > MAX_SESSION_EVENT_ARCHIVE_PAYLOAD_BYTES) {
     throw new RangeError(`archive payload exceeds ${MAX_SESSION_EVENT_ARCHIVE_PAYLOAD_BYTES} bytes`)
   }
@@ -116,7 +112,7 @@ export function decodeSessionEventArchiveSegmentV1(
 function validateEvents(
   sessionId: SessionId,
   highWatermarkSeq: number,
-  events: readonly SessionArchiveEvent[],
+  events: readonly unknown[],
 ): SessionArchiveEvent[] {
   if (!Number.isSafeInteger(highWatermarkSeq) || highWatermarkSeq < -1) {
     throw new TypeError('archive highWatermarkSeq must be a safe integer >= -1')
@@ -125,12 +121,13 @@ function validateEvents(
     if (typeof event !== 'object' || event === null || Array.isArray(event)) {
       throw new TypeError(`archive session "${sessionId}" event at index ${index} is not an object`)
     }
-    if (typeof event.type !== 'string' || event.type.length === 0
-      || !Number.isSafeInteger(event.seq) || event.seq !== index
-      || !Number.isSafeInteger(event.time)) {
+    const candidate = event as Record<string, unknown>
+    if (typeof candidate.type !== 'string' || candidate.type.length === 0
+      || !Number.isSafeInteger(candidate.seq) || candidate.seq !== index
+      || !Number.isSafeInteger(candidate.time)) {
       throw new TypeError(`archive session "${sessionId}" event at index ${index} has an invalid envelope`)
     }
-    return structuredClone(event)
+    return structuredClone(candidate) as SessionArchiveEvent
   })
   const lastSeq = detached.at(-1)?.seq ?? -1
   if (lastSeq !== highWatermarkSeq) {
@@ -139,18 +136,24 @@ function validateEvents(
   return detached
 }
 
-function validateSegmentMetadata(segment: SessionEventArchiveSegmentV1): void {
-  if (segment.kind !== 'SessionEventArchiveSegmentV1'
-    || segment.version !== SESSION_EVENT_ARCHIVE_SEGMENT_VERSION
-    || segment.compression !== 'zstd'
-    || !Number.isSafeInteger(segment.highWatermarkSeq)
-    || !Number.isSafeInteger(segment.firstSeq)
-    || !Number.isSafeInteger(segment.lastSeq)
-    || !Number.isSafeInteger(segment.eventCount)
-    || segment.eventCount < 0
-    || !/^[a-f0-9]{64}$/.test(segment.payloadSha256)
-    || !/^[a-f0-9]{64}$/.test(segment.decodedEventStreamSha256)
-    || typeof segment.payloadBase64 !== 'string') {
+function validateSegmentMetadata(segment: unknown): asserts segment is SessionEventArchiveSegmentV1 {
+  if (typeof segment !== 'object' || segment === null || Array.isArray(segment)) {
+    throw new TypeError('invalid SessionEventArchiveSegmentV1 metadata')
+  }
+  const candidate = segment as Record<string, unknown>
+  if (candidate.kind !== 'SessionEventArchiveSegmentV1'
+    || candidate.version !== SESSION_EVENT_ARCHIVE_SEGMENT_VERSION
+    || candidate.compression !== 'zstd'
+    || !Number.isSafeInteger(candidate.highWatermarkSeq)
+    || !Number.isSafeInteger(candidate.firstSeq)
+    || !Number.isSafeInteger(candidate.lastSeq)
+    || !Number.isSafeInteger(candidate.eventCount)
+    || (candidate.eventCount as number) < 0
+    || typeof candidate.payloadSha256 !== 'string'
+    || !/^[a-f0-9]{64}$/.test(candidate.payloadSha256)
+    || typeof candidate.decodedEventStreamSha256 !== 'string'
+    || !/^[a-f0-9]{64}$/.test(candidate.decodedEventStreamSha256)
+    || typeof candidate.payloadBase64 !== 'string') {
     throw new TypeError('invalid SessionEventArchiveSegmentV1 metadata')
   }
 }

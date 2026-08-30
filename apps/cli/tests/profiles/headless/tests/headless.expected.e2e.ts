@@ -445,7 +445,9 @@ describe('headless stream-json snapshots', () => {
 
       expect(result.stderr).toBe('')
       expect(server.requests).toHaveLength(1)
-      expect(server.requests[0]?.max_tokens).toBe(256_000)
+      // No output cap is configured in this fixture: preserve the provider's
+      // default by omitting max_tokens from the wire request.
+      expect(server.requests[0]).not.toHaveProperty('max_tokens')
       expect(server.requests[0]?.reasoning_effort).toBe('low')
       const header = (parseJsonl(result.stdout)
         .map(record => record.event)
@@ -458,14 +460,12 @@ describe('headless stream-json snapshots', () => {
         ))?.data as JsonObject | undefined)?.header as JsonObject | undefined
       expect(header?.config).toMatchInlineSnapshot(`
         {
-          "maxTokens": 256000,
           "model": "deepseek-v4-flash",
           "provider": "deepseek-official",
           "reasoningEffort": "low",
         }
       `)
       expect(header?.adapterDefaults).toEqual({
-        maxTokens: true,
         reasoningEffort: true,
       })
     } finally {

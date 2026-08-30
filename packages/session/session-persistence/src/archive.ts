@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
+import type { SessionId } from '@deepseek-ai/dsh-session'
 import { canonicalArchiveJson } from './archive-json.ts'
 import type { SessionPersistenceRevision } from './revision.ts'
 
@@ -59,11 +59,11 @@ interface ArchiveToken {
  * @returns detached archive envelopes, including unknown event types.
  */
 export function snapshotArchiveEvents(
-  events: readonly SessionEvent[],
+  events: readonly unknown[],
   id: SessionId,
 ): SessionArchiveEvent[] {
   return events.map((event, index) => {
-    if (typeof event !== 'object' || event === null) {
+    if (typeof event !== 'object' || event === null || Array.isArray(event)) {
       throw new Error(`session "${id}" contains a non-object archival event at seq ${index}`)
     }
     const candidate = event as unknown as Record<string, unknown>

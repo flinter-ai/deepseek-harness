@@ -39,7 +39,7 @@ function snapshot(overrides: Partial<SessionArchiveSnapshot> = {}): SessionArchi
 describe('archive event validation and identity', () => {
   it('detaches unknown events without changing their logical shape', () => {
     const original = event()
-    const detached = snapshotArchiveEvents([original as unknown as SessionEvent], id)
+    const detached = snapshotArchiveEvents([original], id)
     expect(detached).toEqual([original])
     expect(detached[0]).not.toBe(original)
     expect(detached[0]!.data).not.toBe(original.data)

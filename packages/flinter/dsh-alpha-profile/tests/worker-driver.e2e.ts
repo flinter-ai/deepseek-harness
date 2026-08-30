@@ -48,7 +48,8 @@ describe('alpha worker driver process contract', () => {
   it('selects resume for a replacement attempt without creating a new session', async () => {
     const result = await run('resume', 1)
     expect(result.exitCode, result.stderr).toBe(0)
-    expect(JSON.parse(result.stdout).action).toBe('resume:s_process')
+    const payload = JSON.parse(result.stdout) as { action?: unknown }
+    expect(payload.action).toBe('resume:s_process')
   })
 
   it('propagates a missing-session resume failure and never falls back to create', async () => {

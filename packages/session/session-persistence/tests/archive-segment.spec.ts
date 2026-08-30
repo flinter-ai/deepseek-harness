@@ -109,6 +109,28 @@ describe('SessionEventArchiveSegmentV1', () => {
     })).toThrow(`archive payload exceeds ${MAX_SESSION_EVENT_ARCHIVE_PAYLOAD_BYTES} bytes`)
   })
 
+  it('rejects an encoded payload over the local capacity limit', () => {
+    const bytes = Buffer.alloc(MAX_SESSION_EVENT_ARCHIVE_PAYLOAD_BYTES + 1)
+    for (let offset = 0; offset < bytes.length; offset += 32) {
+      createHash('sha256').update(String(offset)).digest().copy(bytes, offset)
+    }
+    const incompressible = bytes.toString('base64')
+    expect(() => encodeSessionEventArchiveSegmentV1(
+      { ...snapshot, highWatermarkSeq: 0 },
+      [{ ...ARCHIVE_FIXTURE[0]!, data: { incompressible } }],
+    )).toThrow(`archive payload exceeds ${MAX_SESSION_EVENT_ARCHIVE_PAYLOAD_BYTES} bytes`)
+  })
+
+  it('rejects a payload that is not valid Zstandard', () => {
+    const payload = Buffer.from('not a zstandard frame', 'utf8')
+    const segment = encodeSessionEventArchiveSegmentV1({ ...snapshot, highWatermarkSeq: 0 }, [ARCHIVE_FIXTURE[0]!])
+    expect(() => decodeSessionEventArchiveSegmentV1({
+      ...segment,
+      payloadBase64: payload.toString('base64'),
+      payloadSha256: sha256(payload),
+    })).toThrow('archive payload is not valid Zstandard')
+  })
+
   it.each([
     ['gap', [{ ...ARCHIVE_FIXTURE[0]!, seq: 1 }]],
     ['overlap', [{ ...ARCHIVE_FIXTURE[0]!, seq: 0 }, { ...ARCHIVE_FIXTURE[1]!, seq: 0 }]],

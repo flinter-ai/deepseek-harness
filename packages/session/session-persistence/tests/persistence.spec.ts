@@ -532,6 +532,15 @@ describe('the archive snapshot seam', () => {
       await expect(
         ctx.sessionPersistence.readArchiveSnapshotPage(checkpoint!, -1, 10),
       ).rejects.toMatchObject({ code: 'STALE_SNAPSHOT' })
+
+      const deletedId = SessionId('archive-deleted-after-checkpoint')
+      await ctx.sessionPersistence.create(meta(deletedId))
+      await ctx.sessionPersistence.append(deletedId, oneTurnLog())
+      const deletedCheckpoint = await ctx.sessionPersistence.beginArchiveSnapshot(deletedId)
+      store.delete(deletedId)
+      await expect(
+        ctx.sessionPersistence.readArchiveSnapshotPage(deletedCheckpoint!, -1, 10),
+      ).rejects.toMatchObject({ code: 'STALE_SNAPSHOT' })
     } finally {
       await fiber.dispose()
       await ctx.fiber.dispose()

@@ -61,8 +61,8 @@ describe('Phase 1 local DSH_HOME rotation seam', () => {
   })
 
   it('covers every UTC hour in the script self-test', async () => {
-    await expect(execFileAsync('python3', [tod, '--selftest']))
-      .resolves.toMatchObject({ stdout: expect.stringContaining('24/24 UTC hours and 7 reasoning options covered') })
+    const result = await execFileAsync('python3', [tod, '--selftest'])
+    expect(result.stdout).toContain('24/24 UTC hours and 7 reasoning options covered')
   })
 
   it('removes known DSH credential exports from the launch child', async () => {
