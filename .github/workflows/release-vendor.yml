@@ -2,15 +2,11 @@
 # packages under vendor/, each on its own version line. This sequence releases
 # independently of dsh and of the native packages.
 #
-# Pack runs without credentials on every pull request and master push.
-# Publication is a manual dispatch from a vendor-* tag; a vendor release can
-# carry several versions, so each package has its own tag.
+# Pack and publication are manual-only. Pull requests use ci-minimal.yml and do
+# not run release or registry work.
 name: Release (vendor)
 
 on:
-  pull_request:
-  push:
-    branches: [master]
   workflow_dispatch:
     inputs:
       publish:
