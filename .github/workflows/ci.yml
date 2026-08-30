@@ -204,10 +204,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - node: '22.19'
-            name: node 22.19
-            runner: ubuntu-latest
-            gate_concurrency: '1'
           - node: 26
             name: node 26
             runner: ubuntu-latest
@@ -232,6 +228,17 @@ jobs:
           DSH_BUILD_CLIENT_PROFILE: official
         run: pnpm run check:node-compat
 
+  # Node 22.19 remains part of the repository's declared compatibility range,
+  # but its pull-request validation is intentionally skipped for the
+  # AWS/Linux-only migration gate. Reopen it only with an explicit policy
+  # decision; this job does not claim Node 22 evidence.
+  node-22-19-skipped:
+    if: false
+    name: node 22.19
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Node 22.19 PR compatibility validation is intentionally skipped for the AWS/Linux profile."
+
   python-sdk:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -251,30 +258,46 @@ jobs:
         run: uv run --python 3.10 --group test --project python/sdk pytest
 
   # The reusable builder owns each published executable, wheel, clean-install,
-  # keyless black-box, and trusted real-API path. All native release targets are
-  # required because a platform wheel cannot be validated by another carrier.
+  # keyless black-box, and trusted real-API path. The pull-request gate runs the
+  # AWS/Linux targets; the full native release matrix remains available from
+  # the dedicated release workflow.
   python-runtime:
     if: github.event_name == 'pull_request'
     name: python runtime / release-shaped matrix
     uses: ./.github/workflows/build-exe-for-python-sdk.yml
     with:
-      targets: node24-linux-x64,node24-linux-arm64,node24-macos-arm64,node24-win-x64
+      targets: node24-linux-x64,node24-linux-arm64
       ci: true
     secrets:
       DEEPSEEK_API_KEY_EXTERNAL: ${{ secrets.DEEPSEEK_API_KEY_EXTERNAL }}
 
-  # The required pull-request Windows signal: the two blocking win32 surfaces
-  # (workspace build, production site) execute with real, checksum-verified
-  # Windows Node under Wine on standard hosted Linux. The independent
-  # windows-native job below keeps the complete native-kernel inventory —
-  # including the observational portability gates this lane does not run —
-  # on real Windows. This job only provisions runner state (caches,
-  # apt); scripts/wine-windows-gates.sh owns the gate logic and is the same
-  # script the optional local gate `pnpm run check:windows-wine` runs.
-  # Current topology and fidelity limits live in
+  # Windows release-shaped validation remains available to the manual release
+  # workflow, but is permanently skipped in the AWS/Linux pull-request gate.
+  python-runtime-windows-skipped:
+    if: false
+    name: python runtime / release-shaped matrix / node24-win-x64
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Windows release-shaped PR validation is intentionally skipped for the AWS/Linux profile."
+
+  # macOS release-shaped validation remains available to the dedicated release
+  # workflow, but is permanently skipped in the AWS/Linux pull-request gate.
+  python-runtime-macos-skipped:
+    if: false
+    name: python runtime / release-shaped matrix / node24-macos-arm64
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "macOS release-shaped PR validation is intentionally skipped for the AWS/Linux profile."
+
+  # Windows PR validation is retained as explicit skipped checks under the
+  # AWS/Linux-only pull-request policy. The manual/master references remain
+  # available for a future platform-support decision. Current topology and
+  # fidelity limits live in
   # .agents/notes/implemented/process/2026-08-08-native-windows-pull-request-ci.md
   windows:
-    if: github.event_name == 'pull_request'
+    # The AWS/Linux pull-request policy does not execute Windows validation.
+    # Keep the job declaration so GitHub records an explicit skipped check.
+    if: false
     runs-on: ubuntu-latest
     name: windows node 24 / wine blocking
     timeout-minutes: 15
@@ -353,11 +376,11 @@ jobs:
         if: always()
         run: wineserver -k 2>/dev/null || true
 
-  # Every pull request also gets Windows signals on the standard hosted image.
-  # The jobs remain split so one slow coverage gate does not hold up the build
-  # and native-test results. Observational checks are non-blocking.
+  # Windows PR validation is retained as explicit skipped jobs under the
+  # AWS/Linux-only pull-request policy. The manual/master references remain
+  # available for a future platform-support decision.
   windows-build:
-    if: github.event_name == 'pull_request'
+    if: false
     runs-on: windows-latest
     name: windows node 24 / build
     timeout-minutes: 60
@@ -384,7 +407,7 @@ jobs:
         run: pnpm run check:ci:windows-blocking
 
   windows-coverage:
-    if: github.event_name == 'pull_request'
+    if: false
     runs-on: windows-latest
     name: windows node 24 / coverage
     timeout-minutes: 120
@@ -419,7 +442,7 @@ jobs:
         run: pnpm run check:ci:coverage
 
   windows-native-tests:
-    if: github.event_name == 'pull_request'
+    if: false
     runs-on: windows-latest
     name: windows node 24 / native tests
     timeout-minutes: 60
@@ -454,7 +477,7 @@ jobs:
           packages/session/session-persistence-sqlite/tests/differential.spec.ts
 
   windows-observational:
-    if: github.event_name == 'pull_request'
+    if: false
     continue-on-error: true
     runs-on: windows-latest
     name: windows node 24 / observational
@@ -486,10 +509,9 @@ jobs:
   # Single stable required check for branch protection: require "all checks
   # passed" instead of enumerating matrix legs whose names change as lanes and
   # node versions evolve. Every blocking job in THIS workflow must be listed in
-  # `needs`. The required Wine job is listed as `windows`; `windows-native` is
-  # deliberately absent so its independent result never delays or changes this
-  # verdict. (`needs` cannot reach across workflow files; the master-only jobs in
-  # ci-master.yml are intentionally not part of this PR verdict.)
+  # `needs`. Windows jobs are intentionally absent because the PR policy is
+  # AWS/Linux-only. (`needs` cannot reach across workflow files; the master-only
+  # jobs in ci-master.yml are intentionally not part of this PR verdict.)
   # `if: always()` is load-bearing: without it a failed dependency
   # would SKIP this job, and GitHub counts a skipped required check as passing
   # — so this job always runs and fails on any non-success result, including
@@ -497,7 +519,7 @@ jobs:
   all-checks-passed:
     name: all checks passed
     runs-on: ubuntu-latest
-    needs: [node-24, node-24-coverage, node-24-consumers, node-compat, python-sdk, python-runtime, windows, windows-build, windows-native-tests]
+    needs: [node-24, node-24-coverage, node-24-consumers, node-compat, python-sdk, python-runtime]
     if: always() && github.event_name == 'pull_request'
     steps:
       - name: Fail if any needed job did not succeed

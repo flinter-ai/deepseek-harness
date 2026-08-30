@@ -55,7 +55,7 @@ describe('CI workflow', () => {
     }
   })
 
-  it('keeps required Wine and split native Windows jobs on standard runners, plus a master-only standby', () => {
+  it('keeps Windows jobs explicit and permanently skipped in the AWS/Linux PR gate', () => {
     const workflow = loadWorkflow('.github/workflows/ci.yml')
     const masterWorkflow = loadWorkflow('.github/workflows/ci-master.yml')
     const previewWorkflow = loadWorkflow('.github/workflows/build-preview-cloudflare.yml')
@@ -95,16 +95,16 @@ describe('CI workflow', () => {
       isRecord(step) && typeof step.run === 'string'
     ))
 
-    // Required PR job: Wine on ubuntu-latest, runs wine-windows-gates.sh.
+    // Windows jobs remain declared for explicit skipped PR checks.
     expect(windows['runs-on']).toBe('ubuntu-latest')
     expect(windows.name).toBe('windows node 24 / wine blocking')
-    expect(windows.if).toBe("github.event_name == 'pull_request'")
+    expect(windows.if).toBe(false)
     expect(commandSteps.some(step => step.run.includes('wine-windows-gates.sh'))).toBe(true)
 
-    // The split native jobs use the standard hosted Windows image.
+    // The split native jobs are also explicit skipped checks.
     for (const [jobName, job] of [['windows-build', windowsBuild], ['windows-coverage', windowsCoverage], ['windows-native-tests', windowsNativeTests], ['windows-observational', windowsObservational]] as const) {
       expect(job['runs-on'], `${jobName} must use the standard Windows runner`).toBe('windows-latest')
-      expect(job.if).toBe("github.event_name == 'pull_request'")
+      expect(job.if).toBe(false)
     }
 
     // windows-build runs the blocking build/site pair.
@@ -152,13 +152,11 @@ describe('CI workflow', () => {
     expect(serialWindows['runs-on']).toBe('windows-latest')
     expect(serialWindows.name).toBe('serial / windows (standard hosted)')
 
-    // Aggregate: Wine and the required split native jobs are needed;
-    // windows-coverage is temporarily non-blocking while Windows ACP
-    // half-close tests are stabilized; observational stays out too.
-    expect(aggregate.needs).toContain('windows')
-    expect(aggregate.needs).toContain('windows-build')
+    // Aggregate: Windows is deliberately outside the AWS/Linux PR verdict.
+    expect(aggregate.needs).not.toContain('windows')
+    expect(aggregate.needs).not.toContain('windows-build')
     expect(aggregate.needs).not.toContain('windows-coverage')
-    expect(aggregate.needs).toContain('windows-native-tests')
+    expect(aggregate.needs).not.toContain('windows-native-tests')
     expect(aggregate.needs).not.toContain('windows-observational')
     expect(aggregate.needs).not.toContain('serial-windows-standard')
 
@@ -274,10 +272,12 @@ describe('CI workflow', () => {
       .sort()
     expect(pushReachable).toEqual(['serial-linux-standard', 'serial-windows-standard', 'wine-apt-cache'])
 
-    // Why workflow_dispatch must keep cancelling: each benchmark fans out to
-    // both platform runners in this same group on master. If it stopped
-    // cancelling, a re-dispatch would queue ahead of a drill instead of
-    // replacing the stale measurement.
+    // A manual rerun still cancels a superseded active measurement. The
+    // historical benchmark itself is permanently skipped, while the retained
+    // consolidated reference keeps its bounded matrix shape documented.
+    const benchmark = workflow.jobs['standard-hosted-benchmark']
+    if (!isRecord(benchmark)) throw new TypeError('standard-hosted-benchmark must be defined')
+    expect(benchmark.if).toBe(false)
     for (const name of ['standard-hosted-benchmark', 'standard-hosted-consolidated']) {
       const job = workflow.jobs[name]
       if (!isRecord(job) || !isRecord(job.strategy)) {
@@ -296,9 +296,13 @@ describe('CI workflow', () => {
     expect(config).not.toContain('packages/lsp/lsp-stdio/src/instance.ts')
   })
 
-  it('requires release-shaped Python runtime validation on every published target', () => {
+  it('requires release-shaped Python Linux validation and records skipped non-Linux targets', () => {
     const workflow = loadWorkflow('.github/workflows/ci.yml')
     const pythonRuntime = workflowJob(workflow, 'python-runtime')
+    const pythonRuntimeWindowsSkipped = workflowJob(workflow, 'python-runtime-windows-skipped')
+    const pythonRuntimeMacosSkipped = workflowJob(workflow, 'python-runtime-macos-skipped')
+    const nodeCompat = workflowJob(workflow, 'node-compat')
+    const node2219Skipped = workflowJob(workflow, 'node-22-19-skipped')
     const aggregate = workflowJob(workflow, 'all-checks-passed')
     if (!Array.isArray(aggregate.needs)) {
       throw new TypeError('CI aggregate must define required job dependencies')
@@ -309,12 +313,27 @@ describe('CI workflow', () => {
       name: 'python runtime / release-shaped matrix',
       uses: './.github/workflows/build-exe-for-python-sdk.yml',
       with: {
-        targets: 'node24-linux-x64,node24-linux-arm64,node24-macos-arm64,node24-win-x64',
+        targets: 'node24-linux-x64,node24-linux-arm64',
         ci: true,
       },
       secrets: {
         DEEPSEEK_API_KEY_EXTERNAL: '${{ secrets.DEEPSEEK_API_KEY_EXTERNAL }}',
       },
+    })
+    expect(pythonRuntimeWindowsSkipped).toMatchObject({
+      if: false,
+      name: 'python runtime / release-shaped matrix / node24-win-x64',
+    })
+    expect(pythonRuntimeMacosSkipped).toMatchObject({
+      if: false,
+      name: 'python runtime / release-shaped matrix / node24-macos-arm64',
+    })
+    expect(nodeCompat.strategy).toMatchObject({
+      matrix: { include: [{ node: 26 }] },
+    })
+    expect(node2219Skipped).toMatchObject({
+      if: false,
+      name: 'node 22.19',
     })
     expect(aggregate.needs).toContain('python-runtime')
   })

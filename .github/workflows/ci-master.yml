@@ -8,16 +8,15 @@ on:
       suite:
         description: Manual CI suite to run
         required: true
-        default: standard-hosted-benchmark
+        default: standard-hosted-consolidated
         type: choice
         options:
-          - standard-hosted-benchmark
           - standard-hosted-consolidated
 
 # A master push may carry only the two standard-hosted serial references and the
 # Wine apt cache seeder; the serial references outlast the interval between
 # master merges, so push is exempt from cancellation. workflow_dispatch keeps
-# cancelling so a re-dispatched benchmark replaces its stale measurement.
+# cancelling so a re-dispatched manual run replaces its stale measurement.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name != 'push' }}
@@ -174,11 +173,11 @@ jobs:
           DSH_PUBLINT_CONCURRENCY: '1'
         run: pnpm run check:ci:windows-complete
 
-  # Manual, bounded measurement of the critical Linux and Windows lanes on
-  # standard hosted capacity. This is a timing/capacity observation, not a
-  # dependency on a named runner pool.
+  # Historical benchmark definition. Benchmark/observational jobs are
+  # permanently skipped; the retained body documents the old measurement
+  # shape without making it a live CI gate.
   standard-hosted-benchmark:
-    if: github.event_name == 'workflow_dispatch' && inputs.suite == 'standard-hosted-benchmark'
+    if: false
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     strategy:

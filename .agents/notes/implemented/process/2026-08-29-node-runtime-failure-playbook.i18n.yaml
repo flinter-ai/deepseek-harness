@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-29-node-runtime-failure-playbook.md
-2026-08-29-node-runtime-failure-playbook.md: fe3320f5a492e20d41c387a45293af657ac631b1
-2026-08-29-node-runtime-failure-playbook.zh.md: 5eab9ace5071e44160babd823f47b5379b58e7bc
+2026-08-29-node-runtime-failure-playbook.md: 8a763aae36a2047a108a8c4c398bd7513d9feeaf
+2026-08-29-node-runtime-failure-playbook.zh.md: e1e1c65a725b1be3adaa970db9a6fe830e14755f
