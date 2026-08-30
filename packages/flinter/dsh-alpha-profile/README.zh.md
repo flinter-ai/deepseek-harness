@@ -9,7 +9,7 @@ kind: "package-library"
 
 ## 概述
 
-`@deepseek-ai/dsh-alpha-profile` 是固定 DeepSeek Harness alpha 之上的 FLINTER 设置与 worker 启动层。它描述 ARK、Modelflare、GMI Serving 以及 direct DeepSeek 的路由引用，记录模型级上下文与输出容量，提供可选择的 reasoning 等级，并把控制平面 worker attempt 绑定到一个 DSH session 与持久化根目录。agent loop、Session/event codec、提供方构建、凭据解析与工具运行时仍由 DSH 负责。
+`@deepseek-ai/dsh-alpha-profile` 是固定 DeepSeek Harness alpha 之上的公开 FLINTER 设置与 worker 启动层。它描述 ARK、Modelflare、GMI Serving 以及 direct DeepSeek 的路由引用，记录模型级上下文与输出容量，提供可选择的 reasoning 等级，并把控制平面 worker attempt 绑定到一个 DSH session 与持久化根目录。agent loop、Session/event codec、提供方构建、凭据解析与工具运行时仍由 DSH 负责。
 
 ## 目录
 
@@ -35,8 +35,14 @@ kind: "package-library"
 - 其他时间的轮换路由是 Modelflare。
 - GMI Serving 只允许显式选择，不参加自动轮换。
 - Direct DeepSeek 仍是独立的 `dsh-llm-deepseek` 路由。
-- AWS 通过同一凭据引用消费 alpha-compatible provider seam；本包不读取或同步 AWS secrets。
+- AWS 通过公开的 `@deepseek-ai/dsh-credentials-aws-secrets-manager` provider seam 消费同一凭据引用；本包不读取或同步 AWS secrets。
 - Agent Teams、Runta、Beam、Tower 与控制平面仍是独立能力。
+
+## 一个 Harness、两个凭据后端
+
+`buildFlinterProfileComposition('tod')` 和 `buildFlinterProfileComposition('aws-worker')` 描述相同的 `dsh-base` 加 `dsh-headless` 组合。AWS 版本只替换 `ctx.credentials` provider 行，并提供公开的引用到 secret 名称映射。它不会创建第二套 DSH 安装、agent loop、Session codec 或 provider catalog。
+
+本地 `tod` launcher 仍是 source checkout 的便利封装。AWS worker profile 是后续部署 probe 使用的精简只读 overlay；它不是部署清单，也不包含账户或 secret 材料。
 
 <a id="model-experience"></a>
 ## 模型体验
@@ -74,7 +80,7 @@ kind: "package-library"
 
 - **配置不能证明真实提供方容量**——mock endpoint 只验证形状与选择；付费提供方调用与 AWS 部署属于独立证据 gate。
 - **当前路由目录有意保持精简**——增加模型或 reasoning 等级需要明确的 endpoint 验证与 profile review。
-- **worker、AWS 与下游迁移仍延期**——本包不扩展 Session codec，也不实现 lease、fencing、callback、retry、真实 Secrets Manager 或 trace-link 等职责。
+- **真实 AWS 与下游迁移仍延期**——本包不扩展 Session codec，也不实现真实 AWS 部署或 trace-link；公开 AWS provider 只在 Phase 1 使用 mock 证据。
 
 <a id="dev-note"></a>
 ### 开发备注

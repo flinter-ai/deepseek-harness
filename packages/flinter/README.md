@@ -16,6 +16,7 @@ The `flinter/` group contains FLINTER-owned composition layers over the pinned D
 | Package | Role | Status |
 |---|---|---|
 | [`dsh-alpha-profile/`](dsh-alpha-profile/README.md) | Phase 1 provider/profile and control-plane worker seam over alpha | active Phase 1 implementation |
+| [`dsh-aws-worker-profile/`](dsh-aws-worker-profile/README.md) | Public read-only AWS credential overlay over the shared alpha bundles | Phase 1 compatibility seam; mock-tested |
 
 Future package rows are added only when their own component and local E2E gates are accepted.
 

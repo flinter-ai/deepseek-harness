@@ -28,6 +28,7 @@ kind: "package-group"
 |---|---|---|
 | [`credentials/`](credentials/README.zh.md) | 在运行时存储、查询与移除机密，而配置只写名字 | `ctx.credentials` |
 | [`credentials-local/`](credentials-local/README.zh.md) | 默认本机存储：一个私有 YAML 文件，环境覆盖优先 | 注册 `ctx.credentials` |
+| [`dsh-credentials-aws-secrets-manager/`](dsh-credentials-aws-secrets-manager/README.zh.md) | 公开 AWS Secrets Manager 引用 provider，默认只读 | 在 AWS profile 中注册 `ctx.credentials` |
 | [`authorization/`](authorization/README.zh.md) | 由插件拥有、通过询问人来取得凭据的 flow | `ctx.authorization` |
 
 -----

@@ -228,3 +228,85 @@ export const DIRECT_DEEPSEEK_ROUTE = Object.freeze({
   model: 'deepseek-v4-flash',
   apiKeyEnv: FLINTER_CREDENTIAL_REFS.deepseekOfficial,
 } as const)
+
+/**
+ * Credential backend selected by a profile. Both backends serve the same
+ * DSH credential-reference seam; only the value source changes.
+ */
+export type FlinterCredentialBackend = 'local' | 'aws-secrets-manager'
+
+/** Public profile names used by the alpha migration. */
+export type FlinterProfileName = 'tod' | 'aws-worker'
+
+/** A serializable Cordis patch row used by the AWS profile overlay. */
+export type FlinterProfilePatch =
+  | Readonly<{ id: 'credentials'; disabled: true }>
+  | Readonly<{
+    insert: readonly [{
+      readonly id: 'credentials-aws-secrets-manager'
+      readonly name: '@deepseek-ai/dsh-credentials-aws-secrets-manager'
+      readonly config: Readonly<{
+        readonly secretNames: Readonly<Record<string, string>>
+        readonly secretFormat: 'json'
+        readonly allowWrites: false
+      }>
+    }]
+  }>
+
+/** One public profile composition over the single DSH alpha installation. */
+export interface FlinterProfileComposition {
+  readonly name: FlinterProfileName
+  readonly bundles: readonly ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless']
+  readonly credentialBackend: FlinterCredentialBackend
+  readonly credentialPackage:
+    | '@deepseek-ai/dsh-credentials-local'
+    | '@deepseek-ai/dsh-credentials-aws-secrets-manager'
+  /** Empty for local; the AWS overlay replaces the base credential row. */
+  readonly patches: readonly FlinterProfilePatch[]
+}
+
+/**
+ * Build the public profile composition for one execution environment.
+ *
+ * This returns metadata only. It does not boot DSH, contact a provider, read
+ * AWS, or contain a credential value. The AWS profile remains one thin patch
+ * over the same base/headless DSH bundles used by local `tod`.
+ */
+export function buildFlinterProfileComposition(
+  name: FlinterProfileName,
+): FlinterProfileComposition {
+  const bundles: FlinterProfileComposition['bundles'] = [
+    '@deepseek-ai/dsh-base',
+    '@deepseek-ai/dsh-headless',
+  ]
+  if (name === 'tod') {
+    return Object.freeze({
+      name,
+      bundles,
+      credentialBackend: 'local',
+      credentialPackage: '@deepseek-ai/dsh-credentials-local',
+      patches: Object.freeze([]),
+    })
+  }
+  const patches: FlinterProfilePatch[] = [
+    Object.freeze({ id: 'credentials', disabled: true }),
+    Object.freeze({
+      insert: [Object.freeze({
+        id: 'credentials-aws-secrets-manager',
+        name: '@deepseek-ai/dsh-credentials-aws-secrets-manager',
+        config: Object.freeze({
+          secretNames: FLINTER_AWS_SECRET_NAMES,
+          secretFormat: 'json',
+          allowWrites: false,
+        }),
+      })] as const,
+    }),
+  ]
+  return Object.freeze({
+    name,
+    bundles,
+    credentialBackend: 'aws-secrets-manager',
+    credentialPackage: '@deepseek-ai/dsh-credentials-aws-secrets-manager',
+    patches: Object.freeze(patches),
+  })
+}

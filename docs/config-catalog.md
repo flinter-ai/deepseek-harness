@@ -566,6 +566,30 @@ export interface Config {
 
 Source: [`packages/extensions/cordis-host-runner/src/index.ts:88`](../packages/extensions/cordis-host-runner/src/index.ts)
 
+<a id="deepseek-aidsh-credentials-aws-secrets-manager"></a>
+
+## `@deepseek-ai/dsh-credentials-aws-secrets-manager`
+
+```ts config-catalog
+/** Plugin configuration. All fields are public routing metadata, never secret values. */
+export interface Config {
+  /** AWS region; omitted means the standard AWS SDK region chain. */
+  region?: string
+  /** Optional default prefix for references not present in `secretNames`. */
+  secretPrefix?: string
+  /** Explicit reference-to-secret-name mapping for deployment-owned names. */
+  secretNames?: Readonly<Record<string, string>>
+  /** Secret payload shape. JSON is the recommended shape for named references. */
+  secretFormat?: 'plain' | 'json'
+  /** JSON property carrying the value; defaults to the reference name. */
+  jsonField?: string
+  /** Writes are opt-in and should remain false for the Phase 1 worker profile. */
+  allowWrites?: boolean
+}
+```
+
+Source: [`packages/credentials/dsh-credentials-aws-secrets-manager/src/index.ts:35`](../packages/credentials/dsh-credentials-aws-secrets-manager/src/index.ts)
+
 <a id="deepseek-aidsh-credentials-local"></a>
 
 ## `@deepseek-ai/dsh-credentials-local`
@@ -3509,6 +3533,7 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 - `@deepseek-ai/dsh-anonymous-user-id` ([`packages/identity/anonymous-user-id/src/index.ts`](../packages/identity/anonymous-user-id/src/index.ts))
 - `@deepseek-ai/dsh-app-boot` ([`packages/boot/app-boot/src/index.ts`](../packages/boot/app-boot/src/index.ts))
 - `@deepseek-ai/dsh-atomic-write` ([`packages/util/atomic-write/src/index.ts`](../packages/util/atomic-write/src/index.ts))
+- `@deepseek-ai/dsh-aws-worker-profile` ([`packages/flinter/dsh-aws-worker-profile/src/index.ts`](../packages/flinter/dsh-aws-worker-profile/src/index.ts))
 - `@deepseek-ai/dsh-base` ([`packages/bundle/base/src/index.ts`](../packages/bundle/base/src/index.ts))
 - `@deepseek-ai/dsh-brand` ([`packages/util/brand/src/index.ts`](../packages/util/brand/src/index.ts))
 - `@deepseek-ai/dsh-client-store` ([`packages/client/store/src/index.ts`](../packages/client/store/src/index.ts))

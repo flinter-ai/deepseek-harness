@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   bindFreshSession,
   buildFlinterProviderSettings,
+  buildFlinterProfileComposition,
   DIRECT_DEEPSEEK_ROUTE,
   FLINTER_AWS_SECRET_NAMES,
   FLINTER_CREDENTIAL_REFS,
@@ -83,5 +84,30 @@ describe('FLINTER alpha provider/profile layer', () => {
       model: 'deepseek-v4-flash',
       apiKeyEnv: 'DEEPSEEK_API_KEY',
     })
+  })
+
+  it('uses one DSH base/headless composition with only the credential backend swapped', () => {
+    const local = buildFlinterProfileComposition('tod')
+    const aws = buildFlinterProfileComposition('aws-worker')
+    expect(local.bundles).toEqual(['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless'])
+    expect(aws.bundles).toEqual(local.bundles)
+    expect(local.credentialPackage).toBe('@deepseek-ai/dsh-credentials-local')
+    expect(local.patches).toEqual([])
+    expect(aws.credentialPackage).toBe('@deepseek-ai/dsh-credentials-aws-secrets-manager')
+    expect(aws.patches).toMatchObject([
+      { id: 'credentials', disabled: true },
+      {
+        insert: [{
+          id: 'credentials-aws-secrets-manager',
+          name: '@deepseek-ai/dsh-credentials-aws-secrets-manager',
+          config: {
+            secretFormat: 'json',
+            allowWrites: false,
+            secretNames: FLINTER_AWS_SECRET_NAMES,
+          },
+        }],
+      },
+    ])
+    expect(JSON.stringify(aws)).not.toMatch(/(?:api[_-]?key|secret|token)\s*[:=]\s*[^,}]+/i)
   })
 })

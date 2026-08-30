@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`@deepseek-ai/dsh-alpha-profile` is the FLINTER-owned settings, worker-launch, and non-Orca attempt-safety layer over the pinned DeepSeek Harness alpha. It describes ARK, Modelflare, GMI Serving, and direct DeepSeek route references; records model-level context and output capacities; exposes selectable reasoning levels; binds a worker attempt to one DSH session and durable root; and provides fresh attempt roots, secret-free manifests, fencing, and canary checks. DSH remains the owner of the agent loop, session/event codec, provider construction, credential resolution, and tool runtime.
+`@deepseek-ai/dsh-alpha-profile` is the public FLINTER-owned settings, worker-launch, and non-Orca attempt-safety layer over the pinned DeepSeek Harness alpha. It describes ARK, Modelflare, GMI Serving, and direct DeepSeek route references; records model-level context and output capacities; exposes selectable reasoning levels; binds a worker attempt to one DSH session and durable root; and provides fresh attempt roots, secret-free manifests, fencing, and canary checks. DSH remains the owner of the agent loop, session/event codec, provider construction, credential resolution, and tool runtime.
 
 ## Table of Contents
 
@@ -33,8 +33,14 @@ Use the profile when a host needs FLINTER's provider settings or needs to launch
 - Modelflare is the rotation route outside that window.
 - GMI Serving is explicit-only; it is not automatic rotation.
 - Direct DeepSeek remains the separate `dsh-llm-deepseek` route.
-- AWS integration consumes the same credential references through an alpha-compatible provider seam; this package does not read or synchronize AWS secrets.
+- AWS integration consumes the same credential references through the public `@deepseek-ai/dsh-credentials-aws-secrets-manager` provider seam; this package does not read or synchronize AWS secrets.
 - Agent Teams, Runta, Beam, Tower, and the control plane remain separate capabilities.
+
+## One harness, two credential backends
+
+`buildFlinterProfileComposition('tod')` and `buildFlinterProfileComposition('aws-worker')` describe the same `dsh-base` plus `dsh-headless` composition. The AWS variant changes only the `ctx.credentials` provider row and supplies public reference-to-secret-name mappings. It does not create a second DSH installation, agent loop, session codec, or provider catalog.
+
+The local `tod` launcher remains the source-checkout convenience wrapper. The AWS worker profile is a thin, read-only overlay for a later deployment probe; it is not a deployment manifest and does not contain account or secret material.
 
 ## Model Experience
 

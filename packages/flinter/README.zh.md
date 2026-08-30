@@ -16,6 +16,7 @@ kind: "package-group"
 | 包 | 职责 | 状态 |
 |---|---|---|
 | [`dsh-alpha-profile/`](dsh-alpha-profile/README.zh.md) | alpha 之上的 Phase 1 提供方/profile 与控制平面 worker seam | Phase 1 实现中 |
+| [`dsh-aws-worker-profile/`](dsh-aws-worker-profile/README.zh.md) | 共享 alpha bundle 之上的公开只读 AWS 凭据 overlay | Phase 1 兼容 seam；已完成 mock 测试 |
 
 只有在其组件测试与本地 E2E gate 被接受后，才添加后续包。
 
