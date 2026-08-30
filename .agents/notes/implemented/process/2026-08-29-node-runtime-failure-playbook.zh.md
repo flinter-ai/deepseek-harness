@@ -24,6 +24,17 @@ Status: implemented
 | Hosted runner 排队、provider 中断、缺少 secret 或平台专属失败 | P1 | 不是本地 hook 修复项 | 分类为 CI/环境证据，有理由才重跑，并保留失败记录 |
 | 无关的 flaky 或资源竞争失败 | P2 | 不在 hook 中隐藏 | 隔离重跑，诚实记录 `NOT_RUN`、`BLOCKED` 或 `FAIL` |
 
+## Pull-request check importance
+
+“Non-blocking” 表示该检查不应阻止代码变更合并；不表示可以静默跳过底层测试。检查仍需可见，失败时仍需调查。
+
+| 类别 | 检查 | 合并处理 |
+| --- | --- | --- |
+| Non-blocking / informational | Cloudflare preview 构建已通过但上传凭据缺失时的上传步骤；没有 provider secret 的 fork PR real-provider E2E；观察性和 benchmark job | 记录结果，不将其设为合并阻塞项。不要把跳过的 E2E 称为 provider 通过。 |
+| Important / blocking | Node 24 static、coverage、snapshots/artifacts；Node 22.19 和 Node 26 兼容性；Windows build/native/coverage；Python contract checks；aggregate verdict | 必须通过，或有明确且经过审查的基础设施例外。不能仅因耗时长就跳过。 |
+| Current exception | Windows native test job：四个文件通过，但 `workflow-worker-thread` 的 Vitest worker 意外退出 | 在隔离重跑证明是平台 flaky，或负责人记录明确策略决定前，继续作为阻塞项。 |
+| Local hook scope | 运行时检查、暂存 lint、空白、翻译配对、vendor manifest；pre-push typecheck | Hook 保留便宜且确定的检查。本地 hook 不运行完整 coverage、snapshots、provider E2E 或云部署。 |
+
 ## Standard local sequence
 
 1. 运行 `node -v`，确认可执行文件满足根目录的 `engines.node` 范围。
