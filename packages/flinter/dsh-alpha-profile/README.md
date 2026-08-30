@@ -18,7 +18,6 @@ English | [中文](README.zh.md)
 - [Model Experience](#model-experience)
 - [Attempt safety](#attempt-safety)
 - [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 

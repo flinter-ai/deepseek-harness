@@ -18,7 +18,6 @@ kind: "package-library"
 - [模型体验](#model-experience)
 - [Attempt safety](#attempt-safety)
 - [实现说明](#understand-the-implementation)
-- [进一步阅读](#further-exploration)
 - [已知限制与延期工作](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
 
@@ -83,7 +82,7 @@ kind: "package-library"
 <details>
 <summary>维护者工作上下文——点击展开</summary>
 
-本开发备注是维护者工作上下文，记录开放问题与延期方向，不是权威规范；已发布行为与限制以本页前文和包代码为准。
+本开发备注是维护者工作上下文，记录开放问题与延期方向，不是权威规范；已发布行为与限制以本页前文和包代码为准。Attempt 与 lifecycle safety 的验收测试见 [tests/attempt.spec.ts](tests/attempt.spec.ts) 和 [tests/lifecycle.spec.ts](tests/lifecycle.spec.ts)。
 
 #### 未来：更丰富的路由能力协商
 
