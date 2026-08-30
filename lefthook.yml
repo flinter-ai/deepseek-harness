@@ -4,6 +4,9 @@
 
 pre-commit:
   jobs:
+    - name: supported Node runtime
+      run: node scripts/verify-node-runtime.mjs
+
     - name: translation pairing (staged records)
       glob: '*.i18n.yaml'
       exclude:
@@ -51,5 +54,8 @@ pre-merge-commit:
 
 pre-push:
   jobs:
+    - name: supported Node runtime
+      run: node scripts/verify-node-runtime.mjs
+
     - name: typecheck
       run: pnpm run typecheck
