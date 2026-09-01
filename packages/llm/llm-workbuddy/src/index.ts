@@ -4,6 +4,7 @@ import { assertUsableApiKey, LlmError } from '@deepseek-ai/dsh-llm'
 import type { LlmConfigurableProvider } from '@deepseek-ai/dsh-llm'
 import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
 import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
+import { authContextFrom, credentialStoreFrom } from '@deepseek-ai/dsh-llm-pi-ai/auth-seam'
 import { resolveProfiles } from '@deepseek-ai/dsh-llm-pi-ai/profile'
 import type { ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai/profile'
 import {
@@ -62,6 +63,7 @@ export function apply(ctx: Context, config: WorkbuddyConfig): void {
 
   const adapter = new PiAiAdapter({
     profiles,
+    auth: { credentials: credentialStoreFrom(ctx), authContext: authContextFrom(ctx) },
     resolveApiKey,
     resolveAttachments: () => ctx.get('attachments'),
     onReplayDegrade: ({ provider, model, reason }) => {

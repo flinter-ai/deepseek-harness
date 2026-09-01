@@ -22,6 +22,10 @@
       "types": "./lib/types/invariant.d.ts",
       "default": "./lib/invariant.js"
     },
+    "./auth-seam": {
+      "types": "./lib/types/auth-seam.d.ts",
+      "default": "./lib/types/auth-seam.js"
+    },
     "./profile": {
       "types": "./lib/types/profile.d.ts",
       "default": "./lib/types/profile.js"
