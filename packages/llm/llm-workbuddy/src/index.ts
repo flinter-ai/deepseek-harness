@@ -3,8 +3,9 @@ import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
 import { assertUsableApiKey, LlmError } from '@deepseek-ai/dsh-llm'
 import type { LlmConfigurableProvider } from '@deepseek-ai/dsh-llm'
 import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
-import { PiAiAdapter, resolveProfiles } from '@deepseek-ai/dsh-llm-pi-ai'
-import type { ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
+import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
+import { resolveProfiles } from '@deepseek-ai/dsh-llm-pi-ai/profile'
+import type { ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai/profile'
 import {
   buildWorkbuddyProfile, Config, DEFAULT_DISPLAY_NAME, WORKBUDDY_PROVIDER,
 } from './config.ts'
