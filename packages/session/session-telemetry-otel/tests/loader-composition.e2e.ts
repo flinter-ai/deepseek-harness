@@ -23,7 +23,7 @@ const configPath = fileURLToPath(new URL(
 ))
 const repoTsconfig = fileURLToPath(new URL('../../../../tsconfig.json', import.meta.url))
 
-const FIXTURE_SECRET = 'sk-e2efixture1234567890'
+const FIXTURE_SECRET = 'sk-e2efixture1234567890' // gitleaks:allow — synthetic redaction fixture; never a credential
 const FIXTURE_PLACEHOLDER = '[E2E-REDACTED]'
 
 interface OtlpLogRecord {

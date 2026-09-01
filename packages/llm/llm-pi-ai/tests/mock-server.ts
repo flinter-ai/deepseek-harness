@@ -31,6 +31,7 @@ export async function mockServer(script: {
   events?: string[]
   body?: string
   delayMs?: number
+  stallAfterEvents?: number
   headers?: Record<string, string>
 }[]): Promise<MockServer> {
   const paths: string[] = []
@@ -58,6 +59,7 @@ export async function mockServer(script: {
       response.writeHead(200, { 'content-type': 'text/event-stream' })
       let index = 0
       const writeNext = (): void => {
+        if (behavior.stallAfterEvents !== undefined && index >= behavior.stallAfterEvents) return
         const event = behavior.events?.[index++]
         if (event === undefined) { response.end(); return }
         response.write(`data: ${event}\n\n`)
