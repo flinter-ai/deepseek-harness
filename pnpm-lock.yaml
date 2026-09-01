@@ -5441,9 +5441,6 @@ importers:
       '@deepseek-ai/dsh-credentials':
         specifier: workspace:^
         version: link:../../credentials/credentials
-      '@deepseek-ai/dsh-fs':
-        specifier: workspace:^
-        version: link:../../fs/fs
       '@deepseek-ai/dsh-launch-environment':
         specifier: workspace:^
         version: link:../../util/launch-environment
