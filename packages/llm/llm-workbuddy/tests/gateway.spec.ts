@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import LlmRuntime, { BlockAssembler, createUserMessage } from '@deepseek-ai/dsh-llm'
+import LlmRuntime, { BlockAssembler, createUserMessage, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import * as Workbuddy from '@deepseek-ai/dsh-llm-workbuddy'
 
 const contexts: Context[] = []
@@ -24,7 +24,8 @@ describe.skipIf(process.env.WORKBUDDY_LIVE_TEST !== '1' || !process.env.WORKBUDD
         content: [{ type: 'text', text: 'Reply with exactly pong.' }],
         source: { kind: 'plugin', plugin: 'workbuddy-live-test' },
       })],
-      maxTokens: 16,
+      reasoningEffort: ReasoningEffortId('off'),
+      maxTokens: 64,
     })) assembler.push(chunk)
 
     expect(assembler.finish.kind).toBe('stop')
