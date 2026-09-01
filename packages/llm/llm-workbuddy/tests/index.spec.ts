@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveProfiles } from '@deepseek-ai/dsh-llm-pi-ai'
+import { resolveProfiles } from '@deepseek-ai/dsh-llm-pi-ai/profile'
 import { apply as applyInvariant, name as invariantName } from '@deepseek-ai/dsh-llm-workbuddy/invariant'
 import {
   buildWorkbuddyProfile, DEFAULT_API_KEY_ENV, DEFAULT_BASE_URL, DEFAULT_DISPLAY_NAME,
