@@ -71,6 +71,11 @@ describe('web e2e: plugin configuration section', () => {
     return readFile(join(scaffold.harnessHome, 'settings.yaml'), 'utf8').catch(() => '')
   }
 
+  /** The credential document as the Host has written it so far. */
+  async function credentialsDocument(): Promise<string> {
+    return readFile(join(scaffold.harnessHome, '.credentials.yaml'), 'utf8').catch(() => '')
+  }
+
   it('shows one card per exposed host-plane namespace', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-plugin-config-cards'))
     const dialog = await openPlugins()
@@ -85,6 +90,40 @@ describe('web e2e: plugin configuration section', () => {
 
     const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(SECTION_EXPECTED, snapshot, MODE)
+    expect(tripwire.pageErrors).toEqual([])
+  }, 60_000)
+
+  it('manages both local 2API keys through the real credential store', async () => {
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-2api-key-settings'))
+    const dialog = await openPlugins()
+    await dialog.getByRole('tab', { name: '2API 密钥', exact: true }).click()
+
+    const workbuddy = dialog.locator('[data-2api-key="workbuddy"]')
+    const gemini = dialog.locator('[data-2api-key="gemini2api"]')
+    await workbuddy.getByText('WorkBuddy 2API', { exact: true }).waitFor({ timeout: 10_000 })
+    await gemini.getByText('Gemini2API', { exact: true }).waitFor({ timeout: 10_000 })
+
+    const workbuddyInput = workbuddy.getByLabel('API 密钥', { exact: true })
+    await workbuddyInput.fill('sk-workbuddy-e2e')
+    await workbuddy.getByRole('button', { name: '保存', exact: true }).click()
+    await expect.poll(async () => (await credentialsDocument()).includes('WORKBUDDY_API_KEY: sk-workbuddy-e2e'), { timeout: 10_000 })
+      .toBe(true)
+
+    const geminiInput = gemini.getByLabel('API 密钥', { exact: true })
+    await geminiInput.fill('sk-gemini-e2e')
+    await gemini.getByRole('button', { name: '保存', exact: true }).click()
+    await expect.poll(async () => (await credentialsDocument()).includes('API_KEY: sk-gemini-e2e'), { timeout: 10_000 })
+      .toBe(true)
+
+    await expect.poll(() => workbuddy.locator('[data-2api-restart-command] code').textContent()).toContain('com.workbuddy2api')
+    await expect.poll(() => gemini.locator('[data-2api-restart-command] code').textContent()).toContain('com.xwteam.gemini2api')
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+    await workbuddy.getByRole('button', { name: '复制命令', exact: true }).click()
+    await expect.poll(() => workbuddy.locator('[data-2api-restart-command] button').textContent()).toBe('已复制')
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toContain('com.workbuddy2api')
+
+    expect(await page.content()).not.toContain('sk-workbuddy-e2e')
+    expect(await page.content()).not.toContain('sk-gemini-e2e')
     expect(tripwire.pageErrors).toEqual([])
   }, 60_000)
 
