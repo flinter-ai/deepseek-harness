@@ -1763,6 +1763,16 @@
     },
     {
       "doc": "docs/subsystems/workspace.md",
+      "symbol": "WorkspaceWorktreeRecord",
+      "source": "packages/workspace/workspace/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/workspace.md",
+      "symbol": "WorkspaceHandle",
+      "source": "packages/workspace/workspace/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/workspace.md",
       "symbol": "Workspace",
       "source": "packages/workspace/workspace/src/types.ts"
     },

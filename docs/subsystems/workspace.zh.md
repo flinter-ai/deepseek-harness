@@ -2,7 +2,7 @@
 
 [English](workspace.md) | 中文
 
-工作区（workspace）是用户工作目录的持久记录：一个建立在规范路径之上的稳定 id、一个显示标题，以及归属于它的会话的有序账本。该子系统是单个包（package）（[dsh-workspace](../../packages/workspace/workspace)，`ctx.workspaceRegistry`）——一项宿主侧可选能力，不属于 agent loop（智能体循环）主干，并且对模型不可见（没有工具、没有提示词文本、没有会话事件）。它通过[存储领域数据形式](storage.zh.md)存储自己的记录，并对照 [`SessionHeader.cwd`](persistence.zh.md#sessionheader--metadata-beside-the-log) 校验会话成员资格，因此 `storageDomain` 与 `sessionPersistence` 是必需的启动依赖：持久化这一依赖不可用时，插件保持 pending，而不是把这种不可用误当作空历史。设计记录：[领域 KV 存储 Agent Note（agent 决策记录）](../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.zh.md)；引导与 GUI 顺序：[Workspace UI 产品流程 Agent Note](../../.agents/notes/implemented/feature/2026-07-25-workspace-ui-product-flow.zh.md)。
+工作区（workspace）是用户工作目录的持久项目记录：一个建立在规范路径之上的稳定 id、一个显示标题，以及归属于它的会话的有序账本。coding project 可以拥有一个 Git worktree，并为每个 workspace-aware 宿主 adapter 暴露一个不可变 handle。该子系统是单个包（package）（[dsh-workspace](../../packages/workspace/workspace)，`ctx.workspaceRegistry`）——一项宿主侧可选能力，不属于 agent loop（智能体循环）主干，并且对模型不可见（没有工具、没有提示词文本、没有会话事件）。它通过[存储领域数据形式](storage.zh.md)存储自己的记录，并对照 [`SessionHeader.cwd`](persistence.zh.md#sessionheader--metadata-beside-the-log) 校验会话成员资格，因此 `storageDomain` 与 `sessionPersistence` 是必需的启动依赖：持久化这一依赖不可用时，插件保持 pending，而不是把这种不可用误当作空历史。设计记录：[领域 KV 存储 Agent Note（agent 决策记录）](../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.zh.md)；引导与 GUI 顺序：[Workspace UI 产品流程 Agent Note](../../.agents/notes/implemented/feature/2026-07-25-workspace-ui-product-flow.zh.md)。
 
 源码：[`packages/workspace/workspace/src/types.ts`](../../packages/workspace/workspace/src/types.ts)
 
@@ -17,6 +17,38 @@ type WorkspaceId = Branded<'WorkspaceId'>
 ```
 
 `WorkspaceId` 是[品牌化 id](core.zh.md#branded-ids)。路径标识与之分离：`realpathNormalize`（`fs.realpath`；尾部斜杠、`..` 与符号链接全部解析）是唯一的一套唯一性规范——工作区路径以规范化形式存储，唯一性即规范路径的字符串相等（指向已被拥有目录的符号链接会与之冲突），attach 时的会话 cwd 检查也走同一套规范。
+
+## 项目与 worktree identity
+
+workspace record 是 repository-backed session 的 project owner。`createWorktree()` 从 source repository 与 base commit 创建一个生成的 branch 与 worktree；宿主 adapter 传递返回的 handle，而不是从 process cwd 另选 checkout。Directory-backed workspace 仍是有效的兼容记录。
+
+```ts type-equiv
+/** Git metadata that makes a workspace's directory a first-class worktree. */
+interface WorkspaceWorktreeRecord {
+  /** Canonical root of the source Git repository. */
+  readonly repositoryRoot: string
+
+  /** Branch checked out by this workspace's worktree. */
+  readonly branch: string
+
+  /** Commit used as the worktree's creation base. */
+  readonly commit: string
+}
+```
+
+```ts type-equiv
+/** Stable, immutable identity passed between host-side workspace adapters. */
+interface WorkspaceHandle {
+  /** Stable workspace record id. */
+  readonly id: WorkspaceId
+
+  /** Canonical directory owned by the workspace. */
+  readonly path: string
+
+  /** Git metadata when the directory is a managed worktree. */
+  readonly worktree?: WorkspaceWorktreeRecord
+}
+```
 
 ## 工作区实体
 
@@ -33,12 +65,18 @@ interface Workspace {
   /** Stable record id (generated uuid). */
   readonly id: WorkspaceId
 
+  /** Immutable identity shared by host-side workspace adapters. */
+  readonly handle: WorkspaceHandle
+
   /**
    * Canonical directory path: the `fs.realpath` of the path given at create
    * time (trailing slashes, `..`, and symlinks all resolved). Never rewritten
    * afterwards, even when the directory disappears (see {@link status}).
    */
   readonly path: string
+
+  /** Git metadata when this workspace owns a managed worktree. */
+  readonly worktree: WorkspaceWorktreeRecord | undefined
 
   /** Display title. Defaults to `basename(path)` at create; duplicates are allowed. */
   readonly title: string
@@ -117,13 +155,15 @@ interface Workspace {
 
 ## 注册表：`ctx.workspaceRegistry`
 
-`WorkspaceRegistry`（[签名](#ctxworkspaceregistry--workspaceregistry)）拥有注册与解析。`create(path, title?)` 规范化路径，拒绝不存在的路径（原样传出原始 `ENOENT`）或非目录；当规范路径已被拥有时原样返回既有实体；否则创建一条标题为 `title ?? basename(path)` 的记录并前插到持久的注册表顺序中（不同规范路径可以共享同一显示标题）。`get(id)` 与有序的 `list()` 是同步缓存读取；`resolveByPath(path)` 应用同一套 realpath 规范但不创建。`delete(id)` 只移除注册记录、顺序条目和会话账本——目录、用户文件、实时会话和已持久化日志一概不动，因此这些会话变为 Ungrouped（[决策](../../.agents/notes/implemented/feature/2026-07-27-workspace-registration-deletion.zh.md)）；未知 id 返回 `false`。create 与 delete 会在其两次写入（记录 + 顺序）可能分叉之前先持久写入一个待定变更标记；启动时恰好解决被标记的那次变更——通过删除被标记的表行：这会补完被中断的 delete，并回滚被中断的 create（注册可以重建，因此回滚是安全方向）——而没有标记的顺序/表不一致则作为损坏大声失败。
+`WorkspaceRegistry`（[签名](#ctxworkspaceregistry--workspaceregistry)）拥有注册与解析。`create(path, title?)` 规范化路径，拒绝不存在的路径（原样传出原始 `ENOENT`）或非目录；当规范路径已被拥有时原样返回既有实体；否则创建一条标题为 `title ?? basename(path)` 的记录并前插到持久的注册表顺序中（不同规范路径可以共享同一显示标题）。`createWorktree(options)` 解析 source repository 与 base commit，在 `worktreeRoot` 下创建一个生成 branch 与 worktree，并持久保存 repository root、branch 与创建 commit。`resumeWorktree(id)` 校验持久化的 Git identity，不替换 dirty file 或用户 commit。`get(id)` 与有序的 `list()` 是同步缓存读取；`handleFor(id)` 返回不可变的项目 handle；`resolvePath(handle, path?)` 验证该 handle 并返回 lexical 包含的路径；`resolveByPath(path)` 应用同一套 realpath 规范但不创建。`claimSession(handle, sessionId)` 与 `releaseSession(sessionId)` 为 worktree-backed record 强制执行进程内单 session lease；directory-backed record 绕过 lease。`delete(id)` 只移除注册记录、顺序条目和会话账本——目录、用户文件、实时会话、已持久化日志与受管理的 worktree 一概不动，因此这些会话变为 Ungrouped（[决策](../../.agents/notes/implemented/feature/2026-07-27-workspace-registration-deletion.zh.md)）；未知 id 返回 `false`。create 与 delete 会在其两次写入（记录 + 顺序）可能分叉之前先持久写入一个待定变更标记；启动时恰好解决被标记的那次变更——通过删除被标记的表行：这会补完被中断的 delete，并回滚被中断的 create（注册可以重建，因此回滚是安全方向）——而没有标记的顺序/表不一致则作为损坏大声失败。
 
-会话的 cwd 在创建时由创建者赋予，而不是由本注册表赋予——API 网关从所选工作区的 `path` 解析新会话的 cwd（回退到显式或默认 cwd），先创建会话使 cwd 落入其不可变的 [`SessionHeader`](persistence.zh.md#sessionheader--metadata-beside-the-log)，再调用 `attachSession`，后者会把已存储的 header cwd 与工作区路径重新校验一遍。首次成功启动时，注册表仅凭已持久化的 header（`id`、`cwd`、`createdAt`——绝不读事件正文）引导历史：把规范 cwd 有效的会话按目录分组为工作区，最新的排在最前；「已初始化」标记最后写入，因此被中断的引导可以安全续跑。引导只发生这一次：没有 cwd 的历史遗留会话保持 Ungrouped，此后创建的会话只能通过 `attachSession` 加入工作区。
+会话的 cwd 在创建时由创建者赋予，而不是由本注册表赋予——API 网关从所选工作区的 `path` 解析新会话的 cwd（回退到显式或默认 cwd），先创建会话使 cwd 落入其不可变的 [`SessionHeader`](persistence.zh.md#sessionheader--metadata-beside-the-log)，再调用 `attachSession`，后者会把已存储的 header cwd 与工作区路径重新校验一遍。对于 worktree workspace，session controller 在创建前 claim handle 的 lease，并在创建失败或 `session/disposed` 时 release。首次成功启动时，注册表仅凭已持久化的 header（`id`、`cwd`、`createdAt`——绝不读事件正文）引导历史：把规范 cwd 有效的会话按目录分组为工作区，最新的排在最前；「已初始化」标记最后写入，因此被中断的引导可以安全续跑。引导只发生这一次：没有 cwd 的历史遗留会话保持 Ungrouped，此后创建的会话只能通过 `attachSession` 加入工作区。
 
 ## 消费方
 
-[`dsh-workspace-controller`](../../packages/api/workspace-controller) 经 `ctx.workspaceRegistry` 向 GUI 客户端提供工作区 CRUD，[`dsh-session-controller`](../../packages/api/session-controller) 执行上文「先建会话再 attach」的流程。[dsh-agent-instructions](../../packages/context/agent-instructions) 尽管名字如此，却**不是**消费方：它在 agent 自己的 cwd 下发现 AGENTS.md 风格的指令文件，从不触碰 `ctx.workspaceRegistry`——两者共用的这个词指的是用户的工作目录，而非本注册表的实体。
+[`dsh-workspace-controller`](../../packages/api/workspace-controller) 经 `ctx.workspaceRegistry` 向 GUI 客户端提供工作区 CRUD，[`dsh-session-controller`](../../packages/api/session-controller) 执行上文「先建会话再 attach」的流程并 claim worktree lease。本 slice 已将 shared handle 接入 session controller、terminal、local file-reference 与 skill adapter。Editor、code-memory、InstaCloud 与 GitHub/PR adapter 在本 checkout 中不存在，仍为 `NOT_RUN`；将来接入时必须接收同一个 `WorkspaceHandle` 并使用 `resolvePath()`，而不是推导另一个 checkout。[dsh-agent-instructions](../../packages/context/agent-instructions) 尽管名字如此，却**不是**消费方：它在 agent 自己的 cwd 下发现 AGENTS.md 风格的指令文件，从不触碰 `ctx.workspaceRegistry`——两者共用的这个词指的是用户的工作目录，而非本注册表的实体。
+
+实现决策：[Git worktree-backed workspace Agent Note](../../.agents/notes/implemented/architecture/2026-09-06-git-worktree-backed-workspaces.zh.md) 说明了共享不可变 handle、进程内 worktree lease，以及保守的 worktree 清理策略。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -263,11 +303,67 @@ Durable workspace registry. Startup waits for `sessionPersistence`, builds one c
 async create(path: string, title?: string): Promise<Workspace>
 
 /**
+ * Create a new branch-backed Git worktree and register it as one workspace.
+ * The worktree is created before its durable record; a failed registry write
+ * removes only this newly-created, clean worktree.
+ *
+ * @param options - Source repository, optional base revision, branch, and title.
+ * @returns the newly durable worktree workspace.
+ */
+async createWorktree(options: CreateWorktreeOptions): Promise<Workspace>
+
+/**
+ * Verify and resume a persisted Git worktree workspace without changing it.
+ * Dirty files and user-created commits are intentionally preserved.
+ *
+ * @param id - Persisted worktree workspace id.
+ * @returns the verified workspace.
+ */
+async resumeWorktree(id: WorkspaceId): Promise<Workspace>
+
+/**
  * Look up a workspace by id.
  * @param id - Workspace id.
  * @returns the workspace, or `undefined` when unknown.
  */
 get(id: WorkspaceId): Workspace | undefined
+
+/**
+ * Return the immutable adapter handle for a workspace.
+ * @param id - Workspace id.
+ * @returns the stable handle, or `undefined` when unknown.
+ */
+handleFor(id: WorkspaceId): WorkspaceHandle | undefined
+
+/**
+ * Resolve a path under an authenticated workspace handle.
+ *
+ * @param handle - Handle previously returned by this registry.
+ * @param path - Absolute or workspace-relative path; defaults to the root.
+ * @returns a lexically contained absolute path.
+ */
+resolvePath(handle: WorkspaceHandle, path: string = '.'): string
+
+/**
+ * Return the worktree handle that currently accounts for a session.
+ * @param sessionId - Session id to locate.
+ * @returns the owning worktree handle, or `undefined`.
+ */
+worktreeForSession(sessionId: SessionId): WorkspaceHandle | undefined
+
+/**
+ * Claim the one active-session lease for a worktree.
+ *
+ * @param handle - Worktree workspace handle to claim.
+ * @param sessionId - Session that will operate in the worktree.
+ */
+claimSession(handle: WorkspaceHandle, sessionId: SessionId): Promise<void>
+
+/**
+ * Release every worktree lease held by a disposed session. Idempotent.
+ * @param sessionId - Session whose lease is ending.
+ */
+releaseSession(sessionId: SessionId): Promise<void>
 
 /**
  * Synchronous workspace projection in durable registry order. Every

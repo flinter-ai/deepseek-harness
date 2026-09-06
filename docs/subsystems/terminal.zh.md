@@ -8,6 +8,8 @@ PTY 后端、`ctx.terminals` 与面向模型的消费方共享的类型。[持�
 
 `TerminalSessionId` 是由服务铸造的branded id。可选名称是拥有者本地的显示元数据；授权比较的是拥有该会话的确切 `Agent`，而不是名称或猜测的 id。
 
+当会话附加到 workspace 时，`terminal_open` 会将不可变的 `WorkspaceHandle` 传入终端服务。请求中的 `cwd` 通过 `ctx.workspaceRegistry` 解析，并始终保持在 workspace 内；没有 handle 的旧调用仍保留原有后端 `cwd` 行为。后端只会收到解析后的路径，不会收到 workspace 权限信息。
+
 `TerminalWaitReason` 说明一次发送为何返回。它与 `TerminalSessionStatus` 无关：一次发送可能因静默或超时而返回，但顶层 shell 仍然存活；`session_exit` 表示该 shell 已退出，而不是某个任意的前台子进程已退出。
 
 ```ts type-equiv
@@ -121,7 +123,7 @@ listBackends(): string[]
 /**
  * Create and publish one owner-scoped session after backend setup succeeds.
  * @param owner - exact registered Agent that owns access and cleanup.
- * @param request - backend type plus optional owner-local name and cwd.
+ * @param request - backend type plus optional owner-local name, workspace, and cwd.
  * @param signal - cancellation of unpublished setup.
  * @returns published identity, metadata, status, and MOTD.
  */

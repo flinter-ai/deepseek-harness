@@ -894,7 +894,7 @@ Create a persistent, owner-isolated terminal session from a registered backend t
     },
     "cwd": {
       "type": "string",
-      "description": "Initial working directory. Defaults to the deployment workspace root."
+      "description": "Initial working directory. For a workspace-attached session this is relative to that workspace and must stay inside it; otherwise it is passed through as the legacy backend cwd."
     }
   },
   "required": [

@@ -2378,7 +2378,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       {
         signature: 'async spawn(owner: Agent, request: TerminalSpawnRequest, signal?: AbortSignal): Promise<TerminalSpawnResult>',
         description: 'Create and publish one owner-scoped session after backend setup succeeds.',
-        parameters: [{ name: 'owner', description: 'exact registered Agent that owns access and cleanup.' }, { name: 'request', description: 'backend type plus optional owner-local name and cwd.' }, { name: 'signal', description: 'cancellation of unpublished setup.' }],
+        parameters: [{ name: 'owner', description: 'exact registered Agent that owns access and cleanup.' }, { name: 'request', description: 'backend type plus optional owner-local name, workspace, and cwd.' }, { name: 'signal', description: 'cancellation of unpublished setup.' }],
         returns: 'published identity, metadata, status, and MOTD.',
       },
       {
@@ -2829,10 +2829,50 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the existing or newly durable workspace.',
       },
       {
+        signature: 'async createWorktree(options: CreateWorktreeOptions): Promise<Workspace>',
+        description: 'Create a new branch-backed Git worktree and register it as one workspace. The worktree is created before its durable record; a failed registry write removes only this newly-created, clean worktree.',
+        parameters: [{ name: 'options', description: 'Source repository, optional base revision, branch, and title.' }],
+        returns: 'the newly durable worktree workspace.',
+      },
+      {
+        signature: 'async resumeWorktree(id: WorkspaceId): Promise<Workspace>',
+        description: 'Verify and resume a persisted Git worktree workspace without changing it. Dirty files and user-created commits are intentionally preserved.',
+        parameters: [{ name: 'id', description: 'Persisted worktree workspace id.' }],
+        returns: 'the verified workspace.',
+      },
+      {
         signature: 'get(id: WorkspaceId): Workspace | undefined',
         description: 'Look up a workspace by id.',
         parameters: [{ name: 'id', description: 'Workspace id.' }],
         returns: 'the workspace, or `undefined` when unknown.',
+      },
+      {
+        signature: 'handleFor(id: WorkspaceId): WorkspaceHandle | undefined',
+        description: 'Return the immutable adapter handle for a workspace.',
+        parameters: [{ name: 'id', description: 'Workspace id.' }],
+        returns: 'the stable handle, or `undefined` when unknown.',
+      },
+      {
+        signature: 'resolvePath(handle: WorkspaceHandle, path: string = \'.\'): string',
+        description: 'Resolve a path under an authenticated workspace handle.',
+        parameters: [{ name: 'handle', description: 'Handle previously returned by this registry.' }, { name: 'path', description: 'Absolute or workspace-relative path; defaults to the root.' }],
+        returns: 'a lexically contained absolute path.',
+      },
+      {
+        signature: 'worktreeForSession(sessionId: SessionId): WorkspaceHandle | undefined',
+        description: 'Return the worktree handle that currently accounts for a session.',
+        parameters: [{ name: 'sessionId', description: 'Session id to locate.' }],
+        returns: 'the owning worktree handle, or `undefined`.',
+      },
+      {
+        signature: 'claimSession(handle: WorkspaceHandle, sessionId: SessionId): Promise<void>',
+        description: 'Claim the one active-session lease for a worktree.',
+        parameters: [{ name: 'handle', description: 'Worktree workspace handle to claim.' }, { name: 'sessionId', description: 'Session that will operate in the worktree.' }],
+      },
+      {
+        signature: 'releaseSession(sessionId: SessionId): Promise<void>',
+        description: 'Release every worktree lease held by a disposed session. Idempotent.',
+        parameters: [{ name: 'sessionId', description: 'Session whose lease is ending.' }],
       },
       {
         signature: 'list(): Workspace[]',
@@ -3821,6 +3861,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'CreateTeamTaskRequest',
     declaration: 'export interface CreateTeamTaskRequest {\n    readonly subject: string;\n    readonly description: string;\n    readonly blockedBy?: readonly TeamTaskId[];\n    readonly writeScopes?: readonly string[];\n}',
+  },
+  {
+    name: 'CreateWorktreeOptions',
+    declaration: 'export interface CreateWorktreeOptions {\n    readonly repository: string;\n    readonly base?: string;\n    readonly branch?: string;\n    readonly title?: string;\n}',
   },
   {
     name: 'CredentialInfo',
@@ -4816,7 +4860,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SessionErrorDetailsMap',
-    declaration: 'export interface SessionErrorDetailsMap {\n    \'bad-request\': Record<never, never>;\n    cancelled: Record<never, never>;\n    \'session-not-found\': {\n        readonly sessionId: SessionId;\n    };\n    \'model-unavailable\': {\n        readonly provider: string;\n        readonly model: string;\n    };\n    \'session-conflict\': {\n        readonly sessionId: SessionId;\n        readonly requestedCwd: string;\n        readonly existingCwd?: string;\n    };\n    \'invalid-time-zone\': {\n        readonly value: string;\n    };\n    \'workspace-attach-failed\': {\n        readonly sessionId: SessionId;\n        readonly workspaceId: string;\n    };\n    \'workspace-not-found\': {\n        readonly workspaceId: string;\n    };\n    \'agent-preset-conflict\': {\n        readonly sessionId: SessionId;\n        readonly requestedPreset: string;\n        readonly existingPreset?: string;\n    };\n    \'agent-preset-not-found\': {\n        readonly agentPreset: string;\n        readonly available: readonly string[];\n    };\n    \'agent-preset-invalid\': {\n        readonly agentPreset: string;\n        readonly reason: string;\n    };\n    \'agent-busy\': {\n        readonly reason: string;\n    };\n    \'attachment-error\': {\n        readonly reason: string;\n    };\n    \'queue-item-not-found\': {\n        readonly itemId: MessageId;\n    };\n    \'steer-unavailable\': {\n        readonly itemId: MessageId;\n    };\n    \'title-invalid\': {\n        readonly sessionId: SessionId;\n    };\n    \'fork-unavailable\': {\n        readonly sessionId: SessionId;\n    /* …truncated — full shape in source */',
+    declaration: 'export interface SessionErrorDetailsMap {\n    \'bad-request\': Record<never, never>;\n    cancelled: Record<never, never>;\n    \'session-not-found\': {\n        readonly sessionId: SessionId;\n    };\n    \'model-unavailable\': {\n        readonly provider: string;\n        readonly model: string;\n    };\n    \'session-conflict\': {\n        readonly sessionId: SessionId;\n        readonly requestedCwd: string;\n        readonly existingCwd?: string;\n    };\n    \'invalid-time-zone\': {\n        readonly value: string;\n    };\n    \'workspace-attach-failed\': {\n        readonly sessionId: SessionId;\n        readonly workspaceId: string;\n    };\n    \'workspace-lease-conflict\': {\n        readonly sessionId: SessionId;\n        readonly workspaceId: string;\n        readonly existingSessionId: SessionId;\n    };\n    \'workspace-not-found\': {\n        readonly workspaceId: string;\n    };\n    \'agent-preset-conflict\': {\n        readonly sessionId: SessionId;\n        readonly requestedPreset: string;\n        readonly existingPreset?: string;\n    };\n    \'agent-preset-not-found\': {\n        readonly agentPreset: string;\n        readonly available: readonly string[];\n    };\n    \'agent-preset-invalid\': {\n        readonly agentPreset: string;\n        readonly reason: string;\n    };\n    \'agent-busy\': {\n        readonly reason: string;\n    };\n    \'attachment-error\': {\n        readonly reason: string;\n    };\n    \'queue-item-not-found\': {\n        readonly itemId: MessageId;\n    };\n    \'steer-unavailable\': {\n        readonl /* …truncated — full shape in source */',
   },
   {
     name: 'SessionEvent',
@@ -5600,7 +5644,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'TerminalBackendSpawnSpec',
-    declaration: 'export interface TerminalBackendSpawnSpec extends TerminalSpawnRequest {\n    sessionId: TerminalSessionIdValue;\n    owner: Agent;\n    signal?: AbortSignal;\n}',
+    declaration: 'export interface TerminalBackendSpawnSpec extends Omit<TerminalSpawnRequest, \'workspace\'> {\n    sessionId: TerminalSessionIdValue;\n    owner: Agent;\n    signal?: AbortSignal;\n}',
   },
   {
     name: 'TerminalCallView',
@@ -5660,7 +5704,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'TerminalSpawnRequest',
-    declaration: 'export interface TerminalSpawnRequest {\n    type: string;\n    name?: string;\n    cwd?: string;\n}',
+    declaration: 'export interface TerminalSpawnRequest {\n    type: string;\n    name?: string;\n    workspace?: WorkspaceHandle;\n    cwd?: string;\n}',
   },
   {
     name: 'TerminalSpawnResult',
@@ -6072,7 +6116,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'Workspace',
-    declaration: 'export interface Workspace {\n    readonly id: WorkspaceId;\n    readonly path: string;\n    readonly title: string;\n    readonly createdAt: string;\n    readonly updatedAt: string;\n    readonly sessionIds: readonly SessionId[];\n    setTitle(title: string): Promise<void>;\n    attachSession(sessionId: SessionId): Promise<void>;\n    insertSessionBefore(sessionId: SessionId, beforeSessionId?: SessionId): Promise<void>;\n    detachSession(sessionId: SessionId): Promise<void>;\n    status(): Promise<\'ok\' | \'missing-dir\'>;\n}',
+    declaration: 'export interface Workspace {\n    readonly id: WorkspaceId;\n    readonly handle: WorkspaceHandle;\n    readonly path: string;\n    readonly worktree: WorkspaceWorktreeRecord | undefined;\n    readonly title: string;\n    readonly createdAt: string;\n    readonly updatedAt: string;\n    readonly sessionIds: readonly SessionId[];\n    setTitle(title: string): Promise<void>;\n    attachSession(sessionId: SessionId): Promise<void>;\n    insertSessionBefore(sessionId: SessionId, beforeSessionId?: SessionId): Promise<void>;\n    detachSession(sessionId: SessionId): Promise<void>;\n    status(): Promise<\'ok\' | \'missing-dir\'>;\n}',
   },
   {
     name: 'WorkspaceArchiveSessionRequest',
@@ -6111,6 +6155,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type WorkspaceFollowIncrement = {\n    readonly type: \'upsert\';\n    readonly workspace: WorkspaceView;\n} | {\n    readonly type: \'remove\';\n    readonly workspaceId: WorkspaceId;\n} | {\n    readonly type: \'order\';\n    readonly workspaceIds: readonly WorkspaceId[];\n} | {\n    readonly type: \'archived\';\n    readonly archivedSessionIds: readonly SessionId[];\n};',
   },
   {
+    name: 'WorkspaceHandle',
+    declaration: 'export interface WorkspaceHandle {\n    readonly id: WorkspaceId;\n    readonly path: string;\n    readonly worktree?: WorkspaceWorktreeRecord;\n}',
+  },
+  {
     name: 'WorkspaceInsertBeforeRequest',
     declaration: 'export interface WorkspaceInsertBeforeRequest {\n    readonly workspaceId: WorkspaceId;\n    readonly beforeWorkspaceId?: WorkspaceId;\n}',
   },
@@ -6133,6 +6181,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'WorkspaceView',
     declaration: 'export interface WorkspaceView {\n    readonly workspaceId: WorkspaceId;\n    readonly path: string;\n    readonly title: string;\n    readonly sessionIds: readonly SessionId[];\n    readonly createdAt: string;\n    readonly updatedAt: string;\n}',
+  },
+  {
+    name: 'WorkspaceWorktreeRecord',
+    declaration: 'export interface WorkspaceWorktreeRecord {\n    readonly repositoryRoot: string;\n    readonly branch: string;\n    readonly commit: string;\n}',
   },
 ]
 

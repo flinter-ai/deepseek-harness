@@ -13,6 +13,7 @@ import FileReferenceService, {
 } from '@deepseek-ai/dsh-file-reference'
 import { FIRST_PARTY_SECTION_ORDER } from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-tools'
+import type {} from '@deepseek-ai/dsh-workspace'
 import {
   DEFAULT_FILE_SEARCH_EXCLUDED_DIRECTORIES,
   DEFAULT_FILE_SEARCH_MAX_ENTRIES,
@@ -118,11 +119,20 @@ export class LocalFileReferenceService extends FileReferenceService {
   ): Promise<FileReferenceCandidate[]> {
     let search = this.searches.get(agent)
     if (search === undefined) {
-      search = new WorkspaceFileSearch(agent.session.header.cwd ?? process.cwd(), this.config)
+      search = new WorkspaceFileSearch(workspaceRoot(this.ctx, agent), this.config)
       this.searches.set(agent, search)
     }
     return search.list(query, signal)
   }
+}
+
+function workspaceRoot(ctx: Context, agent: Agent): string {
+  const registry = ctx.get('workspaceRegistry')
+  if (registry === undefined) return agent.session.header.cwd ?? process.cwd()
+  const workspace = registry.list().find(candidate => candidate.sessionIds.includes(agent.session.id))
+  return workspace === undefined
+    ? agent.session.header.cwd ?? process.cwd()
+    : registry.resolvePath(workspace.handle)
 }
 
 function validateConfig(config: FileSearchConfig): void {

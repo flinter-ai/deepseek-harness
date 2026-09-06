@@ -8,6 +8,8 @@ Types shared by PTY backends, `ctx.terminals`, and the model-facing consumer. Th
 
 `TerminalSessionId` is a service-minted branded id. Optional names are owner-local display metadata; authorization compares the exact owning `Agent`, not a name or guessed id.
 
+When a session is attached to a workspace, `terminal_open` carries that immutable `WorkspaceHandle` into the terminal service. The requested `cwd` is resolved through `ctx.workspaceRegistry` and stays inside the workspace; legacy callers without a handle retain their existing backend `cwd` behavior. Backends receive only the resolved path, never workspace authority.
+
 `TerminalWaitReason` says why one send returned. It is independent from `TerminalSessionStatus`: silence or timeout may return while the top-level shell remains alive, while `session_exit` means that shell exited rather than an arbitrary foreground child.
 
 ```ts type-equiv
@@ -121,7 +123,7 @@ listBackends(): string[]
 /**
  * Create and publish one owner-scoped session after backend setup succeeds.
  * @param owner - exact registered Agent that owns access and cleanup.
- * @param request - backend type plus optional owner-local name and cwd.
+ * @param request - backend type plus optional owner-local name, workspace, and cwd.
  * @param signal - cancellation of unpublished setup.
  * @returns published identity, metadata, status, and MOTD.
  */

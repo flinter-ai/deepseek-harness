@@ -4060,6 +4060,9 @@ importers:
       '@deepseek-ai/dsh-tools':
         specifier: workspace:^
         version: link:../../core/tools
+      '@deepseek-ai/dsh-workspace':
+        specifier: workspace:^
+        version: link:../../workspace/workspace
 
   packages/context/session-reference:
     dependencies:
@@ -8179,6 +8182,9 @@ importers:
       '@deepseek-ai/dsh-tools':
         specifier: workspace:^
         version: link:../../core/tools
+      '@deepseek-ai/dsh-workspace':
+        specifier: workspace:^
+        version: link:../../workspace/workspace
 
   packages/spill/spill:
     devDependencies:
@@ -9017,6 +9023,9 @@ importers:
       '@deepseek-ai/dsh-session':
         specifier: workspace:^
         version: link:../../core/session
+      '@deepseek-ai/dsh-workspace':
+        specifier: workspace:^
+        version: link:../../workspace/workspace
 
   packages/terminal/terminal-bash:
     dependencies:
@@ -9118,6 +9127,9 @@ importers:
       '@deepseek-ai/dsh-tools':
         specifier: workspace:^
         version: link:../../core/tools
+      '@deepseek-ai/dsh-workspace':
+        specifier: workspace:^
+        version: link:../../workspace/workspace
 
   packages/test-support/agent-loop-testkit:
     devDependencies:
@@ -9939,6 +9951,12 @@ importers:
 
   packages/workspace/workspace:
     dependencies:
+      '@deepseek-ai/dsh-home-paths':
+        specifier: workspace:^
+        version: link:../../util/home-paths
+      '@deepseek-ai/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -10210,6 +10228,12 @@ importers:
       '@deepseek-ai/dsh-spill':
         specifier: workspace:^
         version: link:../../packages/spill/spill
+      '@deepseek-ai/dsh-storage':
+        specifier: workspace:^
+        version: link:../../packages/storage/storage
+      '@deepseek-ai/dsh-storage-domain':
+        specifier: workspace:^
+        version: link:../../packages/storage/storage-domain
       '@deepseek-ai/dsh-subagent':
         specifier: workspace:^
         version: link:../../packages/subagent/subagent
@@ -10336,6 +10360,9 @@ importers:
       '@deepseek-ai/dsh-workflow-worker-thread':
         specifier: workspace:^
         version: link:../../packages/workflow/workflow-worker-thread
+      '@deepseek-ai/dsh-workspace':
+        specifier: workspace:^
+        version: link:../../packages/workspace/workspace
       '@deepseek-ai/schemastery':
         specifier: link:../../vendor/schemastery
         version: link:../../vendor/schemastery

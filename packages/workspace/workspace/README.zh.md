@@ -46,7 +46,7 @@ kind: "package-reference"
 - name: '@deepseek-ai/dsh-workspace'
 ```
 
-挂载这些行之后，创建项目会立即出现在列表中并在重启后保留；首次启动还会按会话运行的目录对既有会话分组。如果缺少某个必需依赖，workspace 功能会一直不可用，直到它被挂载。
+挂载这些行之后，创建项目会立即出现在列表中并在重启后保留；首次启动还会按会话运行的目录对既有会话分组。如果缺少某个必需依赖，workspace 功能会一直不可用，直到它被挂载。coding composition 应为每个项目创建一个由 Git worktree 支持的 workspace，并把它的不可变 handle 传给每个 workspace-aware adapter。
 
 ### 创建与排序项目
 
@@ -58,6 +58,19 @@ const project = await ctx.workspaceRegistry.create('/path/to/dir', 'My Project')
 await project.setTitle('Renamed')
 ctx.workspaceRegistry.list() // shows the project, newest first
 ```
+
+### 创建隔离的 coding workspace
+
+当项目拥有会被 session 修改的 source code 时，使用 `createWorktree()`。它会在 `worktreeRoot` 下（默认位于解析后的 DSH home）创建一个 branch 与一个 worktree；返回的 `WorkspaceHandle` 是预期共享的项目 identity。本 slice 已将它接入 session controller、terminal、local file-reference 与 skill adapter；editor、code-memory、InstaCloud 与 GitHub/PR adapter 在此处不存在，仍为 `NOT_RUN`。已接入的 adapter 传递同一个 handle，并对每个路径调用 `resolvePath()`；不会从 process cwd 再推导第二个 checkout：
+
+```ts
+const project = await ctx.workspaceRegistry.createWorktree({
+  repository: '/path/to/repository',
+})
+const sourceFile = ctx.workspaceRegistry.resolvePath(project.handle, 'src/index.ts')
+```
+
+Session controller 接受项目的 `workspaceId`，把 session cwd 设为 worktree，附加 session，并 claim worktree lease。一个进程内每个 worktree 同时只能由一个 active session 持有 lease；directory-backed project 保持兼容行为并绕过该 lease。
 
 ### 将会话归入项目
 
@@ -80,6 +93,7 @@ ctx.workspaceRegistry.list() // shows the project, newest first
 ### 设计理念
 
 - **每个规范路径一条记录。** `fs.realpath` 是唯一的一套唯一性规范：路径以规范化形式存储，因此指向已被拥有目录的符号链接会与之冲突，唯一性即规范路径的字符串相等。
+- **一个 coding project 拥有一个 checkout。** `createWorktree()` 在规范 worktree path 旁记录 source repository、branch 与创建 commit；`WorkspaceHandle` 是 workspace-aware 宿主 adapter 共享的不可变 identity。
 - **成员资格是所有权加实时 cwd 事实。** 记录的 `sessionIds` 顺序是所有权真源；启动时的头部索引校验它，`sessionIds` 在读取时过滤，下一次变更持久剪除。
 - **仅读取头部。** 引导与 attach 校验只读取 `SessionHeader` 字段；事件正文绝不加载。
 - **两次写入的变更带显式标记。** 创建与删除在记录/顺序对可能分叉之前先持久化 `pendingMutation` 标记，因此启动只补全被中断的操作，未标记的分叉作为损坏明确报错。
@@ -87,7 +101,7 @@ ctx.workspaceRegistry.list() // shows the project, newest first
 
 ### API 行为
 
-该 API 是一个由两个所有者构成的小家族：`WorkspaceRegistry` 负责创建、排序与删除项目并管理其会话记账；`Workspace` 实体暴露显示标题、目录状态与会话投影。各方法的精确约定在代码中，而非本 README——参见 [src/index.ts](src/index.ts) 与 [src/entity.ts](src/entity.ts)。
+该 API 是一个由两个所有者构成的小家族：`WorkspaceRegistry` 负责创建、排序与删除项目，创建与恢复 worktree，解析经 handle 验证的路径，并管理会话记账与 lease；`Workspace` 实体暴露不可变 handle、显示标题、目录状态、Git metadata 与会话投影。各方法的精确约定在代码中，而非本 README——参见 [src/index.ts](src/index.ts)、[src/entity.ts](src/entity.ts) 与 [src/git-worktree.ts](src/git-worktree.ts)。
 
 ### 源码地图
 
@@ -96,21 +110,22 @@ ctx.workspaceRegistry.list() // shows the project, newest first
 | [`src/index.ts`](src/index.ts) | 插件入口：`WorkspaceRegistry` 服务、头部索引、引导、操作串行化 |
 | [`src/entity.ts`](src/entity.ts) | 包私有 `Workspace` 实现及其唯一的 `mutate` 写入路径 |
 | [`src/spec.ts`](src/spec.ts) | 领域声明：记录 schema、注册表状态、`defineDomain` 规范 |
-| [`src/types.ts`](src/types.ts) | 公开 `Workspace` 接口与 `WorkspaceId` 品牌 |
+| [`src/types.ts`](src/types.ts) | 公开 `Workspace`、`WorkspaceHandle`、worktree metadata 与 `WorkspaceId` 品牌 |
 | [`src/paths.ts`](src/paths.ts) | `realpath` 唯一性规范 |
+| [`src/git-worktree.ts`](src/git-worktree.ts) | 只使用 argv 的 Git repository、branch、worktree 与回滚 adapter |
 | [`src/invariant.ts`](src/invariant.ts) | 不变式伴生插件：实体缓存镜像持久表 |
 
 ### 持久形态
 
-注册表打开 `workspace` 领域（版本 2）：一张以 `WorkspaceId` 为键的 `workspaces` 表，加上一个持有 `workspaceIds`（权威显示顺序）、`archivedSessionIds` 与可选 `pendingMutation` 标记的全局状态。在 `archivedSessionIds` 存在之前写入的记录会通过 schema 默认值解析为空集合。
+注册表打开 `workspace` 领域（版本 2）：一张以 `WorkspaceId` 为键的 `workspaces` 表，加上一个持有 `workspaceIds`（权威显示顺序）、`archivedSessionIds` 与可选 `pendingMutation` 标记的全局状态。worktree-backed record 还会在该字段旁保存规范 source repository、branch 与创建 commit；directory-backed record 省略该字段。在 `archivedSessionIds` 存在之前写入的记录会通过 schema 默认值解析为空集合。
 
 ### 生命周期
 
-启动时，注册表打开领域、若存在标记则补全被标记的变更、校验已存状态——重复路径、重复会话账本与顺序漂移都会明确报错——并在尚未初始化时先凭持久化头部引导历史、最后写入已初始化标记，因此被中断的引导可以安全恢复。全新空注册表一旦初始化即为真，绝不会再次引导。
+启动时，注册表打开领域、若存在标记则补全被标记的变更、校验已存状态——重复路径、重复会话账本与顺序漂移都会明确报错——并在尚未初始化时先凭持久化头部引导历史、最后写入已初始化标记，因此被中断的引导可以安全恢复。恢复 worktree 时只校验持久化的 repository 与 branch，不替换 dirty file 或用户 commit。全新空注册表一旦初始化即为真，绝不会再次引导。
 
 ### 失败与恢复
 
-创建或删除的第二次写入失败时，缓存与先前顺序会回滚；当操作与回滚都失败时，持久标记仍指明被中断的操作，下一次启动会补全或回滚它。已提交的删除即使标记清理失败仍报告成功，下一次启动会幂等地清除该标记。
+创建或删除的第二次写入失败时，缓存与先前顺序会回滚；当操作与回滚都失败时，持久标记仍指明被中断的操作，下一次启动会补全或回滚它。worktree 注册失败时只移除该操作创建的干净 worktree；普通删除与启动恢复绝不强制删除用户 worktree。已提交的删除即使标记清理失败仍报告成功，下一次启动会幂等地清除该标记。
 
 ### 不变式
 
@@ -130,6 +145,7 @@ ctx.workspaceRegistry.list() // shows the project, newest first
 - [领域 KV 存储 Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.zh.md)——为什么项目记录使用领域数据形式。
 - [Workspace UI 产品流 Agent Note](../../../.agents/notes/implemented/feature/2026-07-25-workspace-ui-product-flow.zh.md)——首次启动如何从会话历史构建项目，以及 GUI 如何排序。
 - [删除 Workspace 注册记录决策](../../../.agents/notes/implemented/feature/2026-07-27-workspace-registration-deletion.zh.md)——为什么移除项目绝不会删除其文件夹或会话。
+- [Git worktree-backed workspace](../../../.agents/notes/implemented/architecture/2026-09-06-git-worktree-backed-workspaces.zh.md)——为什么 coding adapter 共享一个不可变 workspace handle，以及 worktree lease 为何只在进程内有效。
 
 -----
 
@@ -162,6 +178,9 @@ ctx.workspaceRegistry.list() // shows the project, newest first
 - **外部变更延迟可见**——如果另一进程删除或损坏目录，项目只能在下次刷新或重启后反映出来。
 - **归档是单向的**——被隐藏的会话保留其历史与位置，但目前没有取消归档操作；归档集合是持久的显示过滤器。
 - **重新添加目录从空开始**——移除后再次添加同一目录会创建空会话列表的新项目；旧会话不会自动回来。
+- **路径解析是 lexical 的**——`resolvePath()` 会拒绝 traversal 与 foreign root（包括平台特有的 path separator），但不会解析符号链接目标；会跟随现有符号链接的 adapter 必须自行执行规范路径策略。
+- **Worktree lease 只在进程内有效**——不同 DSH 进程仍可能 claim 同一个 worktree；跨进程 ownership 需要独立的持久 lease 机制。
+- **Worktree 清理保持保守**——移除 workspace 注册不会删除 worktree；中断的 create 可能留下未注册 worktree，需人工清理，以避免冒险删除用户文件。
 
 <a id="dev-note"></a>
 ### 开发备注

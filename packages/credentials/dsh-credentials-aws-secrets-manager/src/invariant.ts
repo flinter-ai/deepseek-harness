@@ -8,7 +8,9 @@ const PACKAGE_NAME = '@deepseek-ai/dsh-credentials-aws-secrets-manager'
 export const name = 'credentials-aws-secrets-manager-invariant'
 export const inject = ['invariants']
 
-const install: InvariantInstaller = () => {}
+const install: InvariantInstaller = () => {
+  // No runtime invariant: this credential adapter delegates validation to AWS Secrets Manager.
+}
 
 export const apply = (ctx: Context): Promise<() => void> =>
   Promise.resolve(ctx.invariants.register(PACKAGE_NAME, install))

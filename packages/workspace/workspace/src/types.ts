@@ -14,6 +14,30 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
  */
 export type WorkspaceId = Branded<'WorkspaceId'>
 
+/** Git metadata that makes a workspace's directory a first-class worktree. */
+export interface WorkspaceWorktreeRecord {
+  /** Canonical root of the source Git repository. */
+  readonly repositoryRoot: string
+
+  /** Branch checked out by this workspace's worktree. */
+  readonly branch: string
+
+  /** Commit used as the worktree's creation base. */
+  readonly commit: string
+}
+
+/** Stable, immutable identity passed between host-side workspace adapters. */
+export interface WorkspaceHandle {
+  /** Stable workspace record id. */
+  readonly id: WorkspaceId
+
+  /** Canonical directory owned by the workspace. */
+  readonly path: string
+
+  /** Git metadata when the directory is a managed worktree. */
+  readonly worktree?: WorkspaceWorktreeRecord
+}
+
 /**
  * One workspace: a stable id over an existing directory, a display title, and
  * an ordered candidate account of sessions. Membership requires both an id in
@@ -24,12 +48,18 @@ export interface Workspace {
   /** Stable record id (generated uuid). */
   readonly id: WorkspaceId
 
+  /** Immutable identity shared by host-side workspace adapters. */
+  readonly handle: WorkspaceHandle
+
   /**
    * Canonical directory path: the `fs.realpath` of the path given at create
    * time (trailing slashes, `..`, and symlinks all resolved). Never rewritten
    * afterwards, even when the directory disappears (see {@link status}).
    */
   readonly path: string
+
+  /** Git metadata when this workspace owns a managed worktree. */
+  readonly worktree: WorkspaceWorktreeRecord | undefined
 
   /** Display title. Defaults to `basename(path)` at create; duplicates are allowed. */
   readonly title: string

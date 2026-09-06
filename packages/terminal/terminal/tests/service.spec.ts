@@ -7,6 +7,7 @@ import TerminalSessionService, { TerminalBackendCleanupError, TerminalError, Ter
 import type {
   TerminalBackend,
   TerminalBackendSession,
+  TerminalBackendSpawnSpec,
   TerminalReadRequest,
   TerminalSendOperation,
   TerminalSendRequest,
@@ -14,6 +15,7 @@ import type {
   TerminalSessionStatus,
   TerminalSignal,
 } from '@deepseek-ai/dsh-terminal'
+import type { WorkspaceHandle } from '@deepseek-ai/dsh-workspace'
 
 const agentScopeDisposers = new WeakMap<Agent, () => Promise<void>>()
 const ptyServiceDisposers = new WeakMap<Context, () => Promise<void>>()
@@ -106,15 +108,17 @@ class StubSession implements TerminalBackendSession {
 
 function backend(type = 'stub') {
   const sessions: StubSession[] = []
+  const requests: TerminalBackendSpawnSpec[] = []
   const provider: TerminalBackend = {
     type,
-    async spawn() {
+    async spawn(spec) {
+      requests.push(spec)
       const session = new StubSession()
       sessions.push(session)
       return session
     },
   }
-  return { provider, sessions }
+  return { provider, sessions, requests }
 }
 
 async function harness() {
@@ -170,6 +174,46 @@ describe('TerminalSessionService ownership and lifecycle', () => {
     expect(() => ctx.terminals.read(foreign, created.sessionId)).toThrow('belongs to another agent')
     expect(() => ctx.terminals.signal(foreign, created.sessionId, 'SIGINT')).toThrow('belongs to another agent')
     await expect(Promise.resolve().then(() => ctx.terminals.kill(foreign, created.sessionId))).rejects.toThrow('belongs to another agent')
+  })
+
+  it('resolves workspace-relative cwd through the registry before backend setup', async () => {
+    const ctx = await harness()
+    const b = backend()
+    ctx.terminals.registerBackend(b.provider)
+    const owner = stubAgent(ctx, 'owner')
+    ctx.agents.register(owner)
+    const workspace: WorkspaceHandle = { id: 'workspace-1' as WorkspaceHandle['id'], path: '/workspace' }
+    let resolved: { handle: WorkspaceHandle; path: string } | undefined
+    ctx.provide('workspaceRegistry', {
+      resolvePath(handle: WorkspaceHandle, path: string) {
+        resolved = { handle, path }
+        return `/workspace/${path}`
+      },
+    } as never)
+
+    await ctx.terminals.spawn(owner, { type: 'stub', workspace, cwd: 'src' })
+
+    expect(resolved).toEqual({ handle: workspace, path: 'src' })
+    expect(b.requests[0]).toMatchObject({ cwd: '/workspace/src' })
+    expect(b.requests[0]).not.toHaveProperty('workspace')
+  })
+
+  it('rejects a workspace request before invoking a backend when the handle is foreign', async () => {
+    const ctx = await harness()
+    const b = backend()
+    ctx.terminals.registerBackend(b.provider)
+    const owner = stubAgent(ctx, 'owner')
+    ctx.agents.register(owner)
+    const workspace: WorkspaceHandle = { id: 'workspace-1' as WorkspaceHandle['id'], path: '/foreign' }
+    ctx.provide('workspaceRegistry', {
+      resolvePath() {
+        throw new Error('workspace handle does not match the registered workspace')
+      },
+    } as never)
+
+    await expect(ctx.terminals.spawn(owner, { type: 'stub', workspace }))
+      .rejects.toMatchObject({ code: 'INVALID_WORKSPACE' })
+    expect(b.requests).toEqual([])
   })
 
   it('rejects unknown backends, non-live owners, duplicate names, and active sends', async () => {

@@ -52,6 +52,11 @@ interface SpawnArgs {
   cwd?: string
 }
 
+function workspaceForAgent(ctx: Context, agent: Agent) {
+  return ctx.get('workspaceRegistry')?.list()
+    .find(workspace => workspace.sessionIds.includes(agent.session.id))?.handle
+}
+
 interface SessionArgs {
   sessionId: string
 }
@@ -166,7 +171,7 @@ export function apply(ctx: Context, config: Config = {}): void {
     parameters: {
       type: { type: 'string', required: true, description: 'Registered terminal backend type, usually "shell".' },
       name: { type: 'string', description: 'Optional owner-local display name such as "main" or "gdb".' },
-      cwd: { type: 'string', description: 'Initial working directory. Defaults to the deployment workspace root.' },
+      cwd: { type: 'string', description: 'Initial working directory. For a workspace-attached session this is relative to that workspace and must stay inside it; otherwise it is passed through as the legacy backend cwd.' },
     },
     finalizeContent,
     output: {
@@ -182,9 +187,12 @@ export function apply(ctx: Context, config: Config = {}): void {
     },
     async execute(args: SpawnArgs, exec) {
       if (args.type.length === 0) throw new Error('type must be a non-empty string')
-      const result = await ctx.terminals.spawn(requireAgent(exec.agent), {
+      const owner = requireAgent(exec.agent)
+      const workspace = workspaceForAgent(ctx, owner)
+      const result = await ctx.terminals.spawn(owner, {
         type: args.type,
         ...args.name !== undefined ? { name: args.name } : {},
+        ...workspace === undefined ? {} : { workspace },
         ...args.cwd !== undefined ? { cwd: args.cwd } : {},
       }, exec.signal)
       return result

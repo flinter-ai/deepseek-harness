@@ -55,10 +55,12 @@ declare module '@deepseek-ai/cordis' {
 export type TerminalErrorCode =
   | 'DUPLICATE_BACKEND'
   | 'DUPLICATE_NAME'
+  | 'INVALID_WORKSPACE'
   | 'FOREIGN_SESSION'
   | 'NO_BACKEND'
   | 'NO_SESSION'
   | 'OWNER_NOT_LIVE'
+  | 'NO_WORKSPACE'
   | 'SEND_ACTIVE'
   | 'SERVICE_DISPOSING'
 
@@ -147,7 +149,7 @@ export class TerminalSessionService extends Service {
   /**
    * Create and publish one owner-scoped session after backend setup succeeds.
    * @param owner - exact registered Agent that owns access and cleanup.
-   * @param request - backend type plus optional owner-local name and cwd.
+   * @param request - backend type plus optional owner-local name, workspace, and cwd.
    * @param signal - cancellation of unpublished setup.
    * @returns published identity, metadata, status, and MOTD.
    */
@@ -158,6 +160,7 @@ export class TerminalSessionService extends Service {
     const backend = this.backends.get(request.type)
     if (backend === undefined) throw new TerminalError(`no PTY backend registered for "${request.type}"`, 'NO_BACKEND')
     if (request.name !== undefined && request.name.length === 0) throw new Error('PTY session name must be non-empty')
+    const cwd = this.resolveCwd(request)
     const releaseName = this.reserveName(owner, request.name)
     const spawnReservation = this.reserveSpawn(owner)
     const backendSignal = signal === undefined
@@ -172,7 +175,7 @@ export class TerminalSessionService extends Service {
         owner,
         type: request.type,
         ...request.name !== undefined ? { name: request.name } : {},
-        ...request.cwd !== undefined ? { cwd: request.cwd } : {},
+        ...cwd !== undefined ? { cwd } : {},
         signal: backendSignal,
       })
       signal?.throwIfAborted()
@@ -313,6 +316,20 @@ export class TerminalSessionService extends Service {
 
   private assertActive(): void {
     if (this.disposing) throw new TerminalError('PTY service is disposing', 'SERVICE_DISPOSING')
+  }
+
+  private resolveCwd(request: TerminalSpawnRequest): string | undefined {
+    if (request.workspace === undefined) return request.cwd
+    const registry = this.ctx.get('workspaceRegistry')
+    if (registry === undefined) {
+      throw new TerminalError('PTY workspace context is unavailable', 'NO_WORKSPACE')
+    }
+    try {
+      return registry.resolvePath(request.workspace, request.cwd ?? '.')
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      throw new TerminalError(`invalid PTY workspace: ${message}`, 'INVALID_WORKSPACE')
+    }
   }
 
   private isLiveOwner(owner: Agent): boolean {

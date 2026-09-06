@@ -758,7 +758,7 @@ export interface Config {
 }
 ```
 
-来源：[`packages/context/file-reference-local/src/index.ts:35`](../packages/context/file-reference-local/src/index.ts)
+来源：[`packages/context/file-reference-local/src/index.ts:36`](../packages/context/file-reference-local/src/index.ts)
 
 <a id="deepseek-aidsh-fs-local"></a>
 
@@ -2944,7 +2944,7 @@ export interface Config {
 }
 ```
 
-来源：[`packages/skill/tool-skill/src/index.ts:61`](../packages/skill/tool-skill/src/index.ts)
+来源：[`packages/skill/tool-skill/src/index.ts:73`](../packages/skill/tool-skill/src/index.ts)
 
 <a id="deepseek-aidsh-tool-str-replace-editor"></a>
 
@@ -3425,6 +3425,22 @@ export interface Config {
 
 来源：[`packages/workflow/workflow-worker-thread/src/index.ts:32`](../packages/workflow/workflow-worker-thread/src/index.ts)
 
+<a id="deepseek-aidsh-workspace"></a>
+
+## `@deepseek-ai/dsh-workspace`
+
+需要：`storageDomain` · `sessionPersistence`
+
+```ts config-catalog
+/** Workspace registry deployment configuration. */
+export interface Config {
+  /** Root beneath which newly-created Git worktrees are placed. */
+  readonly worktreeRoot?: string
+}
+```
+
+来源：[`packages/workspace/workspace/src/index.ts:50`](../packages/workspace/workspace/src/index.ts)
+
 ## 无配置的可加载插件
 
 这些插件通过 `cordis.yml` 中不含 `config:` 块的条目加载；它们未声明任何配置接口。
@@ -3503,7 +3519,6 @@ export interface Config {
 - `@deepseek-ai/dsh-tool-subagent-control` — 需要 `tools` · `subagents`（[`packages/subagent/tool-subagent-control/src/index.ts`](../packages/subagent/tool-subagent-control/src/index.ts)）
 - `@deepseek-ai/dsh-user-questions`（[`packages/interaction/user-questions/src/index.ts`](../packages/interaction/user-questions/src/index.ts)）
 - `@deepseek-ai/dsh-webhook` — 需要 `agents` · `agentDefaultModel` · `agentPresets` · `permissionPresets` · `sessionTitle` · `workspaceRegistry`（[`packages/webhook/webhook/src/index.ts`](../packages/webhook/webhook/src/index.ts)）
-- `@deepseek-ai/dsh-workspace` — 需要 `storageDomain` · `sessionPersistence`（[`packages/workspace/workspace/src/index.ts`](../packages/workspace/workspace/src/index.ts)）
 
 ## Seam 包（不可直接加载）
 

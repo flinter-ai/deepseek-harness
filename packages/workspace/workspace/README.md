@@ -46,7 +46,7 @@ The package takes no configuration of its own; it needs a session store, a sessi
 - name: '@deepseek-ai/dsh-workspace'
 ```
 
-With these rows mounted, creating a project shows up in the list immediately and survives a restart; the first start also groups existing sessions by the directory they ran in. If a required peer is missing, the workspace feature stays unavailable until it is mounted.
+With these rows mounted, creating a project shows up in the list immediately and survives a restart; the first start also groups existing sessions by the directory they ran in. If a required peer is missing, the workspace feature stays unavailable until it is mounted. A coding composition should create one Git worktree-backed workspace per project and pass its immutable handle to every workspace-aware adapter.
 
 ### Creating and ordering projects
 
@@ -58,6 +58,19 @@ const project = await ctx.workspaceRegistry.create('/path/to/dir', 'My Project')
 await project.setTitle('Renamed')
 ctx.workspaceRegistry.list() // shows the project, newest first
 ```
+
+### Creating an isolated coding workspace
+
+Use `createWorktree()` when a project owns source code that a session may edit. It creates one branch and one worktree below `worktreeRoot` (by default under the resolved DSH home), and the returned `WorkspaceHandle` is the intended shared project identity. This slice wires it through the session controller, terminal, local file-reference, and skill adapters; editor, code-memory, InstaCloud, and GitHub/PR adapters are not present here and remain `NOT_RUN`. Wired adapters pass the same handle and call `resolvePath()` for every path; they do not derive a second checkout from the process cwd:
+
+```ts
+const project = await ctx.workspaceRegistry.createWorktree({
+  repository: '/path/to/repository',
+})
+const sourceFile = ctx.workspaceRegistry.resolvePath(project.handle, 'src/index.ts')
+```
+
+The session controller accepts the project's `workspaceId`, sets the session cwd to the worktree, attaches the session, and claims the worktree lease. Only one active session may hold a worktree lease in one process; directory-backed projects keep the compatibility behavior and bypass that lease.
 
 ### Grouping sessions under a project
 
@@ -80,6 +93,7 @@ This section explains the design decisions behind the feature and points at the 
 ### Design philosophy
 
 - **One record per canonical path.** `fs.realpath` is the single uniqueness canon: paths are stored canonicalized, so a symlink to an owned directory collides, and uniqueness is string equality of canonical paths.
+- **A coding project owns one checkout.** `createWorktree()` records the source repository, branch, and creation commit beside the canonical worktree path; `WorkspaceHandle` is the immutable identity that workspace-aware host adapters share.
 - **Membership is ownership plus a live cwd fact.** The record's ordered `sessionIds` is the ownership truth; the startup header index validates it, and `sessionIds` filters on read while the next mutation prunes durably.
 - **Header-only reads.** Bootstrap and attach validation read `SessionHeader` fields only; event bodies are never loaded.
 - **Two-write mutations with an explicit marker.** Create and delete persist a `pendingMutation` marker before the record/order pair can diverge, so startup completes exactly the interrupted operation and unmarked divergence fails loud as corruption.
@@ -87,7 +101,7 @@ This section explains the design decisions behind the feature and points at the 
 
 ### API behavior
 
-The API is one small family with two owners: `WorkspaceRegistry` creates, orders, and deletes projects and manages their session accounting; the `Workspace` entity exposes the display title, directory status, and the session projection. Per-method contracts live in the code, not this README — see [src/index.ts](src/index.ts) and [src/entity.ts](src/entity.ts).
+The API is one small family with two owners: `WorkspaceRegistry` creates, orders, and deletes projects, creates and resumes worktrees, resolves handle-authenticated paths, and manages session accounting and leases; the `Workspace` entity exposes the immutable handle, display title, directory status, Git metadata, and session projection. Per-method contracts live in the code, not this README — see [src/index.ts](src/index.ts), [src/entity.ts](src/entity.ts), and [src/git-worktree.ts](src/git-worktree.ts).
 
 ### Source map
 
@@ -96,21 +110,22 @@ The API is one small family with two owners: `WorkspaceRegistry` creates, orders
 | [`src/index.ts`](src/index.ts) | Plugin entry: `WorkspaceRegistry` service, header index, bootstrap, operation serialization |
 | [`src/entity.ts`](src/entity.ts) | Package-private `Workspace` implementation and its single `mutate` write path |
 | [`src/spec.ts`](src/spec.ts) | Domain declaration: record schema, registry state, `defineDomain` spec |
-| [`src/types.ts`](src/types.ts) | Public `Workspace` interface and `WorkspaceId` brand |
+| [`src/types.ts`](src/types.ts) | Public `Workspace`, `WorkspaceHandle`, worktree metadata, and `WorkspaceId` brand |
 | [`src/paths.ts`](src/paths.ts) | The `realpath` uniqueness canon |
+| [`src/git-worktree.ts`](src/git-worktree.ts) | argv-only Git repository, branch, worktree, and rollback adapter |
 | [`src/invariant.ts`](src/invariant.ts) | Invariant companion: the entity cache mirrors the durable table |
 
 ### Durable shape
 
-The registry opens the `workspace` domain (version 2): a `workspaces` table keyed by `WorkspaceId` plus one global state holding `workspaceIds` (the authoritative display order), `archivedSessionIds`, and the optional `pendingMutation` marker. Records written before `archivedSessionIds` existed parse with an empty set through the schema default.
+The registry opens the `workspace` domain (version 2): a `workspaces` table keyed by `WorkspaceId` plus one global state holding `workspaceIds` (the authoritative display order), `archivedSessionIds`, and the optional `pendingMutation` marker. A worktree-backed record also stores its canonical source repository, branch, and creation commit; directory-backed records omit that field. Records written before `archivedSessionIds` existed parse with an empty set through the schema default.
 
 ### Lifecycle
 
-On start, the registry opens the domain, completes a marked mutation if one is pending, validates stored state — duplicate paths, duplicate session accounts, and order drift all fail loud — and, when not yet initialized, bootstraps history from persisted headers before writing the initialized marker last, so an interrupted bootstrap resumes safely. A fresh empty registry is real once initialized; it never re-bootstraps.
+On start, the registry opens the domain, completes a marked mutation if one is pending, validates stored state — duplicate paths, duplicate session accounts, and order drift all fail loud — and, when not yet initialized, bootstraps history from persisted headers before writing the initialized marker last, so an interrupted bootstrap resumes safely. A worktree can be resumed by checking its persisted repository and branch without replacing dirty files or user commits. A fresh empty registry is real once initialized; it never re-bootstraps.
 
 ### Failure and recovery
 
-A create or delete whose second write fails rolls the cache and the prior order back; when both the operation and its rollback fail, the durable marker still names the interrupted operation and the next startup completes or rolls it back. A committed delete whose marker cleanup fails still reports success, and the next startup clears the marker idempotently.
+A create or delete whose second write fails rolls the cache and the prior order back; when both the operation and its rollback fail, the durable marker still names the interrupted operation and the next startup completes or rolls it back. A failed worktree registration removes only the clean worktree created by that operation; ordinary deletion and startup recovery never force-remove a user worktree. A committed delete whose marker cleanup fails still reports success, and the next startup clears the marker idempotently.
 
 ### Invariant
 
@@ -130,6 +145,7 @@ Read these pages when this package's view is not enough: the subsystem reference
 - [domain KV storage Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md) — why project records use the domain data form.
 - [Workspace UI product-flow Agent Note](../../../.agents/notes/implemented/feature/2026-07-25-workspace-ui-product-flow.md) — how the first start builds projects from session history and how the GUI orders them.
 - [Workspace registration deletion decision](../../../.agents/notes/implemented/feature/2026-07-27-workspace-registration-deletion.md) — why removing a project never deletes its folder or sessions.
+- [Git worktree-backed workspaces](../../../.agents/notes/implemented/architecture/2026-09-06-git-worktree-backed-workspaces.md) — why coding adapters share one immutable workspace handle and why worktree leases are process-local.
 
 -----
 
@@ -162,6 +178,9 @@ These limits define when the project list is a poor fit or needs special operati
 - **External changes are seen late** — if another process deletes or damages a directory, the project reflects it only at the next refresh or restart.
 - **Archiving is one-way** — a hidden session keeps its history and its place, but no unarchive action exists yet; the archive set is a durable display filter.
 - **Re-adding a directory starts fresh** — after removal, adding the same directory again creates a new project with an empty session list; the old sessions do not come back automatically.
+- **Path resolution is lexical** — `resolvePath()` rejects traversal and foreign roots, including platform-specific path separators, but it does not resolve symlink targets; an adapter that follows existing symlinks must apply its own canonical-path policy.
+- **Worktree leases are process-local** — separate DSH processes can still claim the same worktree; cross-process ownership needs a separate durable lease mechanism.
+- **Worktree cleanup is conservative** — removing a workspace registration retains its worktree, and an interrupted create may leave an unregistered worktree for manual cleanup rather than risking user files.
 
 <a id="dev-note"></a>
 ### Dev Note

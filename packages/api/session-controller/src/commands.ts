@@ -15,7 +15,10 @@ import type { SessionEvent, SessionHeader, UserMessage } from '@deepseek-ai/dsh-
 import { SessionQueryError, type SessionObservation } from '@deepseek-ai/dsh-session-query'
 import { SessionTitleInvalidError } from '@deepseek-ai/dsh-session-title'
 import { TypertRemoteFailure } from '@deepseek-ai/dsh-typert-protocol'
-import type { Workspace } from '@deepseek-ai/dsh-workspace'
+import {
+  WorkspaceSessionLeaseConflictError,
+  type Workspace,
+} from '@deepseek-ai/dsh-workspace'
 import {
   ApiSessionAgentController,
   ApiSessionCwdConflict,
@@ -84,6 +87,9 @@ export class SessionCommandController {
       }
     }
     const cwd = workspace?.path ?? request.cwd ?? this.defaultCwd
+    const worktreeClaimed = workspace === undefined
+      ? false
+      : await this.claimWorktree(workspace, sessionId)
     let adopted: Agent
     try {
       adopted = await this.agents.ensureSession(
@@ -93,12 +99,14 @@ export class SessionCommandController {
         request.agentPreset,
       )
     } catch (error) {
+      if (worktreeClaimed) await this.releaseWorktree(sessionId)
       this.rejectCreation(sessionId, error)
     }
     if (workspace !== undefined) {
       try {
         await workspace.attachSession(sessionId)
       } catch (error) {
+        if (worktreeClaimed) await this.releaseWorktree(sessionId)
         reject(
           'workspace-attach-failed',
           `session "${sessionId}" was created but could not attach to workspace "${workspace.id}": ${String(error)}`,
@@ -238,6 +246,9 @@ export class SessionCommandController {
     }
     const childId = SessionId(`session-${randomUUID()}`)
     const composition = await this.agents.composeAgent(this.agents.presetForObservation(source))
+    const worktreeClaimed = workspace === undefined
+      ? false
+      : await this.claimWorktree(workspace, childId)
     try {
       const { provider, model } = this.ctx.agentDefaultModel.currentSelection()
       await this.ctx.agents.create({
@@ -255,6 +266,7 @@ export class SessionCommandController {
         setup: composition.setup,
       })
     } catch (error) {
+      if (worktreeClaimed) await this.releaseWorktree(childId)
       reject(
         'internal',
         `failed to fork session "${request.sessionId}": ${String(error)}`,
@@ -265,6 +277,7 @@ export class SessionCommandController {
       try {
         await workspace.attachSession(childId)
       } catch (error) {
+        if (worktreeClaimed) await this.releaseWorktree(childId)
         reject(
           'workspace-attach-failed',
           `session "${childId}" was forked but could not attach to workspace "${workspace.id}": ${String(error)}`,
@@ -500,6 +513,31 @@ export class SessionCommandController {
       if (workspace !== undefined) return workspace
     }
     return undefined
+  }
+
+  private async claimWorktree(workspace: Workspace, sessionId: SessionId): Promise<boolean> {
+    if (workspace.worktree === undefined) return false
+    try {
+      await this.ctx.workspaceRegistry.claimSession(workspace.handle, sessionId)
+      return true
+    } catch (error) {
+      if (error instanceof WorkspaceSessionLeaseConflictError) {
+        reject('workspace-lease-conflict', error.message, {
+          sessionId,
+          workspaceId: workspace.id,
+          existingSessionId: error.existingSessionId,
+        })
+      }
+      reject('internal', `failed to claim workspace '${workspace.id}' for session '${sessionId}': ${String(error)}`, {})
+    }
+  }
+
+  private async releaseWorktree(sessionId: SessionId): Promise<void> {
+    try {
+      await this.ctx.workspaceRegistry.releaseSession(sessionId)
+    } catch (error) {
+      this.ctx.logger.warn(`session-controller: failed to release workspace lease for '${sessionId}': ${String(error)}`)
+    }
   }
 }
 

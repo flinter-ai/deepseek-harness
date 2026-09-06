@@ -900,7 +900,7 @@ glob 和 grep 是无条件可用的发现工具，通过 ctx.subprocess spawn �
     },
     "cwd": {
       "type": "string",
-      "description": "Initial working directory. Defaults to the deployment workspace root."
+      "description": "Initial working directory. For a workspace-attached session this is relative to that workspace and must stay inside it; otherwise it is passed through as the legacy backend cwd."
     }
   },
   "required": [

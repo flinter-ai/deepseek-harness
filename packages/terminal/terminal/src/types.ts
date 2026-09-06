@@ -6,6 +6,7 @@
 
 import type { Branded } from '@deepseek-ai/dsh-brand'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+import type { WorkspaceHandle } from '@deepseek-ai/dsh-workspace'
 
 /** Internal exported basis for the public `TerminalSessionId` type/value pair. */
 export type TerminalSessionIdValue = Branded<'TerminalSessionId'>
@@ -46,12 +47,18 @@ export interface TerminalSpawnRequest {
   type: string
   /** Optional owner-local display name. */
   name?: string
-  /** Optional initial working directory interpreted by the backend. */
+  /**
+   * Authenticated workspace identity used to resolve {@link cwd}.
+   * When present, the workspace registry must be installed and the resolved
+   * path remains lexically contained by the workspace root.
+   */
+  workspace?: WorkspaceHandle
+  /** Optional workspace-relative or legacy absolute initial working directory. */
   cwd?: string
 }
 
 /** Fully identified request handed from the registry to a backend. */
-export interface TerminalBackendSpawnSpec extends TerminalSpawnRequest {
+export interface TerminalBackendSpawnSpec extends Omit<TerminalSpawnRequest, 'workspace'> {
   /** Registry-minted session identity. */
   sessionId: TerminalSessionIdValue
   /** Exact live owner for authority-aware backend setup. */

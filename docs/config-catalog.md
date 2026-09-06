@@ -756,7 +756,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/context/file-reference-local/src/index.ts:35`](../packages/context/file-reference-local/src/index.ts)
+Source: [`packages/context/file-reference-local/src/index.ts:36`](../packages/context/file-reference-local/src/index.ts)
 
 <a id="deepseek-aidsh-fs-local"></a>
 
@@ -2942,7 +2942,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/skill/tool-skill/src/index.ts:61`](../packages/skill/tool-skill/src/index.ts)
+Source: [`packages/skill/tool-skill/src/index.ts:73`](../packages/skill/tool-skill/src/index.ts)
 
 <a id="deepseek-aidsh-tool-str-replace-editor"></a>
 
@@ -3423,6 +3423,22 @@ export interface Config {
 
 Source: [`packages/workflow/workflow-worker-thread/src/index.ts:32`](../packages/workflow/workflow-worker-thread/src/index.ts)
 
+<a id="deepseek-aidsh-workspace"></a>
+
+## `@deepseek-ai/dsh-workspace`
+
+Requires: `storageDomain` · `sessionPersistence`
+
+```ts config-catalog
+/** Workspace registry deployment configuration. */
+export interface Config {
+  /** Root beneath which newly-created Git worktrees are placed. */
+  readonly worktreeRoot?: string
+}
+```
+
+Source: [`packages/workspace/workspace/src/index.ts:50`](../packages/workspace/workspace/src/index.ts)
+
 ## Loadable plugins with no config
 
 These load from a `cordis.yml` entry with no `config:` block; they declare no configuration API.
@@ -3501,7 +3517,6 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-tool-subagent-control` — requires `tools` · `subagents` ([`packages/subagent/tool-subagent-control/src/index.ts`](../packages/subagent/tool-subagent-control/src/index.ts))
 - `@deepseek-ai/dsh-user-questions` ([`packages/interaction/user-questions/src/index.ts`](../packages/interaction/user-questions/src/index.ts))
 - `@deepseek-ai/dsh-webhook` — requires `agents` · `agentDefaultModel` · `agentPresets` · `permissionPresets` · `sessionTitle` · `workspaceRegistry` ([`packages/webhook/webhook/src/index.ts`](../packages/webhook/webhook/src/index.ts))
-- `@deepseek-ai/dsh-workspace` — requires `storageDomain` · `sessionPersistence` ([`packages/workspace/workspace/src/index.ts`](../packages/workspace/workspace/src/index.ts))
 
 ## Seam packages (not directly loadable)
 

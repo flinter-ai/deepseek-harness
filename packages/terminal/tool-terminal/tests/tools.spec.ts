@@ -8,7 +8,8 @@ import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { renderToolsSdk } from '@deepseek-ai/dsh-tools'
 import type { ToolSdkSchema } from '@deepseek-ai/dsh-tools/src/ts-types.ts'
 import TerminalSessionService, { TerminalSessionId } from '@deepseek-ai/dsh-terminal'
-import type { TerminalBackend, TerminalBackendSession, TerminalSendOperation, TerminalSendRequest, TerminalSessionStatus, TerminalSignal } from '@deepseek-ai/dsh-terminal'
+import type { TerminalBackend, TerminalBackendSession, TerminalBackendSpawnSpec, TerminalSendOperation, TerminalSendRequest, TerminalSessionStatus, TerminalSignal } from '@deepseek-ai/dsh-terminal'
+import type { WorkspaceHandle } from '@deepseek-ai/dsh-workspace'
 import LocalJobRegistry from '@deepseek-ai/dsh-jobs-local'
 import * as ToolTasks from '@deepseek-ai/dsh-tool-jobs'
 import * as ToolPty from '@deepseek-ai/dsh-tool-terminal'
@@ -86,15 +87,17 @@ class StubSession implements TerminalBackendSession {
 
 function stubBackend() {
   const sessions: StubSession[] = []
+  const requests: TerminalBackendSpawnSpec[] = []
   const backend: TerminalBackend = {
     type: 'stub',
-    async spawn() {
+    async spawn(spec) {
+      requests.push(spec)
       const session = new StubSession()
       sessions.push(session)
       return session
     },
   }
-  return { backend, sessions }
+  return { backend, sessions, requests }
 }
 
 async function setup(jobs: boolean, config: ToolPty.Config = {}) {
@@ -134,6 +137,21 @@ function text(result: { content: { type: string; text?: string }[] }): string {
 }
 
 describe('tool-terminal foreground API', () => {
+  it('derives the initiating session workspace and keeps terminal cwd inside it', async () => {
+    const { ctx, stub, agent } = await setup(false)
+    const workspace: WorkspaceHandle = { id: 'workspace-1' as WorkspaceHandle['id'], path: '/workspace' }
+    ctx.provide('workspaceRegistry', {
+      list: () => [{ handle: workspace, sessionIds: [agent.session.id] }],
+      resolvePath: (_handle: WorkspaceHandle, path: string) => `/workspace/${path}`,
+    } as never)
+
+    const opened = await call(ctx, 'terminal_open', { type: 'stub', cwd: 'src' }, agent)
+
+    expect(opened).toMatchObject({ isError: false, value: { sessionId: 'pty-1' } })
+    expect(stub.requests[0]).toMatchObject({ cwd: '/workspace/src' })
+    expect(stub.requests[0]).not.toHaveProperty('workspace')
+  })
+
   it('registers exactly six schemas and drives the full owner-scoped lifecycle', async () => {
     const { ctx, agent } = await setup(false)
     expect(TOOL_NAMES.every(name => ctx.tools.get(name) !== undefined)).toBe(true)
