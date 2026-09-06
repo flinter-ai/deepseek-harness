@@ -1,6 +1,6 @@
 ---
 description: "FLINTER's Phase 1 provider/profile, worker-launch, and attempt-safety seam over the pinned DeepSeek Harness alpha."
-kind: "package-library"
+kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-alpha-profile
@@ -15,7 +15,6 @@ English | [中文](README.zh.md)
 
 - [Use this package](#use-this-package)
 - [Route and worker boundaries](#route-and-worker-boundaries)
-- [Model Experience](#model-experience)
 - [Attempt safety](#attempt-safety)
 - [Understand the implementation](#understand-the-implementation)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
@@ -41,22 +40,6 @@ Use the profile when a host needs FLINTER's provider settings or needs to launch
 `buildFlinterProfileComposition('tod')` and `buildFlinterProfileComposition('aws-worker')` describe the same `dsh-base` plus `dsh-headless` composition. The AWS variant changes only the `ctx.credentials` provider row and supplies public reference-to-secret-name mappings. It does not create a second DSH installation, agent loop, session codec, or provider catalog.
 
 The local `tod` launcher remains the source-checkout convenience wrapper. The AWS worker profile is a thin, read-only overlay for a later deployment probe; it is not a deployment manifest and does not contain account or secret material.
-
-## Model Experience
-
-### Profile-selected request
-
-#### What the model sees
-
-The selected DSH model receives the normal native session history, current system prompt, tools, and user input. The profile contributes route selection and model capacity metadata such as `contextWindow`; it does not rewrite canonical session events or invent a parallel prompt history.
-
-#### Token effect
-
-The selected model's declared `contextWindow` and optional `maxTokens` constrain request assembly and output admission through DSH's native model configuration. Exact tokenization and provider acceptance remain provider-specific.
-
-#### KV Cache effect
-
-Fresh-session route selection is captured with the session. Reusing a session preserves its provider/model route, while changing the time-of-day default affects only a new session and therefore does not silently change an existing request prefix.
 
 ## Known Limitations and Deferred Work
 

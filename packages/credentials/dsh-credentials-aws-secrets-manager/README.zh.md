@@ -86,20 +86,29 @@ provider 只负责 AWS 后端的引用查询。DSH 仍负责 agent loop、Sessio
 <a id="model-experience"></a>
 ## 模型体验
 
-### 模型看到什么
+### 凭据引用请求
+
+#### 模型看到什么
 
 没有变化。模型收到由原生 Session 和选定路由组装的正常 DSH 请求。provider 请求使用解析出的值，但机密值不会写入 Session 事件流或模型上下文。
 
-### Token 影响
+#### Token 影响
 
 没有影响。本包不增加 prompt 文本或上下文记录。
 
-### KV Cache 影响
+#### KV Cache 影响
 
 没有影响。凭据轮换只改变下一次请求的授权，不改变规范 Session 历史。
 
-<a id="known-limitations-and-deferred-work"></a>
+##### 缓存稳定性说明
+
+```markdown
+凭据值和提供方授权元数据不会追加到模型上下文中。
+```
+
 ## 已知限制和延期工作
+
+<a id="known-limitations-and-deferred-work"></a>
 
 - **Phase 1 只有 mock 证据** — 测试证明适配器合约，不声称已完成 AWS 部署或 IAM 证明。
 - **没有外部轮换事件** — Secrets Manager 不提供本地文件 watcher 的更新事件；下一次请求会解析当前值。

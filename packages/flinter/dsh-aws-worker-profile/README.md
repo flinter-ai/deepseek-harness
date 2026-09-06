@@ -55,20 +55,29 @@ The runtime content is [`cordis.patch.yml`](cordis.patch.yml). It replaces one `
 <a id="model-experience"></a>
 ## Model Experience
 
-### What the model sees
+### Profile-selected request
+
+#### What the model sees
 
 The same native DSH session, system prompt, tools, and provider route as local `tod`. Secret values are used for request authorization and are not emitted into session events or model context.
 
-### Token effect
+#### Token effect
 
 None. This bundle adds no prompt text or context records.
 
-### KV Cache effect
+#### KV Cache effect
 
 None. Swapping credential source does not change canonical session history.
 
-<a id="known-limitations-and-deferred-work"></a>
+##### Cache-stability note
+
+```markdown
+Credential-source selection changes request authorization only; it is not model context.
+```
+
 ## Known Limitations and Deferred Work
+
+<a id="known-limitations-and-deferred-work"></a>
 
 - **Mock evidence only in Phase 1** — AWS SDK calls and IAM permissions are not proven by this public bundle test.
 - **Read-only by default** — secret writes require a separately reviewed deployment configuration.

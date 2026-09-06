@@ -86,20 +86,29 @@ Record-based credential operations are intentionally unsupported by this adapter
 <a id="model-experience"></a>
 ## Model Experience
 
-### What the model sees
+### Credential-reference request
+
+#### What the model sees
 
 Nothing new. The model receives the normal DSH request assembled from its native session and selected route. Secret values are resolved for the provider request and are not added to the session event stream or model context.
 
-### Token effect
+#### Token effect
 
 None. This package contributes no prompt text or context records.
 
-### KV Cache effect
+#### KV Cache effect
 
 None. A credential rotation changes the next request's authorization only; it does not change canonical session history.
 
-<a id="known-limitations-and-deferred-work"></a>
+##### Cache-stability note
+
+```markdown
+Credential values and provider authorization metadata are not appended to the model context.
+```
+
 ## Known Limitations and Deferred Work
+
+<a id="known-limitations-and-deferred-work"></a>
 
 - **Mock evidence only in Phase 1** — the component suite proves the adapter contract without claiming AWS deployment or IAM proof.
 - **No external-rotation event** — Secrets Manager does not provide the local file watcher's update event through this package; the next request resolves the current value.

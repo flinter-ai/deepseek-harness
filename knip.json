@@ -180,11 +180,17 @@
       "entry": [
         "tests/**/*.spec.ts",
         "tests/**/*.e2e.ts",
-        "tests/fixtures/worker-driver.ts"
+        "tests/fixtures/worker-driver.ts",
+        "tests/fixtures/aws-profile-loader.ts"
       ],
       "project": [
         "src/**/*.ts",
         "tests/**/*.ts"
+      ]
+    },
+    "packages/flinter/dsh-aws-worker-profile": {
+      "ignoreDependencies": [
+        "@deepseek-ai/dsh-credentials-aws-secrets-manager"
       ]
     },
     "packages/client/ui-layout": {

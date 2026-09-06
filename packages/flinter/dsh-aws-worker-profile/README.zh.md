@@ -55,20 +55,29 @@ bundle 的 patch 只包含公开的 secret 名称映射。Secret 内容、AWS �
 <a id="model-experience"></a>
 ## 模型体验
 
-### 模型看到什么
+### Profile 选择的请求
+
+#### 模型看到什么
 
 与本地 `tod` 相同的原生 DSH Session、system prompt、工具和 provider 路由。Secret 值只用于请求授权，不会进入 Session 事件或模型上下文。
 
-### Token 影响
+#### Token 影响
 
 没有影响。本 bundle 不增加 prompt 文本或 context 记录。
 
-### KV Cache 影响
+#### KV Cache 影响
 
 没有影响。更换凭据来源不改变规范 Session 历史。
 
-<a id="known-limitations-and-deferred-work"></a>
+##### 缓存稳定性说明
+
+```markdown
+凭据来源选择只改变请求授权，不属于模型上下文。
+```
+
 ## 已知限制和延期工作
+
+<a id="known-limitations-and-deferred-work"></a>
 
 - **Phase 1 只有 mock 证据** — 本 bundle 测试不证明 AWS SDK 调用或 IAM 权限。
 - **默认只读** — secret 写入需要单独审查的部署配置。

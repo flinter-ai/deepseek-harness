@@ -57,7 +57,12 @@ export interface ResolvedSpec {
   readonly allowWrites: boolean
 }
 
-/** Apply defaults without contacting AWS or reading a secret. */
+/**
+ * Apply defaults without contacting AWS or reading a secret.
+ *
+ * @param config Provider configuration supplied by the profile.
+ * @returns The validated provider configuration with defaults applied.
+ */
 export function resolveSpec(config: Config): ResolvedSpec {
   const secretNames = Object.fromEntries(Object.entries(config.secretNames ?? {}).map(([ref, name]) => {
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(ref)) {

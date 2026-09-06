@@ -262,6 +262,10 @@ export interface FlinterNativeSessionEvents {
  * Consume the canonical DSH header and event sequence without re-encoding it.
  * Unknown/plugin event types remain in `events` and `items` losslessly; the
  * consumer does not infer scientific meaning or create synthetic records.
+ *
+ * @param session Canonical DSH session header.
+ * @param events Canonical DSH events in their original order.
+ * @returns The lossless session-and-event view consumed by FLINTER.
  */
 export function consumeFlinterNativeSessionEvents(
   session: SessionHeader,
@@ -320,6 +324,9 @@ export interface FlinterProfileComposition {
  * This returns metadata only. It does not boot DSH, contact a provider, read
  * AWS, or contain a credential value. The AWS profile remains one thin patch
  * over the same base/headless DSH bundles used by local `tod`.
+ *
+ * @param name Public profile name to compose.
+ * @returns The serializable profile composition metadata.
  */
 export function buildFlinterProfileComposition(
   name: FlinterProfileName,

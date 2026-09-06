@@ -1,6 +1,6 @@
 ---
 description: "固定 DeepSeek Harness alpha 之上的 FLINTER Phase 1 提供方/profile、worker 启动与 attempt safety seam。"
-kind: "package-library"
+kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-alpha-profile
@@ -15,7 +15,6 @@ kind: "package-library"
 
 - [使用本包](#use-this-package)
 - [路由与 worker 边界](#route-and-worker-boundaries)
-- [模型体验](#model-experience)
 - [Attempt safety](#attempt-safety)
 - [实现说明](#understand-the-implementation)
 - [已知限制与延期工作](#known-limitations-and-deferred-work)
@@ -43,23 +42,6 @@ kind: "package-library"
 `buildFlinterProfileComposition('tod')` 和 `buildFlinterProfileComposition('aws-worker')` 描述相同的 `dsh-base` 加 `dsh-headless` 组合。AWS 版本只替换 `ctx.credentials` provider 行，并提供公开的引用到 secret 名称映射。它不会创建第二套 DSH 安装、agent loop、Session codec 或 provider catalog。
 
 本地 `tod` launcher 仍是 source checkout 的便利封装。AWS worker profile 是后续部署 probe 使用的精简只读 overlay；它不是部署清单，也不包含账户或 secret 材料。
-
-<a id="model-experience"></a>
-## 模型体验
-
-### Profile 选择的请求
-
-#### 模型看到的内容
-
-选择的 DSH 模型接收原生 session history、当前 system prompt、工具与用户输入。profile 只提供路由选择与 `contextWindow` 等模型容量元数据，不改写 canonical session events，也不创建平行 prompt history。
-
-#### Token 影响
-
-所选模型声明的 `contextWindow` 与可选 `maxTokens` 通过 DSH 原生模型配置约束请求组装与输出接纳。精确 tokenization 与提供方接纳仍由提供方决定。
-
-#### KV Cache 影响
-
-新 session 的路由会被捕获。复用 session 会保留其 provider/model 路由；修改时段默认值只影响新 session，因此不会静默改变已有请求前缀。
 
 <a id="attempt-safety"></a>
 ## Attempt safety
