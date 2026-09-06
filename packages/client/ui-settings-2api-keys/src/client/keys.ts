@@ -1,4 +1,4 @@
-/** Credential references owned by the 2API settings surface. */
+/** Credential references owned by the local relay settings surface. */
 
 import type { TwoApiKeysLocaleKey } from './locales.ts'
 
@@ -14,11 +14,14 @@ export interface TwoApiKeyDefinition {
   readonly description: TwoApiKeysLocaleKey
   /** Static, machine-local command the user can copy into Terminal. */
   readonly restartCommand: string
+  /** Optional machine-local key rotation command; never executed by the browser. */
+  readonly rotateCommand?: string
 }
 
 /**
- * The WorkBuddy adapter consumes `WORKBUDDY_API_KEY`; Gemini2API's main
- * `API_KEY` authenticates `/admin/*` too when `ADMIN_API_KEY` is left empty.
+ * WorkBuddy consumes `WORKBUDDY_API_KEY`; Gemini2API consumes its main
+ * `API_KEY`; zcode2api consumes its gateway `ZCODE_API_KEY`. The zcode
+ * gateway key is intentionally separate from its admin password.
  */
 export const TWO_API_KEYS = [
   {
@@ -34,6 +37,14 @@ export const TWO_API_KEYS = [
     title: 'geminiTitle',
     description: 'geminiDescription',
     restartCommand: 'launchctl kickstart -k "gui/$(id -u)/com.xwteam.gemini2api"',
+  },
+  {
+    id: 'zcode2api',
+    ref: 'ZCODE_API_KEY',
+    title: 'zcodeTitle',
+    description: 'zcodeDescription',
+    restartCommand: 'launchctl kickstart -k "gui/$(id -u)/com.callingforhelp.zcode2api"',
+    rotateCommand: 'cd "$HOME/zcode2api/.worktrees/native-kimi-dsh" && .venv/bin/python scripts/rotate_gateway_key.py --copy --restart',
   },
 ] as const satisfies readonly TwoApiKeyDefinition[]
 

@@ -27,6 +27,7 @@ function props(credentials: CredentialMap = {}) {
   const describe = vi.fn(async () => response({
     WORKBUDDY_API_KEY: { configured: false, writable: true },
     API_KEY: { configured: false, writable: true },
+    ZCODE_API_KEY: { configured: false, writable: true },
     ...credentials,
   }))
   const set = vi.fn(async () => ({ result: { ok: true as const, value: {} } }))
@@ -38,18 +39,22 @@ function props(credentials: CredentialMap = {}) {
 }
 
 describe('TwoApiKeysSettingsTab', () => {
-  it('describes the two exact credential references and never retains a saved value', async () => {
+  it('describes the three exact credential references and never retains a saved value', async () => {
     const harness = props()
     render(<TwoApiKeysSettingsTab {...harness.props} />)
 
     expect(screen.getByText(en.loading)).toBeTruthy()
     await screen.findByText(en.workbuddyTitle)
-    expect(harness.describe).toHaveBeenCalledWith({ refs: ['WORKBUDDY_API_KEY', 'API_KEY'] })
+    expect(harness.describe).toHaveBeenCalledWith({ refs: ['WORKBUDDY_API_KEY', 'API_KEY', 'ZCODE_API_KEY'] })
     expect(screen.getByText('WORKBUDDY_API_KEY')).toBeTruthy()
     expect(screen.getByText('API_KEY')).toBeTruthy()
-    expect(screen.getAllByText(en.notConfigured)).toHaveLength(2)
+    expect(screen.getByText(en.zcodeTitle)).toBeTruthy()
+    expect(screen.getAllByText(en.notConfigured)).toHaveLength(3)
     expect(screen.getByText('launchctl kickstart -k "gui/$(id -u)/com.workbuddy2api"')).toBeTruthy()
     expect(screen.getByText('launchctl kickstart -k "gui/$(id -u)/com.xwteam.gemini2api"')).toBeTruthy()
+    expect(screen.getByText('launchctl kickstart -k "gui/$(id -u)/com.callingforhelp.zcode2api"')).toBeTruthy()
+    expect(screen.getByText(en.rotateCommand)).toBeTruthy()
+    expect(screen.getByText('cd "$HOME/zcode2api/.worktrees/native-kimi-dsh" && .venv/bin/python scripts/rotate_gateway_key.py --copy --restart')).toBeTruthy()
 
     fireEvent.change(screen.getByLabelText(en.apiKey, { selector: '#api-key-2api-workbuddy' }), {
       target: { value: 'sk-workbuddy-test' },
@@ -98,6 +103,7 @@ describe('TwoApiKeysSettingsTab', () => {
       .mockImplementationOnce(async () => response({
         WORKBUDDY_API_KEY: { configured: false, writable: true },
         API_KEY: { configured: false, writable: true },
+        ZCODE_API_KEY: { configured: false, writable: true },
       }))
     render(<TwoApiKeysSettingsTab {...harness.props} />)
 

@@ -55,11 +55,14 @@ interface KeyCardProps {
   onCancelRemoval: () => void
 }
 
-/** A visible, copyable restart instruction; the browser never executes it. */
-function RestartCommand({ command, t, id }: {
+/** A visible, copyable local command; the browser never executes it. */
+function CommandBlock({ command, label, hint, id, kind, t }: {
   command: string
-  t: TwoApiKeysSettingsTabProps['t']
+  label: string
+  hint: string
   id: string
+  kind: 'restart' | 'rotate'
+  t: TwoApiKeysSettingsTabProps['t']
 }): ReactNode {
   const [copied, setCopied] = useState(false)
 
@@ -76,15 +79,15 @@ function RestartCommand({ command, t, id }: {
   }
 
   return (
-    <div className={css.restart} data-2api-restart-command={id}>
+    <div className={css.restart} data-2api-command={kind} data-2api-restart-command={kind === 'restart' ? id : undefined}>
       <div className={css.restartHeader}>
-        <span className={css.restartLabel}>{t('restartCommand')}</span>
+        <span className={css.restartLabel}>{label}</span>
         <button type="button" className={css.copyButton} onClick={() => { void copy() }}>
           {copied ? t('copied') : t('copyCommand')}
         </button>
       </div>
       <pre className={css.code}><code>{command}</code></pre>
-      <p className={css.restartHint}>{t('restartHint')}</p>
+      <p className={css.restartHint}>{hint}</p>
     </div>
   )
 }
@@ -157,7 +160,24 @@ function KeyCard(props: KeyCardProps): ReactNode {
             </>
           )}
         </div>
-        <RestartCommand command={definition.restartCommand} id={definition.id} t={t} />
+        <CommandBlock
+          command={definition.restartCommand}
+          label={t('restartCommand')}
+          hint={t('restartHint')}
+          id={definition.id}
+          kind="restart"
+          t={t}
+        />
+        {definition.rotateCommand !== undefined ? (
+          <CommandBlock
+            command={definition.rotateCommand}
+            label={t('rotateCommand')}
+            hint={t('rotateHint')}
+            id={definition.id}
+            kind="rotate"
+            t={t}
+          />
+        ) : null}
       </div>
     </li>
   )
@@ -167,7 +187,7 @@ function KeyCard(props: KeyCardProps): ReactNode {
 export function TwoApiKeysSettingsTab({ api, t }: TwoApiKeysSettingsTabProps): ReactNode {
   const [state, setState] = useState<LoadState>('loading')
   const [views, setViews] = useState<Views>(emptyViews)
-  const [drafts, setDrafts] = useState<Record<TwoApiKeyId, string>>({ workbuddy: '', gemini2api: '' })
+  const [drafts, setDrafts] = useState<Record<TwoApiKeyId, string>>({ workbuddy: '', gemini2api: '', zcode2api: '' })
   const [busyKey, setBusyKey] = useState<TwoApiKeyId | undefined>(undefined)
   const [confirmingRemoval, setConfirmingRemoval] = useState<TwoApiKeyId | undefined>(undefined)
   const [message, setMessage] = useState<{ kind: 'notice' | 'error'; text: string } | undefined>(undefined)

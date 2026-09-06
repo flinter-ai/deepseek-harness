@@ -130,6 +130,8 @@ worker home（`worker-home.mjs`）配置 DSH 可以调用的模型。当前路�
 | `hard` | ark-plan / `kimi-k3` | 强力编程模型，走 Ark Plan 路线 |
 | `hard-backup` | opencode-go / `glm-5.3` | Kimi 失败时的 fallback |
 | `glm-5.3` | opencode-go / `glm-5.3` | 显式 GLM 档位 |
+| `zcode` | zcode2api / `glm-5.2` | 本机 Anthropic Messages relay |
+| `zcode-glm-5.2`、`zcode-glm-5-turbo` | zcode2api / 对应模型 | 显式本机 ZCode 档位 |
 | `nadirclaw` 等 | NadirClaw localhost router | 本地验证 agent |
 
 `dsh-agent` 只对 provider、配额、404/未授权、not-supported 和 transport 失败（`stream ended`、`finish_reason`、`transport`）重试一次。`NO_ADAPTER` 和本地配置错误 **不会** 触发 fallback。
@@ -158,6 +160,7 @@ DSH `llm-pi-ai` 支持按模型 `api` 选择（`model.api ?? provider.api`），
    OPENCODE_GO_API_KEY: sk-…
    GMI_SERVING_API_KEY: sk-…
    ARK_PLAN_API_KEY: ark-…
+   ZCODE_API_KEY: sk-…
    ```
 
    GMI 也会读取 `~/.flinter/gmi-env.sh`；`dsh-agent` 会自动 source 它。
@@ -181,6 +184,9 @@ pnpm dsh --profile headless --model hard "your task here"
 
 # explicit GLM tier: opencode-go / glm-5.3
 pnpm dsh --profile headless --model glm-5.3 "your task here"
+
+# local zcode2api / GLM-5.2
+pnpm dsh --profile headless --model zcode "your task here"
 ```
 
 ### 在 Web UI 中切换模型
@@ -215,13 +221,16 @@ pnpm dsh --profile headless --model hard "Say OK"
 
 # opencode-go / glm-5.3
 pnpm dsh --profile headless --model glm-5.3 "Say OK"
+
+# local zcode2api / GLM-5.2
+pnpm dsh --profile headless --model zcode "Say OK"
 ```
 
 每个都应打印简短回复。`QUOTA` 或 `AUTH` 错误表示密钥缺失或已耗尽；`NO_ADAPTER` 错误表示 `settings.yaml` 中未声明该 provider。
 
 ## Credentials
 
-API key 从 `~/.dsh/.credentials.yaml`（由 harness 管理）和 GMI-serving 的 `~/.flinter/gmi-env.sh` 读取。plugin 不会把 key 存进仓库文件。`dsh-agent` 在启动 DSH 前 source `~/.flinter/gmi-env.sh`，这样 `GMI_SERVING_API_KEY` 可用，而 plugin 不读取该文件。
+API key 从 `~/.dsh/.credentials.yaml`（由 harness 管理）和 GMI-serving 的 `~/.flinter/gmi-env.sh` 读取。`ZCODE_API_KEY` 是本机 zcode2api 的网关密钥；zcode 管理员密钥是服务专用的独立密钥，DSH 不使用它。plugin 不会把 key 存进仓库文件。`dsh-agent` 在启动 DSH 前 source `~/.flinter/gmi-env.sh`，这样 `GMI_SERVING_API_KEY` 可用，而 plugin 不读取该文件。
 
 如果你误把 key 文件加进了仓库，确保它在 `.gitignore` 中并且绝不提交。
 

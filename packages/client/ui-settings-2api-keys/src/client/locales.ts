@@ -3,7 +3,7 @@
 /** Simplified Chinese dictionary and key source of truth. */
 export const zh = {
   tab: '2API 密钥',
-  intro: '在这里管理 DSH 访问 WorkBuddy 和 Gemini2API 所需的密钥。密钥值不会写入 settings.yaml。',
+  intro: '在这里管理 DSH 访问 WorkBuddy、Gemini2API 和 zcode2api 所需的密钥。密钥值不会写入 settings.yaml。',
   loading: '正在读取密钥状态…',
   error: '暂时无法读取密钥状态。',
   retry: '重试',
@@ -29,10 +29,14 @@ export const zh = {
   workbuddyDescription: '供 DSH 的 WorkBuddy 兼容模型路由使用。',
   geminiTitle: 'Gemini2API',
   geminiDescription: '供 Gemini2API 管理接口和 Chrome 保活插件使用。',
+  zcodeTitle: 'zcode2api',
+  zcodeDescription: '供 DSH 和 Kimi Code 调用本机 Anthropic Messages 网关。',
   restartCommand: '重启命令',
   copyCommand: '复制命令',
   copied: '已复制',
   restartHint: '请在本机 Terminal 中运行；如果服务已在前台运行，请先按 Ctrl-C。此标签页只复制命令，不会自动执行或修改服务环境。',
+  rotateCommand: '轮换并重新登录',
+  rotateHint: '运行轮换命令后，将剪贴板中的新密钥粘贴到 Kimi Code 的 zcode2api provider，再把同一个密钥保存到此处。此标签页只复制命令，不会自动轮换或修改 Kimi 配置。',
 } satisfies Record<string, string>
 
 /** Locale key union. */
@@ -41,7 +45,7 @@ export type TwoApiKeysLocaleKey = keyof typeof zh
 /** English dictionary checked against the Chinese key set. */
 export const en = {
   tab: '2API keys',
-  intro: 'Manage the keys DSH uses to reach WorkBuddy and Gemini2API. Key values never go into settings.yaml.',
+  intro: 'Manage the keys DSH uses to reach WorkBuddy, Gemini2API, and zcode2api. Key values never go into settings.yaml.',
   loading: 'Reading key status…',
   error: 'Key status is temporarily unavailable.',
   retry: 'Retry',
@@ -67,8 +71,12 @@ export const en = {
   workbuddyDescription: 'Used by DSH’s WorkBuddy-compatible model route.',
   geminiTitle: 'Gemini2API',
   geminiDescription: 'Used by the Gemini2API admin interface and Chrome keep-alive plugin.',
+  zcodeTitle: 'zcode2api',
+  zcodeDescription: 'Used by DSH and Kimi Code to reach the local Anthropic Messages gateway.',
   restartCommand: 'Restart command',
   copyCommand: 'Copy command',
   copied: 'Copied',
   restartHint: 'Run this in Terminal on this Mac; if the service is already running in the foreground, press Ctrl-C first. This tab only copies the command; it does not execute it or change the service environment.',
+  rotateCommand: 'Rotate / re-login',
+  rotateHint: 'Run the rotation command, paste the new clipboard key into Kimi Code’s zcode2api provider, then save that same key here. This tab only copies the command; it does not rotate the key or edit Kimi configuration.',
 } satisfies Record<TwoApiKeysLocaleKey, string>

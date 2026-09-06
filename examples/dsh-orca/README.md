@@ -150,6 +150,8 @@ Current routing:
 | `hard` | ark-plan / `kimi-k3` | strong coding model, on the Ark Plan route |
 | `hard-backup` | opencode-go / `glm-5.3` | fallback when Kimi fails |
 | `glm-5.3` | opencode-go / `glm-5.3` | explicit GLM tier |
+| `zcode` | zcode2api / `glm-5.2` | local Anthropic Messages relay |
+| `zcode-glm-5.2`, `zcode-glm-5-turbo` | zcode2api / matching model | explicit local ZCode tiers |
 | `nadirclaw` etc. | NadirClaw localhost router | local verification agents |
 
 `dsh-agent` retries once with the configured fallback only for provider,
@@ -186,6 +188,7 @@ routes.
    OPENCODE_GO_API_KEY: sk-…
    GMI_SERVING_API_KEY: sk-…
    ARK_PLAN_API_KEY: ark-…
+   ZCODE_API_KEY: sk-…
    ```
 
    GMI also reads `~/.flinter/gmi-env.sh`; `dsh-agent` sources it automatically.
@@ -209,6 +212,9 @@ pnpm dsh --profile headless --model hard "your task here"
 
 # explicit GLM tier: opencode-go / glm-5.3
 pnpm dsh --profile headless --model glm-5.3 "your task here"
+
+# local zcode2api / GLM-5.2
+pnpm dsh --profile headless --model zcode "your task here"
 ```
 
 ### Switch models in the Web UI
@@ -243,6 +249,9 @@ pnpm dsh --profile headless --model hard "Say OK"
 
 # opencode-go / glm-5.3
 pnpm dsh --profile headless --model glm-5.3 "Say OK"
+
+# local zcode2api / GLM-5.2
+pnpm dsh --profile headless --model zcode "Say OK"
 ```
 
 Each should print a short reply. A `QUOTA` or `AUTH` error means the key is missing or exhausted; a `NO_ADAPTER` error means the provider is not declared in `settings.yaml`.
@@ -250,8 +259,10 @@ Each should print a short reply. A `QUOTA` or `AUTH` error means the key is miss
 ## Credentials
 
 API keys are read from `~/.dsh/.credentials.yaml` (managed by the harness) and
-from `~/.flinter/gmi-env.sh` for GMI-serving. The plugin never stores keys in
-repo files. `dsh-agent` sources `~/.flinter/gmi-env.sh` before launching DSH so
+from `~/.flinter/gmi-env.sh` for GMI-serving. `ZCODE_API_KEY` is the local
+zcode2api gateway key; the zcode admin key is a separate service-only secret
+and is not used by DSH. The plugin never stores keys in repo files.
+`dsh-agent` sources `~/.flinter/gmi-env.sh` before launching DSH so
 `GMI_SERVING_API_KEY` is available without the plugin reading the file.
 
 If you add a key file inside the repo by mistake, make sure it is in

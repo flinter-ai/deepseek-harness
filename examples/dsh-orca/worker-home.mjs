@@ -16,6 +16,7 @@
  *   hard          -> ark-plan / kimi-k3            (Kimi K3 on the Ark Plan route)
  *   hard-backup   -> opencode-go / glm-5.3         (backup if K3 unavailable)
  *   glm-5.3       -> opencode-go / glm-5.3
+ *   zcode         -> zcode2api / glm-5.2           (local Anthropic Messages relay)
  *   kimi          -> alias of hard
  *   nadirclaw     -> NadirClaw difficulty router (localhost only)
  *
@@ -49,6 +50,9 @@ const MODELS = {
   // hard backup when K3-256K is 404 / out of credit / unresponsive.
   'hard-backup': { provider: 'opencode-go', model: 'glm-5.3' },
   'glm-5.3': { provider: 'opencode-go', model: 'glm-5.3' },
+  zcode: { provider: 'zcode2api', model: 'glm-5.2' },
+  'zcode-glm-5.2': { provider: 'zcode2api', model: 'glm-5.2' },
+  'zcode-glm-5-turbo': { provider: 'zcode2api', model: 'glm-5-turbo' },
   // NadirClaw difficulty router — LOCAL DISPATCHES ONLY.
   nadirclaw: { provider: 'nadirclaw', model: 'auto' },
   'nadir-auto': { provider: 'nadirclaw', model: 'nadir-auto' },
@@ -72,7 +76,7 @@ const sourceSettings = flag('settings', join(homedir(), '.dsh', 'settings.yaml')
 
 const selection = MODELS[model]
 if (selection === undefined) {
-  console.error(`worker-home: unknown --model "${model}" (use easy|deepseek|opencode|easy-backup|backup|hard|kimi|hard-backup|glm-5.3|nadirclaw|nadir-auto|nadir-eco|nadir-premium|nadir-reasoning)`)
+  console.error(`worker-home: unknown --model "${model}" (use easy|deepseek|opencode|easy-backup|backup|hard|kimi|hard-backup|glm-5.3|zcode|zcode-glm-5.2|zcode-glm-5-turbo|nadirclaw|nadir-auto|nadir-eco|nadir-premium|nadir-reasoning)`)
   process.exit(1)
 }
 if (!home) {
@@ -143,6 +147,11 @@ const NADIRCLAW_MODELS = [
 ].map(([id, name, ctx, maxTok, input, compat]) =>
   `        - id: ${id}\n          name: ${name}\n          contextWindow: ${ctx}\n          maxTokens: ${maxTok}\n          input: [${input}]`
   + (compat ? `\n          compat:\n            ${compat}` : ''))
+const ZCODE_MODELS = [
+  ['glm-5.2', 'ZCode GLM-5.2', 131072, 32768, 'text'],
+  ['glm-5-turbo', 'ZCode GLM-5 Turbo', 131072, 32768, 'text'],
+].map(([id, name, ctx, maxTok, input]) =>
+  `        - id: ${id}\n          name: ${name}\n          contextWindow: ${ctx}\n          maxTokens: ${maxTok}\n          input: [${input}]`)
 const settings = [
   'ui-onboarding:',
   '  welcomeNoticeVersion: 2026-08-13.1',
@@ -169,6 +178,14 @@ const settings = [
   '      baseURL: https://ark.cn-beijing.volces.com/api/plan/v3',
   '      models:',
   ...ARK_PLAN_MODELS,
+  '    zcode2api:',
+  '      apiKeyEnv: ZCODE_API_KEY',
+  '      api: anthropic-messages',
+  // pi-ai's Anthropic adapter appends /v1/messages; keep the provider base
+  // at the service root so the request is not doubled to /v1/v1/messages.
+  '      baseURL: http://127.0.0.1:5920',
+  '      models:',
+  ...ZCODE_MODELS,
   '    nadirclaw:',
   '      apiKeyEnv: NADIRCLAW_API_KEY',
   '      api: openai-completions',
