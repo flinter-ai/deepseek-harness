@@ -90,13 +90,19 @@ describe('AwsSecretsManagerCredentialProvider', () => {
     expect(JSON.stringify(resolveSpec({ allowWrites: true }))).not.toContain('mock-value')
   })
 
-  it('keeps record operations out of this reference-only adapter', async () => {
+  it('keeps browser-session records local and out of AWS', async () => {
     const { provider } = makeProvider()
     const key = 'llm-pi-ai/route' as CredentialKey
     await expect(provider.readRecord(key)).resolves.toBeUndefined()
-    await expect(provider.describeRecord(key)).resolves.toEqual({ configured: false, writable: false })
+    await expect(provider.describeRecord(key)).resolves.toEqual({ configured: false, writable: true })
     await expect(provider.listRecords()).resolves.toEqual([])
-    await expect(provider.deleteRecord(key)).rejects.toThrow(/record operations are not supported/)
+    const record = { kind: 'grant' as const, payload: { token: 'ephemeral-browser-token' } }
+    await expect(provider.modifyRecord(key, async () => record)).resolves.toEqual(record)
+    await expect(provider.readRecord(key)).resolves.toEqual(record)
+    await expect(provider.describeRecord(key)).resolves.toEqual({ configured: true, kind: 'grant', writable: true })
+    await expect(provider.listRecords()).resolves.toEqual([{ key, kind: 'grant' }])
+    await provider.deleteRecord(key)
+    await expect(provider.readRecord(key)).resolves.toBeUndefined()
   })
 
   it('destroys its SDK client during service disposal', () => {

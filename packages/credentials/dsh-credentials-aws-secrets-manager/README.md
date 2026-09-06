@@ -49,7 +49,7 @@ The names above are public routing metadata. The secret contents are supplied on
 {"ARK_PLAN_API_KEY": "<value supplied outside this repository>"}
 ```
 
-The default profile is read-only. `resolve` and `describe` perform request-time reads through the standard AWS SDK credential chain. `set` and `unset` fail closed unless a separately reviewed deployment explicitly enables `allowWrites`.
+The default profile is read-only for AWS references. `resolve` and `describe` perform request-time reads through the standard AWS SDK credential chain. `set` and `unset` fail closed unless a separately reviewed deployment explicitly enables `allowWrites`. The provider also keeps the DSH browser-session grant record in process-local memory; it never writes that record to AWS, and it is recreated on the next DSH process start.
 
 ### Configuration
 

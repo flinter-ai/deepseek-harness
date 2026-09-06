@@ -109,10 +109,6 @@ function isResourceNotFound(error: unknown): boolean {
   return (error as { name?: string } | null)?.name === 'ResourceNotFoundException'
 }
 
-function unsupportedRecords(): Error {
-  return new Error('credentials-aws-secrets-manager: record operations are not supported; use credential references')
-}
-
 /** AWS-backed implementation of the DSH credential-reference seam. */
 export class AwsSecretsManagerCredentialProvider extends CredentialProvider {
   static Config: z<Config> = z.object({
@@ -126,6 +122,13 @@ export class AwsSecretsManagerCredentialProvider extends CredentialProvider {
 
   private readonly spec: ResolvedSpec
   private readonly client: SecretsManagerClient
+  /**
+   * The web connection layer needs a process-local grant record for its
+   * browser-session token. It is deliberately separate from AWS-backed
+   * references: no record is written to Secrets Manager, and a fresh DSH
+   * process receives a fresh browser grant just as the local web profile does.
+   */
+  private readonly records = new Map<CredentialKey, CredentialRecord>()
 
   constructor(ctx: Context, public config: Config) {
     super(ctx)
@@ -198,28 +201,43 @@ export class AwsSecretsManagerCredentialProvider extends CredentialProvider {
     }
   }
 
-  /** The AWS adapter serves reference values only; record state remains local to its owner. */
+  /**
+   * Records are ephemeral process-local state for host capabilities such as
+   * the DSH browser-session grant. API/model credentials remain references
+   * resolved from AWS and are never copied into this map.
+   */
   override readRecord(_key: CredentialKey): Promise<CredentialRecord | undefined> {
-    return Promise.resolve(undefined)
+    return Promise.resolve(this.records.get(_key))
   }
 
-  override describeRecord(_key: CredentialKey): Promise<CredentialRecordInfo> {
-    return Promise.resolve({ configured: false, writable: false })
+  override describeRecord(key: CredentialKey): Promise<CredentialRecordInfo> {
+    const record = this.records.get(key)
+    return Promise.resolve(record === undefined
+      ? { configured: false, writable: true }
+      : { configured: true, kind: record.kind, writable: true })
   }
 
   override listRecords(): Promise<readonly CredentialRecordEntry[]> {
-    return Promise.resolve([])
+    return Promise.resolve([...this.records].map(([key, record]) => ({ key, kind: record.kind })))
   }
 
-  override modifyRecord(
-    _key: CredentialKey,
-    _mutate: (current: CredentialRecord | undefined) => Promise<CredentialRecord | undefined>,
+  override async modifyRecord(
+    key: CredentialKey,
+    mutate: (current: CredentialRecord | undefined) => Promise<CredentialRecord | undefined>,
   ): Promise<CredentialRecord | undefined> {
-    return Promise.reject(unsupportedRecords())
+    const current = this.records.get(key)
+    const next = await mutate(current)
+    if (next !== undefined) {
+      this.records.set(key, next)
+      this.notifyRecordUpdated(key)
+      return next
+    }
+    return current
   }
 
-  override deleteRecord(_key: CredentialKey): Promise<void> {
-    return Promise.reject(unsupportedRecords())
+  override deleteRecord(key: CredentialKey): Promise<void> {
+    if (this.records.delete(key)) this.notifyRecordUpdated(key)
+    return Promise.resolve()
   }
 
   * [Service.init](): Generator<() => void, void, void> {
