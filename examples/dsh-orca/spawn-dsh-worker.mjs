@@ -71,7 +71,7 @@ const dryRun = process.argv.includes('--dry-run')
 
 if (![
   'easy', 'easy-backup', 'backup',
-  'hard', 'kimi', 'hard-backup', 'glm-5.3', 'zcode', 'zcode-glm-5.2', 'zcode-glm-5-turbo',
+  'hard', 'kimi', 'hard-backup', 'glm-5.3', 'zcode', 'zcode-glm-5.2', 'zcode-glm-5.3-flash', 'zcode-glm-5-turbo',
   'nadirclaw', 'nadir-auto', 'nadir-eco', 'nadir-premium', 'nadir-reasoning',
 ].includes(model)) {
   console.error(`spawn-dsh-worker: unknown --model "${model}"`)

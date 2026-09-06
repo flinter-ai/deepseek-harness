@@ -17,6 +17,7 @@
  *   hard-backup   -> opencode-go / glm-5.3         (backup if K3 unavailable)
  *   glm-5.3       -> opencode-go / glm-5.3
  *   zcode         -> zcode2api / glm-5.2           (local Anthropic Messages relay)
+ *   zcode-glm-5.3-flash -> zcode2api / glm-5.3-flash
  *   kimi          -> alias of hard
  *   nadirclaw     -> NadirClaw difficulty router (localhost only)
  *
@@ -52,6 +53,7 @@ const MODELS = {
   'glm-5.3': { provider: 'opencode-go', model: 'glm-5.3' },
   zcode: { provider: 'zcode2api', model: 'glm-5.2' },
   'zcode-glm-5.2': { provider: 'zcode2api', model: 'glm-5.2' },
+  'zcode-glm-5.3-flash': { provider: 'zcode2api', model: 'glm-5.3-flash' },
   'zcode-glm-5-turbo': { provider: 'zcode2api', model: 'glm-5-turbo' },
   // NadirClaw difficulty router — LOCAL DISPATCHES ONLY.
   nadirclaw: { provider: 'nadirclaw', model: 'auto' },
@@ -76,7 +78,7 @@ const sourceSettings = flag('settings', join(homedir(), '.dsh', 'settings.yaml')
 
 const selection = MODELS[model]
 if (selection === undefined) {
-  console.error(`worker-home: unknown --model "${model}" (use easy|deepseek|opencode|easy-backup|backup|hard|kimi|hard-backup|glm-5.3|zcode|zcode-glm-5.2|zcode-glm-5-turbo|nadirclaw|nadir-auto|nadir-eco|nadir-premium|nadir-reasoning)`)
+  console.error(`worker-home: unknown --model "${model}" (use easy|deepseek|opencode|easy-backup|backup|hard|kimi|hard-backup|glm-5.3|zcode|zcode-glm-5.2|zcode-glm-5.3-flash|zcode-glm-5-turbo|nadirclaw|nadir-auto|nadir-eco|nadir-premium|nadir-reasoning)`)
   process.exit(1)
 }
 if (!home) {
@@ -148,6 +150,7 @@ const NADIRCLAW_MODELS = [
   `        - id: ${id}\n          name: ${name}\n          contextWindow: ${ctx}\n          maxTokens: ${maxTok}\n          input: [${input}]`
   + (compat ? `\n          compat:\n            ${compat}` : ''))
 const ZCODE_MODELS = [
+  ['glm-5.3-flash', 'ZCode GLM-5.3 Flash', 1000000, 131072, 'text'],
   ['glm-5.2', 'ZCode GLM-5.2', 131072, 32768, 'text'],
   ['glm-5-turbo', 'ZCode GLM-5 Turbo', 131072, 32768, 'text'],
 ].map(([id, name, ctx, maxTok, input]) =>

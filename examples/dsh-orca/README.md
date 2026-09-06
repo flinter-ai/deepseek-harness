@@ -151,7 +151,7 @@ Current routing:
 | `hard-backup` | opencode-go / `glm-5.3` | fallback when Kimi fails |
 | `glm-5.3` | opencode-go / `glm-5.3` | explicit GLM tier |
 | `zcode` | zcode2api / `glm-5.2` | local Anthropic Messages relay |
-| `zcode-glm-5.2`, `zcode-glm-5-turbo` | zcode2api / matching model | explicit local ZCode tiers |
+| `zcode-glm-5.2`, `zcode-glm-5.3-flash`, `zcode-glm-5-turbo` | zcode2api / matching model | explicit local ZCode tiers |
 | `nadirclaw` etc. | NadirClaw localhost router | local verification agents |
 
 `dsh-agent` retries once with the configured fallback only for provider,
@@ -215,6 +215,9 @@ pnpm dsh --profile headless --model glm-5.3 "your task here"
 
 # local zcode2api / GLM-5.2
 pnpm dsh --profile headless --model zcode "your task here"
+
+# local zcode2api / GLM-5.3 Flash
+pnpm dsh --profile headless --model zcode-glm-5.3-flash "your task here"
 ```
 
 ### Switch models in the Web UI
@@ -252,6 +255,9 @@ pnpm dsh --profile headless --model glm-5.3 "Say OK"
 
 # local zcode2api / GLM-5.2
 pnpm dsh --profile headless --model zcode "Say OK"
+
+# local zcode2api / GLM-5.3 Flash
+pnpm dsh --profile headless --model zcode-glm-5.3-flash "Say OK"
 ```
 
 Each should print a short reply. A `QUOTA` or `AUTH` error means the key is missing or exhausted; a `NO_ADAPTER` error means the provider is not declared in `settings.yaml`.

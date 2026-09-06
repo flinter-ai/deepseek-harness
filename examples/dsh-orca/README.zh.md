@@ -131,7 +131,7 @@ worker home（`worker-home.mjs`）配置 DSH 可以调用的模型。当前路�
 | `hard-backup` | opencode-go / `glm-5.3` | Kimi 失败时的 fallback |
 | `glm-5.3` | opencode-go / `glm-5.3` | 显式 GLM 档位 |
 | `zcode` | zcode2api / `glm-5.2` | 本机 Anthropic Messages relay |
-| `zcode-glm-5.2`、`zcode-glm-5-turbo` | zcode2api / 对应模型 | 显式本机 ZCode 档位 |
+| `zcode-glm-5.2`、`zcode-glm-5.3-flash`、`zcode-glm-5-turbo` | zcode2api / 对应模型 | 显式本机 ZCode 档位 |
 | `nadirclaw` 等 | NadirClaw localhost router | 本地验证 agent |
 
 `dsh-agent` 只对 provider、配额、404/未授权、not-supported 和 transport 失败（`stream ended`、`finish_reason`、`transport`）重试一次。`NO_ADAPTER` 和本地配置错误 **不会** 触发 fallback。
@@ -187,6 +187,9 @@ pnpm dsh --profile headless --model glm-5.3 "your task here"
 
 # local zcode2api / GLM-5.2
 pnpm dsh --profile headless --model zcode "your task here"
+
+# local zcode2api / GLM-5.3 Flash
+pnpm dsh --profile headless --model zcode-glm-5.3-flash "your task here"
 ```
 
 ### 在 Web UI 中切换模型
@@ -224,6 +227,9 @@ pnpm dsh --profile headless --model glm-5.3 "Say OK"
 
 # local zcode2api / GLM-5.2
 pnpm dsh --profile headless --model zcode "Say OK"
+
+# local zcode2api / GLM-5.3 Flash
+pnpm dsh --profile headless --model zcode-glm-5.3-flash "Say OK"
 ```
 
 每个都应打印简短回复。`QUOTA` 或 `AUTH` 错误表示密钥缺失或已耗尽；`NO_ADAPTER` 错误表示 `settings.yaml` 中未声明该 provider。
