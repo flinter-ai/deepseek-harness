@@ -72,7 +72,7 @@ bundle 的 patch 只包含公开的 secret 名称映射。Secret 内容、AWS �
 ##### 缓存稳定性说明
 
 ```markdown
-凭据来源选择只改变请求授权，不属于模型上下文。
+Credential-source selection changes request authorization only; it is not model context.
 ```
 
 ## 已知限制和延期工作

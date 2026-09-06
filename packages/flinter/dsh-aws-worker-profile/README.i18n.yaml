@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/flinter/dsh-aws-worker-profile/README.md
-README.md: f7c93bb06f3b49a79c7f975882bcfe88585fa968
-README.zh.md: 1dbf14a8923634b67123c210a418377de442f184
+README.md: 7662d2153047594af90a122d1c5f6bedb280c527
+README.zh.md: 3642b3e92eda12606c05c67537877f19bf005d1a

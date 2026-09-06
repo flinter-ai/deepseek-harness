@@ -103,7 +103,7 @@ provider 只负责 AWS 后端的引用查询。DSH 仍负责 agent loop、Sessio
 ##### 缓存稳定性说明
 
 ```markdown
-凭据值和提供方授权元数据不会追加到模型上下文中。
+Credential values and provider authorization metadata are not appended to the model context.
 ```
 
 ## 已知限制和延期工作
