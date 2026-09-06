@@ -12,6 +12,7 @@ import AgentRegistry, { agentEvents, Inbox, type Agent, type PreStepDecision } f
 import SkillRegistry from '@deepseek-ai/dsh-skill'
 import * as SkillFileSystem from '@deepseek-ai/dsh-skill-filesystem'
 import * as toolSkill from '@deepseek-ai/dsh-tool-skill'
+import type { WorkspaceHandle } from '@deepseek-ai/dsh-workspace'
 
 const testToolSignal = new AbortController().signal
 
@@ -796,6 +797,31 @@ describe('dsh-tool-skill', () => {
       '</skill_content>',
     ].join('\n'))
     expect(block.text).not.toContain('# Skill:')
+  })
+
+  it('loads a skill from the workspace attached to the calling session', async () => {
+    const home = await tempDir('tool-load-workspace')
+    const headerRoot = await tempDir('tool-header-root')
+    const workspaceRoot = await tempDir('tool-attached-workspace')
+    await mkdir(join(workspaceRoot, '.git'), { recursive: true })
+    await writeSkill(join(workspaceRoot, '.dsh/skills'), 'workspace-skill', 'Workspace skill', 'Workspace instructions.')
+    const ctx = await setup(home)
+    const agent = agentForCwd(headerRoot)
+    const handle: WorkspaceHandle = { id: 'workspace-1' as WorkspaceHandle['id'], path: workspaceRoot }
+    ctx.provide('workspaceRegistry', {
+      list: () => [{ handle, sessionIds: [agent.session.id] }],
+      resolvePath: () => workspaceRoot,
+    } as never)
+
+    const result = await ctx.tools.execute({
+      signal: testToolSignal,
+      callId: ToolCallId('workspace-skill'),
+      name: 'skill',
+      arguments: { name: 'workspace-skill' },
+      agent,
+    })
+
+    expect(result).toMatchObject({ isError: false, value: { name: 'workspace-skill', content: 'Workspace instructions.' } })
   })
 
   it('renders provider-managed resource hints for non-local skills', async () => {

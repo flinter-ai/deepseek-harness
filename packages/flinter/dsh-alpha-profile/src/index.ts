@@ -7,6 +7,8 @@
  * once; a later UTC boundary affects only a new session.
  */
 
+import type { SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
+
 export * from './worker.ts'
 export * from './attempt.ts'
 export * from './lifecycle.ts'
@@ -228,3 +230,139 @@ export const DIRECT_DEEPSEEK_ROUTE = Object.freeze({
   model: 'deepseek-v4-flash',
   apiKeyEnv: FLINTER_CREDENTIAL_REFS.deepseekOfficial,
 } as const)
+
+/** The native DSH event types consumed by the Phase 1 FLINTER seam. */
+export const FLINTER_NATIVE_EVENT_TYPES = Object.freeze([
+  'turn/start',
+  'step/start',
+  'request/header',
+  'request/context',
+  'user/message',
+  'assistant/chunk',
+  'assistant/message',
+  'tool/call',
+  'tool/result',
+  'step/end',
+  'turn/end',
+] as const)
+
+/** One lossless item exposed to a future FLINTER trace consumer. */
+export type FlinterNativeSessionItem =
+  | Readonly<{ kind: 'session'; header: SessionHeader }>
+  | Readonly<{ kind: 'event'; event: SessionEvent }>
+
+/** Native DSH session data as consumed by FLINTER, without a parallel codec. */
+export interface FlinterNativeSessionEvents {
+  readonly session: SessionHeader
+  readonly events: readonly SessionEvent[]
+  readonly items: readonly FlinterNativeSessionItem[]
+}
+
+/**
+ * Consume the canonical DSH header and event sequence without re-encoding it.
+ * Unknown/plugin event types remain in `events` and `items` losslessly; the
+ * consumer does not infer scientific meaning or create synthetic records.
+ *
+ * @param session Canonical DSH session header.
+ * @param events Canonical DSH events in their original order.
+ * @returns The lossless session-and-event view consumed by FLINTER.
+ */
+export function consumeFlinterNativeSessionEvents(
+  session: SessionHeader,
+  events: readonly SessionEvent[],
+): FlinterNativeSessionEvents {
+  const items: FlinterNativeSessionItem[] = [
+    Object.freeze({ kind: 'session', header: session }),
+    ...events.map(event => Object.freeze({ kind: 'event', event })),
+  ]
+  return Object.freeze({
+    session,
+    events,
+    items: Object.freeze(items),
+  })
+}
+
+/**
+ * Credential backend selected by a profile. Both backends serve the same
+ * DSH credential-reference seam; only the value source changes.
+ */
+export type FlinterCredentialBackend = 'local' | 'aws-secrets-manager'
+
+/** Public profile names used by the alpha migration. */
+export type FlinterProfileName = 'tod' | 'aws-worker'
+
+/** A serializable Cordis patch row used by the AWS profile overlay. */
+export type FlinterProfilePatch =
+  | Readonly<{ id: 'credentials'; disabled: true }>
+  | Readonly<{
+    insert: readonly [{
+      readonly id: 'credentials-aws-secrets-manager'
+      readonly name: '@deepseek-ai/dsh-credentials-aws-secrets-manager'
+      readonly config: Readonly<{
+        readonly secretNames: Readonly<Record<string, string>>
+        readonly secretFormat: 'json'
+        readonly allowWrites: false
+      }>
+    }]
+  }>
+
+/** One public profile composition over the single DSH alpha installation. */
+export interface FlinterProfileComposition {
+  readonly name: FlinterProfileName
+  readonly bundles: readonly ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless']
+  readonly credentialBackend: FlinterCredentialBackend
+  readonly credentialPackage:
+    | '@deepseek-ai/dsh-credentials-local'
+    | '@deepseek-ai/dsh-credentials-aws-secrets-manager'
+  /** Empty for local; the AWS overlay replaces the base credential row. */
+  readonly patches: readonly FlinterProfilePatch[]
+}
+
+/**
+ * Build the public profile composition for one execution environment.
+ *
+ * This returns metadata only. It does not boot DSH, contact a provider, read
+ * AWS, or contain a credential value. The AWS profile remains one thin patch
+ * over the same base/headless DSH bundles used by local `tod`.
+ *
+ * @param name Public profile name to compose.
+ * @returns The serializable profile composition metadata.
+ */
+export function buildFlinterProfileComposition(
+  name: FlinterProfileName,
+): FlinterProfileComposition {
+  const bundles: FlinterProfileComposition['bundles'] = [
+    '@deepseek-ai/dsh-base',
+    '@deepseek-ai/dsh-headless',
+  ]
+  if (name === 'tod') {
+    return Object.freeze({
+      name,
+      bundles,
+      credentialBackend: 'local',
+      credentialPackage: '@deepseek-ai/dsh-credentials-local',
+      patches: Object.freeze([]),
+    })
+  }
+  const patches: FlinterProfilePatch[] = [
+    Object.freeze({ id: 'credentials', disabled: true }),
+    Object.freeze({
+      insert: [Object.freeze({
+        id: 'credentials-aws-secrets-manager',
+        name: '@deepseek-ai/dsh-credentials-aws-secrets-manager',
+        config: Object.freeze({
+          secretNames: FLINTER_AWS_SECRET_NAMES,
+          secretFormat: 'json',
+          allowWrites: false,
+        }),
+      })] as const,
+    }),
+  ]
+  return Object.freeze({
+    name,
+    bundles,
+    credentialBackend: 'aws-secrets-manager',
+    credentialPackage: '@deepseek-ai/dsh-credentials-aws-secrets-manager',
+    patches: Object.freeze(patches),
+  })
+}

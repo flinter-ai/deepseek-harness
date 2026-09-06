@@ -187,6 +187,11 @@ export interface SessionErrorDetailsMap {
   }
   'invalid-time-zone': { readonly value: string }
   'workspace-attach-failed': { readonly sessionId: SessionId; readonly workspaceId: string }
+  'workspace-lease-conflict': {
+    readonly sessionId: SessionId
+    readonly workspaceId: string
+    readonly existingSessionId: SessionId
+  }
   'workspace-not-found': { readonly workspaceId: string }
   'agent-preset-conflict': {
     readonly sessionId: SessionId

@@ -8,6 +8,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SystemPrompt, { renderPrompt } from '@deepseek-ai/dsh-system-prompt'
 import ToolRegistry, { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
+import type { WorkspaceHandle } from '@deepseek-ai/dsh-workspace'
 import { FILE_REFERENCE_PROMPT } from '@deepseek-ai/dsh-file-reference'
 import LocalFileReferenceService, { WorkspaceFileSearch } from '../src/index.ts'
 
@@ -98,6 +99,23 @@ describe('LocalFileReferenceService', () => {
     dispose()
     expect(close).toHaveBeenCalledOnce()
     ctx.emit('agent/disposed', { agent })
+  })
+
+  it('roots discovery at the attached workspace handle instead of the session cwd', async () => {
+    const ctx = await harness()
+    const { agent } = await stubAgent(ctx, 'workspace-root')
+    const workspaceRoot = await mkdtemp(join(tmpdir(), 'dsh-file-reference-attached-workspace-'))
+    roots.push(workspaceRoot)
+    await writeFile(join(workspaceRoot, 'workspace.txt'), 'workspace')
+    const handle: WorkspaceHandle = { id: 'workspace-1' as WorkspaceHandle['id'], path: workspaceRoot }
+    ctx.provide('workspaceRegistry', {
+      list: () => [{ handle, sessionIds: [agent.session.id] }],
+      resolvePath: () => workspaceRoot,
+    } as never)
+    await ctx.plugin(LocalFileReferenceService)
+
+    await expect(ctx.fileReferences.list(agent, 'workspace', new AbortController().signal))
+      .resolves.toEqual([{ path: 'workspace.txt', kind: 'file' }])
   })
 
   it('installs guidance for agents announced after the service and validates deployment tunables', async () => {

@@ -7,24 +7,65 @@
 
 import { randomUUID } from 'node:crypto'
 import { stat } from 'node:fs/promises'
-import { basename } from 'node:path'
+import { basename, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { Context, Service } from '@deepseek-ai/cordis'
+import z from '@deepseek-ai/schemastery'
+import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import type { SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-persistence'
 import type { DomainGlobal, KvTable } from '@deepseek-ai/dsh-storage-domain'
 import { WorkspaceEntity } from './entity.ts'
 import type { WorkspaceEntityHost } from './entity.ts'
+import {
+  addGitWorktree,
+  ensureWorktreeRoot,
+  inspectGitWorktree,
+  removeGitWorktree,
+  resolveGitCommit,
+  resolveGitRepository,
+} from './git-worktree.ts'
 
 export { WorkspaceMoveInvalidError } from './entity.ts'
 import { realpathNormalize } from './paths.ts'
 import { workspaceDomainSpec } from './spec.ts'
 import type { WorkspaceDomainState, WorkspaceRecord } from './spec.ts'
-import type { Workspace, WorkspaceId as WorkspaceIdBrand } from './types.ts'
+import type {
+  Workspace,
+  WorkspaceHandle,
+  WorkspaceId as WorkspaceIdBrand,
+  WorkspaceWorktreeRecord,
+} from './types.ts'
 
-export type { Workspace } from './types.ts'
-export { workspaceDomainState, workspaceRecord, workspaceDomainSpec } from './spec.ts'
+export type { Workspace, WorkspaceHandle, WorkspaceWorktreeRecord } from './types.ts'
+export {
+  workspaceDomainState,
+  workspaceRecord,
+  workspaceDomainSpec,
+  workspaceWorktreeRecord,
+} from './spec.ts'
 export type { WorkspaceDomainState, WorkspaceRecord } from './spec.ts'
 export { realpathNormalize } from './paths.ts'
+
+/** Workspace registry deployment configuration. */
+export interface Config {
+  /** Root beneath which newly-created Git worktrees are placed. */
+  readonly worktreeRoot?: string
+}
+
+/** Options for creating one new Git-backed workspace. */
+export interface CreateWorktreeOptions {
+  /** Existing Git repository or worktree used as the source. */
+  readonly repository: string
+
+  /** Revision used as the new branch's starting point; defaults to `HEAD`. */
+  readonly base?: string
+
+  /** Optional safe branch name; otherwise one is generated from the workspace id. */
+  readonly branch?: string
+
+  /** Display title; defaults to the source repository basename. */
+  readonly title?: string
+}
 
 /** Identifies one workspace record (see `src/types.ts` for the brand rationale). */
 export type WorkspaceId = WorkspaceIdBrand
@@ -63,6 +104,26 @@ export class WorkspaceOrderInvalidError extends Error {
   }
 }
 
+/** A worktree lease was requested by a second active session. */
+export class WorkspaceSessionLeaseConflictError extends Error {
+  /**
+   * @param workspaceId - Worktree workspace whose lease is occupied.
+   * @param requestedSessionId - Session requesting the lease.
+   * @param existingSessionId - Session currently holding the lease.
+   */
+  constructor(
+    readonly workspaceId: WorkspaceId,
+    readonly requestedSessionId: SessionId,
+    readonly existingSessionId: SessionId,
+  ) {
+    super(
+      `workspace '${workspaceId}' worktree is already leased by session '${existingSessionId}'; `
+      + `session '${requestedSessionId}' cannot claim it`,
+    )
+    this.name = 'WorkspaceSessionLeaseConflictError'
+  }
+}
+
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -91,6 +152,7 @@ const compareHeaders = (left: SessionHeader, right: SessionHeader): number =>
  */
 export class WorkspaceRegistry extends Service {
   static inject = ['storageDomain', 'sessionPersistence']
+  static Config: z<Config> = z.object({ worktreeRoot: z.string() })
 
   private table?: KvTable<WorkspaceId, WorkspaceRecord>
   private global?: DomainGlobal<WorkspaceDomainState>
@@ -99,6 +161,8 @@ export class WorkspaceRegistry extends Service {
   private readonly headers = new Map<SessionId, SessionHeader>()
   private readonly sessionPaths = new Map<SessionId, string>()
   private readonly invalidSessionPaths = new Map<SessionId, string>()
+  private readonly worktreeLeases = new Map<WorkspaceId, SessionId>()
+  private readonly worktreeRoot: string
   private operationTail: Promise<void> = Promise.resolve()
 
   private readonly host: WorkspaceEntityHost = {
@@ -111,8 +175,14 @@ export class WorkspaceRegistry extends Service {
     },
   }
 
-  constructor(ctx: Context) {
+  constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'workspaceRegistry')
+    this.worktreeRoot = resolve(config.worktreeRoot ?? join(resolveDshHome(), 'worktrees'))
+    ctx.on('session/disposed', (session) => {
+      void this.releaseSession(session.id).catch((error: unknown) => {
+        this.ctx.logger.warn(`workspace worktree lease release failed for '${session.id}': ${String(error)}`)
+      })
+    })
   }
 
   /** Open the domain, finish bootstrap when required, and rebuild the ordered cache. */
@@ -164,12 +234,151 @@ export class WorkspaceRegistry extends Service {
   }
 
   /**
+   * Create a new branch-backed Git worktree and register it as one workspace.
+   * The worktree is created before its durable record; a failed registry write
+   * removes only this newly-created, clean worktree.
+   *
+   * @param options - Source repository, optional base revision, branch, and title.
+   * @returns the newly durable worktree workspace.
+   */
+  async createWorktree(options: CreateWorktreeOptions): Promise<Workspace> {
+    return await this.enqueueOperation(async () => {
+      const repositoryRoot = await resolveGitRepository(options.repository)
+      const commit = await resolveGitCommit(repositoryRoot, options.base)
+      const root = await ensureWorktreeRoot(this.worktreeRoot)
+      const id = WorkspaceId(randomUUID())
+      const branch = options.branch ?? `dsh/workspace/${id}`
+      const worktreePath = resolve(root, id)
+      assertContained(root, worktreePath)
+
+      await addGitWorktree({ repositoryRoot, worktreePath, branch, commit })
+      try {
+        return await this.createCanonical(
+          worktreePath,
+          options.title ?? basename(repositoryRoot),
+          { repositoryRoot, branch, commit },
+        )
+      } catch (error) {
+        try {
+          await removeGitWorktree(worktreePath)
+        } catch (rollbackError) {
+          throw new AggregateError(
+            [error, rollbackError],
+            `workspace worktree '${worktreePath}' registration failed and Git rollback failed`,
+          )
+        }
+        throw error
+      }
+    })
+  }
+
+  /**
+   * Verify and resume a persisted Git worktree workspace without changing it.
+   * Dirty files and user-created commits are intentionally preserved.
+   *
+   * @param id - Persisted worktree workspace id.
+   * @returns the verified workspace.
+   */
+  async resumeWorktree(id: WorkspaceId): Promise<Workspace> {
+    return await this.enqueueOperation(async () => {
+      const workspace = this.requireEntity(id)
+      const worktree = workspace.worktree
+      if (worktree === undefined) {
+        throw new Error(`workspace '${id}' is directory-backed, not a Git worktree`)
+      }
+      const observed = await inspectGitWorktree(workspace.path)
+      if (observed.repositoryRoot !== worktree.repositoryRoot) {
+        throw new Error(
+          `workspace '${id}' worktree belongs to '${observed.repositoryRoot}', `
+          + `expected '${worktree.repositoryRoot}'`,
+        )
+      }
+      if (observed.branch !== worktree.branch) {
+        throw new Error(
+          `workspace '${id}' worktree is on branch '${observed.branch}', `
+          + `expected '${worktree.branch}'`,
+        )
+      }
+      return workspace
+    })
+  }
+
+  /**
    * Look up a workspace by id.
    * @param id - Workspace id.
    * @returns the workspace, or `undefined` when unknown.
    */
   get(id: WorkspaceId): Workspace | undefined {
     return this.entities.get(id)
+  }
+
+  /**
+   * Return the immutable adapter handle for a workspace.
+   * @param id - Workspace id.
+   * @returns the stable handle, or `undefined` when unknown.
+   */
+  handleFor(id: WorkspaceId): WorkspaceHandle | undefined {
+    return this.entities.get(id)?.handle
+  }
+
+  /**
+   * Resolve a path under an authenticated workspace handle.
+   *
+   * @param handle - Handle previously returned by this registry.
+   * @param path - Absolute or workspace-relative path; defaults to the root.
+   * @returns a lexically contained absolute path.
+   */
+  resolvePath(handle: WorkspaceHandle, path: string = '.'): string {
+    const workspace = this.requireHandle(handle)
+    const resolved = resolve(workspace.path, path)
+    assertContained(workspace.path, resolved)
+    return resolved
+  }
+
+  /**
+   * Return the worktree handle that currently accounts for a session.
+   * @param sessionId - Session id to locate.
+   * @returns the owning worktree handle, or `undefined`.
+   */
+  worktreeForSession(sessionId: SessionId): WorkspaceHandle | undefined {
+    return this.list().find(workspace =>
+      workspace.worktree !== undefined && workspace.sessionIds.includes(sessionId))?.handle
+  }
+
+  /**
+   * Claim the one active-session lease for a worktree.
+   *
+   * @param handle - Worktree workspace handle to claim.
+   * @param sessionId - Session that will operate in the worktree.
+   */
+  claimSession(handle: WorkspaceHandle, sessionId: SessionId): Promise<void> {
+    return this.enqueueOperation(async () => {
+      const workspace = this.requireHandle(handle)
+      if (workspace.worktree === undefined) return
+      for (const [workspaceId, owner] of this.worktreeLeases) {
+        if (owner === sessionId && workspaceId !== workspace.id) {
+          throw new WorkspaceSessionLeaseConflictError(workspace.id, sessionId, owner)
+        }
+      }
+      const owner = this.worktreeLeases.get(workspace.id)
+      if (owner !== undefined && owner !== sessionId) {
+        throw new WorkspaceSessionLeaseConflictError(workspace.id, sessionId, owner)
+      }
+      this.worktreeLeases.set(workspace.id, sessionId)
+    })
+  }
+
+  /**
+   * Release every worktree lease held by a disposed session. Idempotent.
+   * @param sessionId - Session whose lease is ending.
+   */
+  releaseSession(sessionId: SessionId): Promise<void> {
+    if (this.state === undefined) return Promise.resolve()
+    return this.enqueueOperation(async () => {
+      for (const [workspaceId, owner] of this.worktreeLeases) {
+        if (owner === sessionId) this.worktreeLeases.delete(workspaceId)
+      }
+    })
   }
 
   /**
@@ -282,7 +491,11 @@ export class WorkspaceRegistry extends Service {
     return undefined
   }
 
-  private async createCanonical(canonical: string, title?: string): Promise<WorkspaceEntity> {
+  private async createCanonical(
+    canonical: string,
+    title?: string,
+    worktree?: WorkspaceWorktreeRecord,
+  ): Promise<WorkspaceEntity> {
     for (const entity of this.entities.values()) {
       if (entity.path === canonical) return entity
     }
@@ -298,6 +511,7 @@ export class WorkspaceRegistry extends Service {
       sessionIds: [],
       createdAt: now,
       updatedAt: now,
+      ...(worktree === undefined ? {} : { worktree }),
     }
     const entity = new WorkspaceEntity(this.host, id, record)
     this.entities.set(id, entity)
@@ -358,6 +572,7 @@ export class WorkspaceRegistry extends Service {
   private async deleteKnown(id: WorkspaceId): Promise<boolean> {
     const entity = this.entities.get(id)
     if (entity === undefined) return false
+    const lease = this.worktreeLeases.get(id)
     const state = this.requireState()
     const nextState = {
       initialized: true,
@@ -369,10 +584,12 @@ export class WorkspaceRegistry extends Service {
       pendingMutation: { operation: 'delete', workspaceId: id },
     })
     this.entities.delete(id)
+    this.worktreeLeases.delete(id)
     try {
       await this.requireTable().delete(id)
     } catch (error) {
       this.entities.set(id, entity)
+      if (lease !== undefined) this.worktreeLeases.set(id, lease)
       try {
         await this.setState(state)
       } catch (rollbackError) {
@@ -655,9 +872,38 @@ export class WorkspaceRegistry extends Service {
     this.operationTail = result.then(() => {}, () => {})
     return result
   }
+
+  private requireEntity(id: WorkspaceId): WorkspaceEntity {
+    const entity = this.entities.get(id)
+    if (entity === undefined) throw new Error(`workspace '${id}' not found`)
+    return entity
+  }
+
+  private requireHandle(handle: WorkspaceHandle): WorkspaceEntity {
+    const entity = this.requireEntity(handle.id)
+    const expected = entity.handle
+    const expectedWorktree = expected.worktree
+    const actualWorktree = handle.worktree
+    if (expected.path !== handle.path
+      || (expectedWorktree === undefined) !== (actualWorktree === undefined)
+      || (expectedWorktree !== undefined && actualWorktree !== undefined
+        && (expectedWorktree.repositoryRoot !== actualWorktree.repositoryRoot
+          || expectedWorktree.branch !== actualWorktree.branch
+          || expectedWorktree.commit !== actualWorktree.commit))) {
+      throw new Error(`workspace handle '${handle.id}' does not match the registered workspace`)
+    }
+    return entity
+  }
 }
 
 const sameSessionIds = (left: readonly SessionId[], right: readonly SessionId[]): boolean =>
   left.length === right.length && left.every((id, index) => id === right[index])
+
+function assertContained(root: string, candidate: string): void {
+  const path = relative(root, candidate)
+  if (path === ''
+    || (path !== '..' && !path.startsWith(`..${sep}`) && !isAbsolute(path))) return
+  throw new Error(`path '${candidate}' is outside workspace root '${root}'`)
+}
 
 export default WorkspaceRegistry

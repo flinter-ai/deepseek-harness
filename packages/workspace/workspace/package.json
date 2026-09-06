@@ -46,6 +46,8 @@
     "@deepseek-ai/cordis": "workspace:^"
   },
   "dependencies": {
+    "@deepseek-ai/dsh-home-paths": "workspace:^",
+    "@deepseek-ai/schemastery": "workspace:^",
     "zod": "^4.4.3"
   },
   "devDependencies": {

@@ -4,7 +4,11 @@ import type { Agent, AgentHandle, CreateAgentOptions } from '@deepseek-ai/dsh-ag
 import { PresetMountError } from '@deepseek-ai/dsh-agent-presets'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
-import type { Workspace, WorkspaceId } from '@deepseek-ai/dsh-workspace'
+import {
+  WorkspaceSessionLeaseConflictError,
+  type Workspace,
+  type WorkspaceId,
+} from '@deepseek-ai/dsh-workspace'
 import { describe, expect, it, vi } from 'vitest'
 import {
   ApiSessionAgentController,
@@ -99,6 +103,63 @@ describe('Session creation failures', () => {
       workspaceId: workspace.id,
     }), 'workspace-attach-failed')
     await failed.fiber.dispose()
+  })
+
+  it('maps a worktree lease conflict and releases a claimed lease on creation failure', async () => {
+    const conflict = await baseContext()
+    const workspaceId = 'workspace-lease' as WorkspaceId
+    const workspace = {
+      id: workspaceId,
+      path: '/workspace',
+      handle: {
+        id: workspaceId,
+        path: '/workspace',
+        worktree: { repositoryRoot: '/repo', branch: 'dsh/workspace/test', commit: 'a'.repeat(40) },
+      },
+      worktree: { repositoryRoot: '/repo', branch: 'dsh/workspace/test', commit: 'a'.repeat(40) },
+      attachSession: vi.fn(),
+    } as unknown as Workspace
+    const claimSession = vi.fn().mockRejectedValue(new WorkspaceSessionLeaseConflictError(
+      workspaceId,
+      SessionId('requested'),
+      SessionId('owner'),
+    ))
+    conflict.provide('workspaceRegistry', {
+      get: () => workspace,
+      list: () => [workspace],
+      claimSession,
+      releaseSession: vi.fn(),
+    } as never)
+    const controller = new SessionCommandController(conflict, controllerAgents(), '/default')
+
+    await expectFailure(controller.create({
+      workspaceId,
+      sessionId: SessionId('requested'),
+    }), 'workspace-lease-conflict')
+    expect(claimSession).toHaveBeenCalledWith(workspace.handle, SessionId('requested'))
+    expect(workspace.attachSession).not.toHaveBeenCalled()
+    await conflict.fiber.dispose()
+
+    const release = await baseContext()
+    const releaseWorkspace = { ...workspace, id: 'workspace-release' as WorkspaceId } as unknown as Workspace
+    const releaseSession = vi.fn().mockResolvedValue(undefined)
+    release.provide('workspaceRegistry', {
+      get: () => releaseWorkspace,
+      list: () => [releaseWorkspace],
+      claimSession: vi.fn().mockResolvedValue(undefined),
+      releaseSession,
+    } as never)
+    const failing = new SessionCommandController(
+      release,
+      controllerAgents({ ensureSession: () => Promise.reject(new Error('factory failed')) }),
+      '/default',
+    )
+    await expectFailure(failing.create({
+      workspaceId: releaseWorkspace.id,
+      sessionId: SessionId('failed-worktree-session'),
+    }), 'internal')
+    expect(releaseSession).toHaveBeenCalledWith(SessionId('failed-worktree-session'))
+    await release.fiber.dispose()
   })
 
   it.each([

@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises'
+import { execFile } from 'node:child_process'
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
+import { promisify } from 'node:util'
 import { Context } from '@deepseek-ai/cordis'
 import Storage from '@deepseek-ai/dsh-storage'
 import type { StorageBackend } from '@deepseek-ai/dsh-storage'
@@ -11,9 +13,11 @@ import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionHeader } from '@deepseek-ai/dsh-session'
 import { MemoryMediaPool, MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
 import WorkspaceRegistry, {
+  type Config,
   WorkspaceId,
   WorkspaceMoveInvalidError,
   WorkspaceOrderInvalidError,
+  WorkspaceSessionLeaseConflictError,
 } from '../src/index.ts'
 import type { WorkspaceDomainState, WorkspaceRecord } from '../src/index.ts'
 
@@ -32,6 +36,7 @@ interface HarnessOptions {
   liveSessions?: SessionHeader[]
   sessionStore?: boolean
   backend?: StorageBackend
+  config?: Config
 }
 
 /** Boot the real storage/domain/registry composition over controllable header-only peers. */
@@ -62,7 +67,9 @@ async function harness(options: HarnessOptions = {}) {
 
   const changes: DomainChanged[] = []
   ctx.on('domain/changed', (change) => { changes.push(change) })
-  const fiber = await ctx.plugin(WorkspaceRegistry)
+  const fiber = options.config === undefined
+    ? await ctx.plugin(WorkspaceRegistry)
+    : await ctx.plugin(WorkspaceRegistry, options.config)
   const initChanges = [...changes]
   changes.length = 0
   return {
@@ -169,6 +176,24 @@ function storedState(pool: MemoryMediaPool): WorkspaceDomainState {
 
 let base: string
 const tempDirs: string[] = []
+const execFileAsync = promisify(execFile)
+
+async function git(cwd: string, ...args: string[]): Promise<string> {
+  const result = await execFileAsync('git', args, { cwd, encoding: 'utf8' })
+  return result.stdout.trim()
+}
+
+async function makeGitRepository(): Promise<{ root: string; commit: string }> {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'dsh-worktree-repository-')))
+  tempDirs.push(root)
+  await git(root, 'init', '-b', 'main')
+  await git(root, 'config', 'user.email', 'dsh-workspace-tests@example.invalid')
+  await git(root, 'config', 'user.name', 'DSH Workspace Tests')
+  await writeFile(join(root, 'base.txt'), 'base\n')
+  await git(root, 'add', 'base.txt')
+  await git(root, 'commit', '-m', 'initial')
+  return { root, commit: await git(root, 'rev-parse', 'HEAD') }
+}
 
 async function makeDir(name: string): Promise<string> {
   base ??= await realpath(await mkdtemp(join(tmpdir(), 'dsh-workspace-')))
@@ -379,6 +404,128 @@ describe('WorkspaceRegistry create and lookup', () => {
     expect(left).toBe(right)
     expect(registry.list()).toEqual([left])
     expect(pool.media.get('workspace')!.tables.get('workspaces')!.size).toBe(1)
+  })
+
+  it('creates isolated branch-backed workspaces and exposes one frozen handle', async () => {
+    const repository = await makeGitRepository()
+    const worktreeRoot = await mkdtemp(join(tmpdir(), 'dsh-worktree-root-'))
+    tempDirs.push(worktreeRoot)
+    const { registry } = await harness({ config: { worktreeRoot } })
+
+    const first = await registry.createWorktree({ repository: repository.root })
+    const second = await registry.createWorktree({ repository: repository.root })
+
+    expect(first.path).not.toBe(second.path)
+    expect(first.worktree).toMatchObject({
+      repositoryRoot: repository.root,
+      commit: repository.commit,
+    })
+    expect(first.worktree?.branch).toMatch(/^dsh\/workspace\//)
+    expect(registry.handleFor(first.id)).toBe(first.handle)
+    expect(Object.isFrozen(first.handle)).toBe(true)
+    expect(Object.isFrozen(first.handle.worktree)).toBe(true)
+
+    await writeFile(join(first.path, 'isolated.txt'), 'first\n')
+    await writeFile(join(second.path, 'isolated.txt'), 'second\n')
+    await expect(readFile(join(first.path, 'isolated.txt'), 'utf8')).resolves.toBe('first\n')
+    await expect(readFile(join(second.path, 'isolated.txt'), 'utf8')).resolves.toBe('second\n')
+    await expect(git(first.path, 'branch', '--show-current')).resolves.toBe(first.worktree?.branch)
+  })
+
+  it('removes a newly-created worktree when durable registration fails', async () => {
+    const repository = await makeGitRepository()
+    const worktreeRoot = await mkdtemp(join(tmpdir(), 'dsh-worktree-rollback-root-'))
+    tempDirs.push(worktreeRoot)
+    const pool = new MemoryMediaPool()
+    const { registry } = await harness({
+      pool,
+      config: { worktreeRoot },
+      backend: selectiveFailureBackend(pool, { putAt: 1 }),
+    })
+
+    await expect(registry.createWorktree({ repository: repository.root }))
+      .rejects.toThrow(/selected bootstrap put failure/)
+    await expect(readdir(worktreeRoot)).resolves.toEqual([])
+    const worktrees = await git(repository.root, 'worktree', 'list', '--porcelain')
+    expect(worktrees.match(/^worktree /gm)).toHaveLength(1)
+    await expect(git(repository.root, 'rev-parse', 'HEAD')).resolves.toBe(repository.commit)
+  })
+
+  it('resumes a persisted worktree without losing dirty files', async () => {
+    const repository = await makeGitRepository()
+    const worktreeRoot = await mkdtemp(join(tmpdir(), 'dsh-worktree-resume-root-'))
+    tempDirs.push(worktreeRoot)
+    const first = await harness({ config: { worktreeRoot } })
+    const workspace = await first.registry.createWorktree({ repository: repository.root })
+    const dirtyPath = join(workspace.path, 'dirty.txt')
+    await writeFile(dirtyPath, 'preserve me\n')
+    const id = workspace.id
+    const path = workspace.path
+    await first.fiber.dispose()
+
+    const nextFiber = await first.ctx.plugin(WorkspaceRegistry, { worktreeRoot })
+    const resumed = await first.ctx.workspaceRegistry.resumeWorktree(id)
+    expect(resumed.path).toBe(path)
+    expect(resumed.handle).toEqual(workspace.handle)
+    await expect(readFile(dirtyPath, 'utf8')).resolves.toBe('preserve me\n')
+    await nextFiber.dispose()
+  })
+
+  it('rejects foreign and traversal paths for an authenticated workspace handle', async () => {
+    const repository = await makeGitRepository()
+    const worktreeRoot = await mkdtemp(join(tmpdir(), 'dsh-worktree-path-root-'))
+    const foreignRoot = await mkdtemp(join(tmpdir(), 'dsh-worktree-foreign-root-'))
+    tempDirs.push(worktreeRoot, foreignRoot)
+    const { registry } = await harness({ config: { worktreeRoot } })
+    const workspace = await registry.createWorktree({ repository: repository.root })
+
+    expect(registry.resolvePath(workspace.handle, 'nested/file.txt'))
+      .toBe(join(workspace.path, 'nested/file.txt'))
+    expect(() => registry.resolvePath(workspace.handle, '../outside'))
+      .toThrow(/outside workspace root/)
+    expect(() => registry.resolvePath(workspace.handle, join(foreignRoot, 'file.txt')))
+      .toThrow(/outside workspace root/)
+    expect(() => registry.resolvePath({ ...workspace.handle, path: foreignRoot }))
+      .toThrow(/does not match the registered workspace/)
+  })
+
+  it('serializes one active lease per worktree and keeps directory workspaces compatible', async () => {
+    const repository = await makeGitRepository()
+    const worktreeRoot = await mkdtemp(join(tmpdir(), 'dsh-worktree-lease-root-'))
+    tempDirs.push(worktreeRoot)
+    const { registry } = await harness({ config: { worktreeRoot } })
+    const worktree = await registry.createWorktree({ repository: repository.root })
+
+    await registry.claimSession(worktree.handle, SessionId('lease-owner'))
+    await registry.claimSession(worktree.handle, SessionId('lease-owner'))
+    await expect(registry.claimSession(worktree.handle, SessionId('lease-contender')))
+      .rejects.toBeInstanceOf(WorkspaceSessionLeaseConflictError)
+    await registry.releaseSession(SessionId('lease-contender'))
+    await registry.releaseSession(SessionId('lease-owner'))
+    await expect(registry.claimSession(worktree.handle, SessionId('lease-contender'))).resolves.toBeUndefined()
+
+    const directory = await makeDir('directory-lease-compatibility')
+    const ordinary = await registry.create(directory)
+    await expect(registry.claimSession(ordinary.handle, SessionId('directory-owner'))).resolves.toBeUndefined()
+    await expect(registry.claimSession(ordinary.handle, SessionId('directory-contender'))).resolves.toBeUndefined()
+  })
+
+  it('releases a worktree lease when the owning live session is disposed', async () => {
+    const repository = await makeGitRepository()
+    const worktreeRoot = await mkdtemp(join(tmpdir(), 'dsh-worktree-disposal-root-'))
+    tempDirs.push(worktreeRoot)
+    const result = await harness({ config: { worktreeRoot }, sessionStore: true })
+    const workspace = await result.registry.createWorktree({ repository: repository.root })
+    const session = result.ctx.sessions.prepare(SessionId('disposed-owner'), {
+      meta: { cwd: workspace.path },
+    })
+    const detach = result.ctx.sessions.enter(session)
+    result.ctx.sessions.announce(session)
+
+    await result.registry.claimSession(workspace.handle, session.id)
+    detach()
+    await expect(result.registry.claimSession(workspace.handle, SessionId('new-owner')))
+      .resolves.toBeUndefined()
   })
 
   it('allows a duplicate display name on a different canonical path', async () => {

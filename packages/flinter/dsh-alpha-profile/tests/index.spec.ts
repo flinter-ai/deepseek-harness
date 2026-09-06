@@ -2,13 +2,17 @@ import { describe, expect, it } from 'vitest'
 import {
   bindFreshSession,
   buildFlinterProviderSettings,
+  buildFlinterProfileComposition,
+  consumeFlinterNativeSessionEvents,
   DIRECT_DEEPSEEK_ROUTE,
   FLINTER_AWS_SECRET_NAMES,
   FLINTER_CREDENTIAL_REFS,
+  FLINTER_NATIVE_EVENT_TYPES,
   FLINTER_MODEL_CAPACITIES,
   freshSessionProvider,
   PI_AI_DEFAULTS,
 } from '../src/index.ts'
+import { SessionId } from '@deepseek-ai/dsh-session'
 
 const endpoints = {
   arkAgentPlan: 'http://127.0.0.1:4101/v1',
@@ -83,5 +87,52 @@ describe('FLINTER alpha provider/profile layer', () => {
       model: 'deepseek-v4-flash',
       apiKeyEnv: 'DEEPSEEK_API_KEY',
     })
+  })
+
+  it('uses one DSH base/headless composition with only the credential backend swapped', () => {
+    const local = buildFlinterProfileComposition('tod')
+    const aws = buildFlinterProfileComposition('aws-worker')
+    expect(local.bundles).toEqual(['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless'])
+    expect(aws.bundles).toEqual(local.bundles)
+    expect(local.credentialPackage).toBe('@deepseek-ai/dsh-credentials-local')
+    expect(local.patches).toEqual([])
+    expect(aws.credentialPackage).toBe('@deepseek-ai/dsh-credentials-aws-secrets-manager')
+    expect(aws.patches).toMatchObject([
+      { id: 'credentials', disabled: true },
+      {
+        insert: [{
+          id: 'credentials-aws-secrets-manager',
+          name: '@deepseek-ai/dsh-credentials-aws-secrets-manager',
+          config: {
+            secretFormat: 'json',
+            allowWrites: false,
+            secretNames: FLINTER_AWS_SECRET_NAMES,
+          },
+        }],
+      },
+    ])
+    expect(JSON.stringify(aws)).not.toMatch(/(?:api[_-]?key|secret|token)\s*[:=]\s*[^,}]+/i)
+  })
+
+  it('consumes native events without dropping opaque plugin records', () => {
+    const session = {
+      version: 0,
+      id: SessionId('native-consumer'),
+      createdAt: 1,
+      delegationDepth: 0,
+    }
+    const events = [
+      { type: 'turn/start', seq: 0, time: 2, data: { turn: 0 } },
+      { type: 'plugin/opaque', seq: 1, time: 3, data: { value: 'preserve' } },
+      { type: 'turn/end', seq: 2, time: 4, data: { turn: 0, reason: { kind: 'completed' } } },
+    ] as unknown as import('@deepseek-ai/dsh-session').SessionEvent[]
+    const consumed = consumeFlinterNativeSessionEvents(session, events)
+
+    expect(FLINTER_NATIVE_EVENT_TYPES).toContain('turn/start')
+    expect(consumed.session).toBe(session)
+    expect(consumed.events).toBe(events)
+    expect(consumed.items).toHaveLength(4)
+    expect(consumed.items[0]).toEqual({ kind: 'session', header: session })
+    expect(consumed.items[2]).toEqual({ kind: 'event', event: events[1] })
   })
 })

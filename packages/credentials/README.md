@@ -28,6 +28,7 @@ Three packages provide the credential feature: one stores, looks up, and removes
 |---|---|---|
 | [`credentials/`](credentials/README.md) | Store, look up, and remove secrets at runtime while configuration only names them | `ctx.credentials` |
 | [`credentials-local/`](credentials-local/README.md) | The default on-machine store: a private YAML file, environment overrides win | registers `ctx.credentials` |
+| [`dsh-credentials-aws-secrets-manager/`](dsh-credentials-aws-secrets-manager/README.md) | Public AWS Secrets Manager reference provider; read-only by default | registers `ctx.credentials` in an AWS profile |
 | [`authorization/`](authorization/README.md) | Plugin-owned flows that obtain a credential by asking a human | `ctx.authorization` |
 
 -----

@@ -1,6 +1,6 @@
 ---
 description: "FLINTER's Phase 1 provider/profile, worker-launch, and attempt-safety seam over the pinned DeepSeek Harness alpha."
-kind: "package-library"
+kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-alpha-profile
@@ -9,13 +9,12 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`@deepseek-ai/dsh-alpha-profile` is the FLINTER-owned settings, worker-launch, and non-Orca attempt-safety layer over the pinned DeepSeek Harness alpha. It describes ARK, Modelflare, GMI Serving, and direct DeepSeek route references; records model-level context and output capacities; exposes selectable reasoning levels; binds a worker attempt to one DSH session and durable root; and provides fresh attempt roots, secret-free manifests, fencing, and canary checks. DSH remains the owner of the agent loop, session/event codec, provider construction, credential resolution, and tool runtime.
+`@deepseek-ai/dsh-alpha-profile` is the public FLINTER-owned settings, worker-launch, and non-Orca attempt-safety layer over the pinned DeepSeek Harness alpha. It describes ARK, Modelflare, GMI Serving, and direct DeepSeek route references; records model-level context and output capacities; exposes selectable reasoning levels; binds a worker attempt to one DSH session and durable root; and provides fresh attempt roots, secret-free manifests, fencing, and canary checks. DSH remains the owner of the agent loop, session/event codec, provider construction, credential resolution, and tool runtime.
 
 ## Table of Contents
 
 - [Use this package](#use-this-package)
 - [Route and worker boundaries](#route-and-worker-boundaries)
-- [Model Experience](#model-experience)
 - [Attempt safety](#attempt-safety)
 - [Understand the implementation](#understand-the-implementation)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
@@ -33,24 +32,14 @@ Use the profile when a host needs FLINTER's provider settings or needs to launch
 - Modelflare is the rotation route outside that window.
 - GMI Serving is explicit-only; it is not automatic rotation.
 - Direct DeepSeek remains the separate `dsh-llm-deepseek` route.
-- AWS integration consumes the same credential references through an alpha-compatible provider seam; this package does not read or synchronize AWS secrets.
+- AWS integration consumes the same credential references through the public `@deepseek-ai/dsh-credentials-aws-secrets-manager` provider seam; this package does not read or synchronize AWS secrets.
 - Agent Teams, Runta, Beam, Tower, and the control plane remain separate capabilities.
 
-## Model Experience
+## One harness, two credential backends
 
-### Profile-selected request
+`buildFlinterProfileComposition('tod')` and `buildFlinterProfileComposition('aws-worker')` describe the same `dsh-base` plus `dsh-headless` composition. The AWS variant changes only the `ctx.credentials` provider row and supplies public reference-to-secret-name mappings. It does not create a second DSH installation, agent loop, session codec, or provider catalog.
 
-#### What the model sees
-
-The selected DSH model receives the normal native session history, current system prompt, tools, and user input. The profile contributes route selection and model capacity metadata such as `contextWindow`; it does not rewrite canonical session events or invent a parallel prompt history.
-
-#### Token effect
-
-The selected model's declared `contextWindow` and optional `maxTokens` constrain request assembly and output admission through DSH's native model configuration. Exact tokenization and provider acceptance remain provider-specific.
-
-#### KV Cache effect
-
-Fresh-session route selection is captured with the session. Reusing a session preserves its provider/model route, while changing the time-of-day default affects only a new session and therefore does not silently change an existing request prefix.
+The local `tod` launcher remains the source-checkout convenience wrapper. The AWS worker profile is a thin, read-only overlay for a later deployment probe; it is not a deployment manifest and does not contain account or secret material.
 
 ## Known Limitations and Deferred Work
 

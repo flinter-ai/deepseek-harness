@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/flinter/README.md
-README.md: e1fee8c6fe06436ac5714e47cfa5785de2970dbe
-README.zh.md: eb1b999c69ebeef7956c47bb1d0b6424c439d43f
+README.md: 58339a7a64fd8cf92a25c6c6251853a9b8ca940e
+README.zh.md: 60e2be9d00d315c5538c4a5cb9b32883e904318b

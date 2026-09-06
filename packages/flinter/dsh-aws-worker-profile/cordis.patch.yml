@@ -1,0 +1,20 @@
+# Public AWS worker profile overlay.
+#
+# This is the only difference from the local alpha profile's credential
+# source. DSH base/headless, sessions, tools, model routes, event persistence,
+# worker identity, and attempt safety remain the same composition.
+
+- id: credentials
+  disabled: true
+
+- insert:
+    - id: credentials-aws-secrets-manager
+      name: '@deepseek-ai/dsh-credentials-aws-secrets-manager'
+      config:
+        secretNames:
+          ARK_PLAN_API_KEY: flinter/dsh-ark-agent-plan
+          MODELFLARE_API_KEY: flinter/dsh-modelflare
+          GMI_SERVING_API_KEY: flinter/dsh-gmi-serving
+          DEEPSEEK_API_KEY: flinter/dsh-deepseek-official
+        secretFormat: json
+        allowWrites: false

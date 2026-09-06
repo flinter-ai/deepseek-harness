@@ -13,6 +13,13 @@ import type { WorkspaceId } from './types.ts'
 /** Workspace id schema at the durable boundary; branding has no runtime representation. */
 const workspaceId = z.string().transform(value => value as WorkspaceId)
 
+/** Durable Git metadata for a workspace-backed worktree. */
+export const workspaceWorktreeRecord = z.object({
+  repositoryRoot: z.string(),
+  branch: z.string(),
+  commit: z.string(),
+})
+
 /**
  * Durable shape of one workspace record. `path` is the `fs.realpath` canon
  * stamped at create; `sessionIds` is the ordered ownership account (array
@@ -24,6 +31,7 @@ export const workspaceRecord = z.object({
   sessionIds: z.array(z.string().transform(SessionId)),
   createdAt: z.string(),
   updatedAt: z.string(),
+  worktree: workspaceWorktreeRecord.optional(),
 })
 
 /** One stored workspace record, inferred from {@link workspaceRecord}. */

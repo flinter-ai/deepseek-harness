@@ -22,7 +22,9 @@ const PATTERNS = [
   'docs/**/*.md',
   'packages/*/*.md',
   'packages/*/*/*.md',
-  'snapshots/**/system-prompt.expected.md',
+  // Expand the snapshot tree first. Node's fs.globSync can treat a symlinked
+  // terminal match as a directory when `**/system-prompt.expected.md` is used.
+  'snapshots/**',
   'packages/**/system-prompt.expected.md',
   'AGENTS.md',
   'packages/AGENTS.md',
@@ -70,7 +72,13 @@ function findViolations(absPath: string): Violation[] {
   return out
 }
 
-const files = uniqueRepoFiles(root, PATTERNS, isArchivedAgentNotePath)
+const files = uniqueRepoFiles(root, PATTERNS, (relativePath) => {
+  if (isArchivedAgentNotePath(relativePath)) return true
+  if (relativePath === 'snapshots' || relativePath.startsWith('snapshots/')) {
+    return !relativePath.endsWith('/system-prompt.expected.md')
+  }
+  return false
+})
 const all = files.flatMap(file => findViolations(file.abs))
 const checked = files.length
 

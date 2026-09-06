@@ -12,7 +12,7 @@ import { stat } from 'node:fs/promises'
 import type { SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
 import type { KvTable } from '@deepseek-ai/dsh-storage-domain'
 import type { WorkspaceRecord } from './spec.ts'
-import type { Workspace, WorkspaceId } from './types.ts'
+import type { Workspace, WorkspaceHandle, WorkspaceId, WorkspaceWorktreeRecord } from './types.ts'
 import { realpathNormalize } from './paths.ts'
 
 /** An insertSessionBefore request named a session or anchor not on the account (storage failures stay plain errors). */
@@ -68,6 +68,7 @@ const unchangedSentinel = new Error('workspace record unchanged (internal sentin
 /** The single {@link Workspace} implementation; constructed only by the registry. */
 export class WorkspaceEntity implements Workspace {
   private record: WorkspaceRecord
+  private readonly workspaceHandle: WorkspaceHandle
 
   /**
    * @param host - Registry-owned table, session-path index, and header reads.
@@ -80,10 +81,26 @@ export class WorkspaceEntity implements Workspace {
     record: WorkspaceRecord,
   ) {
     this.record = record
+    const worktree = record.worktree === undefined
+      ? undefined
+      : Object.freeze({ ...record.worktree }) as WorkspaceWorktreeRecord
+    this.workspaceHandle = Object.freeze({
+      id,
+      path: record.path,
+      ...(worktree === undefined ? {} : { worktree }),
+    })
+  }
+
+  get handle(): WorkspaceHandle {
+    return this.workspaceHandle
   }
 
   get path(): string {
     return this.record.path
+  }
+
+  get worktree(): WorkspaceWorktreeRecord | undefined {
+    return this.workspaceHandle.worktree
   }
 
   get title(): string {

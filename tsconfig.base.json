@@ -235,6 +235,14 @@
       // so its package aliases remain hand-written rather than generated.
       "@deepseek-ai/dsh-alpha-profile": ["./packages/flinter/dsh-alpha-profile/src"],
       "@deepseek-ai/dsh-alpha-profile/invariant": ["./packages/flinter/dsh-alpha-profile/src/invariant.ts"],
+      // The AWS credential adapter keeps the dsh-prefixed public package name
+      // in a historical directory, so its aliases remain hand-written too.
+      "@deepseek-ai/dsh-credentials-aws-secrets-manager": ["./packages/credentials/dsh-credentials-aws-secrets-manager/src"],
+      "@deepseek-ai/dsh-credentials-aws-secrets-manager/invariant": ["./packages/credentials/dsh-credentials-aws-secrets-manager/src/invariant.ts"],
+      // This public FLINTER bundle also retains a dsh-prefixed package name
+      // in its directory, so keep its source aliases explicit.
+      "@deepseek-ai/dsh-aws-worker-profile": ["./packages/flinter/dsh-aws-worker-profile/src"],
+      "@deepseek-ai/dsh-aws-worker-profile/invariant": ["./packages/flinter/dsh-aws-worker-profile/src/invariant.ts"],
       // BEGIN generated package aliases — pnpm run gen-tsconfig-paths
       "@deepseek-ai/dsh-acp": ["./packages/acp/acp/src"],
       "@deepseek-ai/dsh-acp/invariant": ["./packages/acp/acp/src/invariant.ts"],

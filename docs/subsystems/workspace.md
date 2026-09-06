@@ -2,7 +2,7 @@
 
 English | [中文](workspace.zh.md)
 
-A workspace is the persistent record of a directory the user works in: a stable id over a canonical path, a display title, and the ordered account of sessions that belong to it. The subsystem is one package ([dsh-workspace](../../packages/workspace/workspace), `ctx.workspaceRegistry`) — an optional host-side capability, not part of the agent-loop spine, and invisible to models (no tools, no prompt text, no session events). It stores its records through the [storage domain form](storage.md) and validates session membership against [`SessionHeader.cwd`](persistence.md#sessionheader--metadata-beside-the-log), so `storageDomain` and `sessionPersistence` are mandatory startup dependencies: an unavailable persistence peer leaves the plugin pending rather than being mistaken for an empty history. Design record: [domain KV storage Agent Note](../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md); bootstrap and GUI ordering: [Workspace UI product-flow Agent Note](../../.agents/notes/implemented/feature/2026-07-25-workspace-ui-product-flow.md).
+A workspace is the persistent project record for a directory the user works in: a stable id over a canonical path, a display title, and the ordered account of sessions that belong to it. A coding project can own one Git worktree and exposes one immutable handle for every workspace-aware host adapter. The subsystem is one package ([dsh-workspace](../../packages/workspace/workspace), `ctx.workspaceRegistry`) — an optional host-side capability, not part of the agent-loop spine, and invisible to models (no tools, no prompt text, no session events). It stores its records through the [storage domain form](storage.md) and validates session membership against [`SessionHeader.cwd`](persistence.md#sessionheader--metadata-beside-the-log), so `storageDomain` and `sessionPersistence` are mandatory startup dependencies: an unavailable persistence peer leaves the plugin pending rather than being mistaken for an empty history. Design record: [domain KV storage Agent Note](../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md); bootstrap and GUI ordering: [Workspace UI product-flow Agent Note](../../.agents/notes/implemented/feature/2026-07-25-workspace-ui-product-flow.md).
 
 Source: [`packages/workspace/workspace/src/types.ts`](../../packages/workspace/workspace/src/types.ts)
 
@@ -17,6 +17,38 @@ type WorkspaceId = Branded<'WorkspaceId'>
 ```
 
 `WorkspaceId` is a [branded id](core.md#branded-ids). Path identity is separate: `realpathNormalize` (`fs.realpath`; trailing slashes, `..`, and symlinks resolved) is the one uniqueness canon — workspace paths are stored canonicalized, uniqueness is string equality of canonical paths (a symlink to an owned directory collides), and attach-time session cwd checks go through the same canon.
+
+## Project and worktree identity
+
+The workspace record is the project owner for repository-backed sessions. `createWorktree()` creates one generated branch and worktree from a source repository and base commit; host adapters carry the returned handle instead of selecting another checkout from process cwd. Directory-backed workspaces remain valid compatibility records.
+
+```ts type-equiv
+/** Git metadata that makes a workspace's directory a first-class worktree. */
+interface WorkspaceWorktreeRecord {
+  /** Canonical root of the source Git repository. */
+  readonly repositoryRoot: string
+
+  /** Branch checked out by this workspace's worktree. */
+  readonly branch: string
+
+  /** Commit used as the worktree's creation base. */
+  readonly commit: string
+}
+```
+
+```ts type-equiv
+/** Stable, immutable identity passed between host-side workspace adapters. */
+interface WorkspaceHandle {
+  /** Stable workspace record id. */
+  readonly id: WorkspaceId
+
+  /** Canonical directory owned by the workspace. */
+  readonly path: string
+
+  /** Git metadata when the directory is a managed worktree. */
+  readonly worktree?: WorkspaceWorktreeRecord
+}
+```
 
 ## The workspace entity
 
@@ -33,12 +65,18 @@ interface Workspace {
   /** Stable record id (generated uuid). */
   readonly id: WorkspaceId
 
+  /** Immutable identity shared by host-side workspace adapters. */
+  readonly handle: WorkspaceHandle
+
   /**
    * Canonical directory path: the `fs.realpath` of the path given at create
    * time (trailing slashes, `..`, and symlinks all resolved). Never rewritten
    * afterwards, even when the directory disappears (see {@link status}).
    */
   readonly path: string
+
+  /** Git metadata when this workspace owns a managed worktree. */
+  readonly worktree: WorkspaceWorktreeRecord | undefined
 
   /** Display title. Defaults to `basename(path)` at create; duplicates are allowed. */
   readonly title: string
@@ -117,13 +155,15 @@ Ownership truth is the record's ordered `sessionIds`, never derived from session
 
 ## The registry: `ctx.workspaceRegistry`
 
-`WorkspaceRegistry` ([signatures](#ctxworkspaceregistry--workspaceregistry)) owns registration and resolution. `create(path, title?)` canonicalizes the path, rejects a nonexistent path (the original `ENOENT`) or a non-directory, returns the existing entity unchanged when the canonical path is already owned, and otherwise creates a record with `title ?? basename(path)` prepended to the durable registry order (different canonical paths may share a display title). `get(id)` and the ordered `list()` are synchronous cache reads; `resolveByPath(path)` applies the same realpath canon without creating. `delete(id)` removes only the registration, order entry, and session account — the directory, user files, live sessions, and persisted logs are never touched, so those sessions become Ungrouped ([decision](../../.agents/notes/implemented/feature/2026-07-27-workspace-registration-deletion.md)); unknown ids return `false`. Create and delete persist a pending-mutation marker before their two writes (record + order) can diverge; startup resolves exactly the marked mutation — by deleting the marked table row, which completes an interrupted delete and rolls back an interrupted create (the registration is re-creatable, so rollback is the safe direction) — and an unmarked order/table mismatch fails loud as corruption.
+`WorkspaceRegistry` ([signatures](#ctxworkspaceregistry--workspaceregistry)) owns registration and resolution. `create(path, title?)` canonicalizes the path, rejects a nonexistent path (the original `ENOENT`) or a non-directory, returns the existing entity unchanged when the canonical path is already owned, and otherwise creates a record with `title ?? basename(path)` prepended to the durable registry order (different canonical paths may share a display title). `createWorktree(options)` resolves a source repository and base commit, creates one generated branch and worktree below `worktreeRoot`, and persists its repository root, branch, and creation commit. `resumeWorktree(id)` verifies that persisted Git identity without rewriting dirty files or user commits. `get(id)` and the ordered `list()` are synchronous cache reads; `handleFor(id)` returns the immutable project handle; `resolvePath(handle, path?)` authenticates that handle and returns a lexically contained path; `resolveByPath(path)` applies the same realpath canon without creating. `claimSession(handle, sessionId)` and `releaseSession(sessionId)` enforce a process-local single-session lease for worktree-backed records; directory-backed records bypass the lease. `delete(id)` removes only the registration, order entry, and session account — the directory, user files, live sessions, persisted logs, and managed worktree are never touched, so those sessions become Ungrouped ([decision](../../.agents/notes/implemented/feature/2026-07-27-workspace-registration-deletion.md)); unknown ids return `false`. Create and delete persist a pending-mutation marker before their two writes (record + order) can diverge; startup resolves exactly the marked mutation — by deleting the marked table row, which completes an interrupted delete and rolls back an interrupted create (the registration is re-creatable, so rollback is the safe direction) — and an unmarked order/table mismatch fails loud as corruption.
 
-Sessions get their cwd at create time from whoever creates them, not from this registry — the API gateway resolves a new session's cwd from the chosen workspace's `path` (falling back to an explicit or default cwd), creates the session so the cwd lands in its immutable [`SessionHeader`](persistence.md#sessionheader--metadata-beside-the-log), then calls `attachSession`, which re-validates that stored header cwd against the workspace path. On the first successful start, the registry bootstraps history from persisted headers alone (`id`, `cwd`, `createdAt` — never event bodies), grouping sessions with a valid canonical cwd into per-directory workspaces, newest first; the initialized marker is written last so an interrupted bootstrap resumes safely. The bootstrap is one-time: cwd-less legacy sessions stay Ungrouped, and sessions created afterwards join a workspace only through `attachSession`.
+Sessions get their cwd at create time from whoever creates them, not from this registry — the API gateway resolves a new session's cwd from the chosen workspace's `path` (falling back to an explicit or default cwd), creates the session so the cwd lands in its immutable [`SessionHeader`](persistence.md#sessionheader--metadata-beside-the-log), then calls `attachSession`, which re-validates that stored header cwd against the workspace path. For a worktree workspace, the session controller claims the handle's lease before creation and releases it on creation failure or `session/disposed`. On the first successful start, the registry bootstraps history from persisted headers alone (`id`, `cwd`, `createdAt` — never event bodies), grouping sessions with a valid canonical cwd into per-directory workspaces, newest first; the initialized marker is written last so an interrupted bootstrap resumes safely. The bootstrap is one-time: cwd-less legacy sessions stay Ungrouped, and sessions created afterwards join a workspace only through `attachSession`.
 
 ## Consumers
 
-[`dsh-workspace-controller`](../../packages/api/workspace-controller) serves workspace CRUD to GUI clients over `ctx.workspaceRegistry`, and [`dsh-session-controller`](../../packages/api/session-controller) performs the create-session-then-attach flow above. [dsh-agent-instructions](../../packages/context/agent-instructions) is **not** a consumer despite the name: it discovers AGENTS.md-style instruction files under an agent's own cwd and never touches `ctx.workspaceRegistry` — the shared word refers to the user's working directory, not to this registry's entities.
+[`dsh-workspace-controller`](../../packages/api/workspace-controller) serves workspace CRUD to GUI clients over `ctx.workspaceRegistry`, and [`dsh-session-controller`](../../packages/api/session-controller) performs the create-session-then-attach flow above and claims worktree leases. This slice wires the shared handle through the session controller, terminal, local file-reference, and skill adapters. Editor, code-memory, InstaCloud, and GitHub/PR adapters are not present in this checkout and remain `NOT_RUN`; when added, they must receive the same `WorkspaceHandle` and use `resolvePath()` rather than infer a separate checkout. [dsh-agent-instructions](../../packages/context/agent-instructions) is **not** a consumer despite the name: it discovers AGENTS.md-style instruction files under an agent's own cwd and never touches `ctx.workspaceRegistry` — the shared word refers to the user's working directory, not to this registry's entities.
+
+The [Git worktree-backed workspace Agent Note](../../.agents/notes/implemented/architecture/2026-09-06-git-worktree-backed-workspaces.md) records the shared immutable handle, process-local worktree lease, and conservative worktree cleanup decision.
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -263,11 +303,67 @@ Durable workspace registry. Startup waits for `sessionPersistence`, builds one c
 async create(path: string, title?: string): Promise<Workspace>
 
 /**
+ * Create a new branch-backed Git worktree and register it as one workspace.
+ * The worktree is created before its durable record; a failed registry write
+ * removes only this newly-created, clean worktree.
+ *
+ * @param options - Source repository, optional base revision, branch, and title.
+ * @returns the newly durable worktree workspace.
+ */
+async createWorktree(options: CreateWorktreeOptions): Promise<Workspace>
+
+/**
+ * Verify and resume a persisted Git worktree workspace without changing it.
+ * Dirty files and user-created commits are intentionally preserved.
+ *
+ * @param id - Persisted worktree workspace id.
+ * @returns the verified workspace.
+ */
+async resumeWorktree(id: WorkspaceId): Promise<Workspace>
+
+/**
  * Look up a workspace by id.
  * @param id - Workspace id.
  * @returns the workspace, or `undefined` when unknown.
  */
 get(id: WorkspaceId): Workspace | undefined
+
+/**
+ * Return the immutable adapter handle for a workspace.
+ * @param id - Workspace id.
+ * @returns the stable handle, or `undefined` when unknown.
+ */
+handleFor(id: WorkspaceId): WorkspaceHandle | undefined
+
+/**
+ * Resolve a path under an authenticated workspace handle.
+ *
+ * @param handle - Handle previously returned by this registry.
+ * @param path - Absolute or workspace-relative path; defaults to the root.
+ * @returns a lexically contained absolute path.
+ */
+resolvePath(handle: WorkspaceHandle, path: string = '.'): string
+
+/**
+ * Return the worktree handle that currently accounts for a session.
+ * @param sessionId - Session id to locate.
+ * @returns the owning worktree handle, or `undefined`.
+ */
+worktreeForSession(sessionId: SessionId): WorkspaceHandle | undefined
+
+/**
+ * Claim the one active-session lease for a worktree.
+ *
+ * @param handle - Worktree workspace handle to claim.
+ * @param sessionId - Session that will operate in the worktree.
+ */
+claimSession(handle: WorkspaceHandle, sessionId: SessionId): Promise<void>
+
+/**
+ * Release every worktree lease held by a disposed session. Idempotent.
+ * @param sessionId - Session whose lease is ending.
+ */
+releaseSession(sessionId: SessionId): Promise<void>
 
 /**
  * Synchronous workspace projection in durable registry order. Every

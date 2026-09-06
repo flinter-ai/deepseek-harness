@@ -18,6 +18,12 @@ The local commands are recorded in `.github/workflows/ci.yml`. A skipped hosted 
 
 On PR #47, the hosted coverage gate ran for 571 seconds and failed a persistent PowerShell state assertion. The snapshots/artifacts gate failed three recorded-session assertions and a browser snapshot gate after 346 seconds. The failures were not evidence that the DSH archive change was incorrect; focused local tests and build/typecheck gates remained separate.
 
-## Consequence
+## Alternatives considered
+
+**Run every broad gate on every pull request:** Rejected because the slow, environment-sensitive suites make the required verdict less deterministic without improving the signal from the focused static and runtime checks.
+
+**Treat broad local gates as optional:** Rejected because release, cutover, and provider-facing decisions still need the wider coverage, snapshot, compatibility, and platform evidence.
+
+## Consequences
 
 PR review gets a short deterministic package-integrity signal. Local-only gates remain required before release, cutover, or any claim that depends on exhaustive coverage, recorded snapshots, cross-runtime compatibility, provider behavior, or cloud/platform evidence.
