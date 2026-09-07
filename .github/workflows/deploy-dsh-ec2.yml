@@ -1,0 +1,149 @@
+name: Deploy DSH Web to EC2
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/deploy-dsh-ec2.yml'
+      - 'apps/cli/**'
+      - 'deploy/dsh-ec2/**'
+      - 'packages/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'package.json'
+      - 'tsconfig*.json'
+      - 'vendor/**'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref or commit to deploy
+        required: true
+        default: master
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: dsh-ec2-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: DSH Web / EC2
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment:
+      name: dsh-ec2-production
+    env:
+      AWS_REGION: ${{ vars.DSH_AWS_REGION }}
+      DSH_INSTANCE_ID: ${{ vars.DSH_EC2_INSTANCE_ID }}
+      DSH_DEPLOY_ROLE_ARN: ${{ vars.DSH_DEPLOY_ROLE_ARN }}
+    steps:
+      - name: Check out deployment revision
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Validate deployment inputs
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$AWS_REGION" || { echo 'Missing dsh-ec2-production variable DSH_AWS_REGION' >&2; exit 1; }
+          test -n "$DSH_INSTANCE_ID" || { echo 'Missing dsh-ec2-production variable DSH_EC2_INSTANCE_ID' >&2; exit 1; }
+          test -n "$DSH_DEPLOY_ROLE_ARN" || { echo 'Missing dsh-ec2-production variable DSH_DEPLOY_ROLE_ARN' >&2; exit 1; }
+          [[ "$DSH_INSTANCE_ID" =~ ^i-[0-9a-f]+$ ]] || { echo 'DSH_EC2_INSTANCE_ID is not an EC2 instance ID' >&2; exit 1; }
+          [[ "$DSH_DEPLOY_ROLE_ARN" =~ ^arn:aws:iam::[0-9]{12}:role/[A-Za-z0-9+=,.@_/-]+$ ]] || { echo 'DSH_DEPLOY_ROLE_ARN is not an IAM role ARN' >&2; exit 1; }
+          deploy_sha=$(git rev-parse HEAD)
+          [[ "$deploy_sha" =~ ^[0-9a-f]{40}$ ]] || { echo 'The checked-out revision is not a full commit SHA' >&2; exit 1; }
+          echo "sha=$deploy_sha" >> "$GITHUB_OUTPUT"
+          echo "Validated DSH Web deployment revision $deploy_sha for the configured EC2 target."
+
+      - name: Configure AWS credentials through GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ env.DSH_DEPLOY_ROLE_ARN }}
+          role-session-name: github-dsh-ec2-deploy
+
+      - name: Verify EC2 and Systems Manager readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          instance_state=$(aws ec2 describe-instances \
+            --instance-ids "$DSH_INSTANCE_ID" \
+            --query 'Reservations[0].Instances[0].State.Name' \
+            --output text)
+          [[ "$instance_state" == running ]] || {
+            echo "Refusing deployment: EC2 target is $instance_state; start it and retry." >&2
+            exit 1
+          }
+          ssm_status=$(aws ssm describe-instance-information \
+            --filters "Key=InstanceIds,Values=$DSH_INSTANCE_ID" \
+            --query 'InstanceInformationList[0].PingStatus' \
+            --output text)
+          [[ "$ssm_status" == Online ]] || {
+            echo "Refusing deployment: Systems Manager target is $ssm_status; restore SSM and retry." >&2
+            exit 1
+          }
+          echo "EC2 target is running and Systems Manager is Online."
+
+      - name: Deploy through Systems Manager
+        id: command
+        shell: bash
+        env:
+          DEPLOY_SHA: ${{ steps.target.outputs.sha }}
+          # The live checkout was cloned from the canonical public DSH source,
+          # even when this workflow is rehearsed from an internal mirror.
+          DEPLOY_REMOTE: https://github.com/flinter-ai/deepseek-harness.git
+        run: |
+          set -euo pipefail
+          remote_script=$(<deploy/dsh-ec2/deploy.sh)
+          command_script=$(printf 'export DSH_DEPLOY_SHA=%q\nexport DSH_DEPLOY_REMOTE=%q\nexport DSH_DEPLOY_AWS_REGION=%q\n%s\n' \
+            "$DEPLOY_SHA" "$DEPLOY_REMOTE" "$AWS_REGION" "$remote_script")
+          parameters=$(jq -cn --arg script "$command_script" '{commands:[$script]}')
+          command_id=$(aws ssm send-command \
+            --instance-ids "$DSH_INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --comment "DSH Web deployment $DEPLOY_SHA" \
+            --parameters "$parameters" \
+            --query 'Command.CommandId' \
+            --output text)
+          echo "id=$command_id" >> "$GITHUB_OUTPUT"
+          echo "Started SSM deployment command $command_id."
+
+          for _ in {1..300}; do
+            status=$(aws ssm get-command-invocation \
+              --command-id "$command_id" \
+              --instance-id "$DSH_INSTANCE_ID" \
+              --query 'StatusDetails' \
+              --output text)
+            case "$status" in
+              Success)
+                echo 'SSM deployment command completed successfully.'
+                aws ssm get-command-invocation \
+                  --command-id "$command_id" \
+                  --instance-id "$DSH_INSTANCE_ID" \
+                  --query 'StandardOutputContent' \
+                  --output text | sed -n '/^dsh-ec2-deploy:/p'
+                exit 0
+                ;;
+              Failed|TimedOut|Cancelled|Cancelling)
+                echo "SSM deployment command ended with $status." >&2
+                exit 1
+                ;;
+              Pending|InProgress|Delayed)
+                sleep 5
+                ;;
+              *)
+                echo "SSM deployment command returned unexpected status $status." >&2
+                exit 1
+                ;;
+            esac
+          done
+          echo 'SSM deployment command did not complete before the workflow timeout.' >&2
+          exit 1
