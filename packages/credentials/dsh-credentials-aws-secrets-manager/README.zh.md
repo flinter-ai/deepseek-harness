@@ -49,7 +49,7 @@ kind: "package-reference"
 {"ARK_PLAN_API_KEY": "<value supplied outside this repository>"}
 ```
 
-默认 profile 为只读。`resolve` 和 `describe` 通过 AWS SDK 标准凭据链在请求时读取。除非经过单独审查并明确启用 `allowWrites`，否则 `set` 和 `unset` 会安全失败。
+默认 profile 对 AWS 引用为只读。`resolve` 和 `describe` 通过 AWS SDK 标准凭据链在请求时读取。除非经过单独审查并明确启用 `allowWrites`，否则 `set` 和 `unset` 会安全失败。provider 还会将 DSH 浏览器会话授权记录保存在进程内存中；该记录不会写入 AWS，并会在下次 DSH 进程启动时重新生成。
 
 ### 配置
 
@@ -67,7 +67,7 @@ kind: "package-reference"
 
 provider 只负责 AWS 后端的引用查询。DSH 仍负责 agent loop、Session、原生事件、模型/提供方选择和请求组装。FLINTER alpha profile 负责路由到 secret 名称的映射。因此本地 `tod` 和 AWS worker 使用同一套 DSH 安装与路由引用；只有凭据 provider 行发生变化。
 
-记录型凭据操作在本适配器中明确不支持。provider 所有者的授权记录仍留在其专属存储中；Phase 1 的 AWS seam 只服务模型 API key 引用。
+浏览器会话所需的记录型操作仅保存在 provider 进程内存中，不会写入 Secrets Manager；模型 API key 仍只通过 AWS 引用按请求解析。DSH 进程重启后会重新生成浏览器授权记录。
 
 | 文件 | 作用 |
 |---|---|
@@ -112,7 +112,7 @@ Credential values and provider authorization metadata are not appended to the mo
 
 - **Phase 1 只有 mock 证据** — 测试证明适配器合约，不声称已完成 AWS 部署或 IAM 证明。
 - **没有外部轮换事件** — Secrets Manager 不提供本地文件 watcher 的更新事件；下一次请求会解析当前值。
-- **仅支持引用** — plugin 的记录型授权仍不在本适配器范围内。
+- **没有持久记录存储**——浏览器会话授权保存在进程内存中；本适配器不提供持久 API-key 记录。
 - **alpha profile 不写 AWS 状态** — profile 设置 `allowWrites: false`；部署写权限需要后续明确审查。
 
 <a id="dev-note"></a>

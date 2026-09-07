@@ -49,7 +49,7 @@ The names above are public routing metadata. The secret contents are supplied on
 {"ARK_PLAN_API_KEY": "<value supplied outside this repository>"}
 ```
 
-The default profile is read-only. `resolve` and `describe` perform request-time reads through the standard AWS SDK credential chain. `set` and `unset` fail closed unless a separately reviewed deployment explicitly enables `allowWrites`.
+The default profile is read-only for AWS references. `resolve` and `describe` perform request-time reads through the standard AWS SDK credential chain. `set` and `unset` fail closed unless a separately reviewed deployment explicitly enables `allowWrites`. The provider also keeps the DSH browser-session grant record in process-local memory; it never writes that record to AWS, and it is recreated on the next DSH process start.
 
 ### Configuration
 
@@ -67,7 +67,7 @@ The default profile is read-only. `resolve` and `describe` perform request-time 
 
 The provider owns only the AWS-backed reference lookup. DSH still owns the agent loop, sessions, native events, model/provider selection, and request assembly. The FLINTER alpha profile owns the route-to-secret-name mapping. Local `tod` and AWS workers therefore use one DSH installation and one set of route references; only the credential provider row changes.
 
-Record-based credential operations are intentionally unsupported by this adapter. Provider-owned authorization records remain in the owner-specific store; the AWS Phase 1 seam is for model API-key references only.
+Browser-session record operations are process-local and never write to Secrets Manager; model API keys remain AWS references resolved at request time. Browser authorization records are recreated when the DSH process starts.
 
 | File | Role |
 |---|---|
@@ -112,7 +112,7 @@ Credential values and provider authorization metadata are not appended to the mo
 
 - **Mock evidence only in Phase 1** — the component suite proves the adapter contract without claiming AWS deployment or IAM proof.
 - **No external-rotation event** — Secrets Manager does not provide the local file watcher's update event through this package; the next request resolves the current value.
-- **Reference-only scope** — record-based plugin grants remain outside this adapter.
+- **No durable record store** — browser-session grants are process-local; durable API-key records are not supplied by this adapter.
 - **No AWS state is written by the alpha profile** — the profile sets `allowWrites: false`; deployment write access requires a later explicit review.
 
 <a id="dev-note"></a>
