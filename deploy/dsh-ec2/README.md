@@ -50,10 +50,12 @@ required by the profile.
 
 The repository currently does not create the GitHub OIDC provider or IAM role
 automatically. That is an account-level trust decision and must be provisioned
-once through the existing AWS infrastructure owner with the canonical
-`flinter-ai/deepseek-harness` repository and `master` ref pinned in the trust
-policy. Until the three environment variables and that trust relationship exist,
-the workflow fails closed before sending a command.
+once through the existing AWS infrastructure owner. The role trust policy must
+use the canonical `flinter-ai/deepseek-harness` repository's immutable OIDC
+subject for the `dsh-ec2-production` environment; the environment's deployment
+branch policy separately allows only `master`. Until the three environment
+variables and that trust relationship exist, the workflow fails closed before
+sending a command.
 
 ## EC2 prerequisites
 

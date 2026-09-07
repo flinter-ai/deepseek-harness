@@ -43,9 +43,11 @@ GitHub role 只需要区域内 EC2 状态读取、SSM 目标就绪检查、针�
 权限主体，并且应只保留 profile 实际需要的读取权限。
 
 本仓库当前不会自动创建 GitHub OIDC provider 或 IAM role。这是账户级信任
-决策，必须由现有 AWS 基础设施负责人一次性配置，并在 trust policy 中固定
-规范的 `flinter-ai/deepseek-harness` 仓库和 `master` ref。在三项 environment
-变量和该信任关系存在之前，工作流会在发送命令前 fail closed。
+决策，必须由现有 AWS 基础设施负责人一次性配置。role 的 trust policy 必须
+使用规范 `flinter-ai/deepseek-harness` 仓库在 `dsh-ec2-production` environment
+中的 immutable OIDC subject；environment 的 deployment branch policy 另外只允许
+`master`。在三项 environment 变量和该信任关系存在之前，工作流会在发送命令前
+fail closed。
 
 ## EC2 前置条件
 
