@@ -97,6 +97,9 @@ export interface FlinterModelProfile {
   contextWindow: number
   maxTokens?: number
   reasoningEfforts?: FlinterReasoningEfforts | false
+  compat?: {
+    supportsDeveloperRole?: boolean
+  }
 }
 
 /** One OpenAI-compatible provider route in the alpha settings schema. */
@@ -128,6 +131,7 @@ function profile(
   model: string,
   capacity: { contextWindow: number; maxTokens?: number },
   reasoningEfforts?: FlinterReasoningEfforts | false,
+  compat?: FlinterModelProfile['compat'],
 ): FlinterProviderProfile {
   return {
     displayName,
@@ -144,6 +148,7 @@ function profile(
       ...reasoningEfforts === undefined
         ? {}
         : { reasoningEfforts: reasoningEfforts === false ? false : { ...reasoningEfforts } },
+      ...compat === undefined ? {} : { compat: { ...compat } },
     }],
   }
 }
@@ -168,6 +173,7 @@ export function buildFlinterProviderSettings(
         'ark-code-latest',
         FLINTER_MODEL_CAPACITIES.arkCodeLatest,
         reasoningEfforts['ark-agent-plan'] ?? FLINTER_DEFAULT_REASONING_EFFORTS,
+        { supportsDeveloperRole: false },
       ),
       modelflare: profile(
         'Modelflare',
