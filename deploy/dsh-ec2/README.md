@@ -19,9 +19,10 @@ manually with an explicit Git ref. The workflow:
 2. authenticates to AWS with GitHub OIDC and a narrowly scoped deployment role;
 3. refuses a stopped EC2 instance or an SSM-offline target;
 4. sends `deploy.sh` to the target through `AWS-RunShellScript`;
-5. verifies the checkout origin, rejects a dirty live tree, backs up the
-   profile files, installs the frozen lockfile, builds the provider and profile,
-   and reapplies the profile bundle;
+5. verifies the checkout origin, rejects tracked drift or untracked files that
+   collide with the target commit, backs up the profile files, installs the
+   frozen lockfile, builds the provider and profile, and reapplies the profile
+   bundle;
 6. resolves the Ark reference through the EC2 instance role, restarts
    `dsh.service`, checks port `3080`, expects HTTP `401` from the unauthenticated
    root, and checks that credential-shaped environment variables are absent.
@@ -63,17 +64,19 @@ The target must already have:
 
 - the live checkout at `/opt/dsh-phase2` with `origin` set to the canonical
   `https://github.com/flinter-ai/deepseek-harness.git` source;
-- a clean checkout, the `dsh.service` unit, and an active listener on `3080`;
+- a checkout without tracked drift, the `dsh.service` unit, and an active
+  listener on `3080`;
 - an SSM agent reporting `Online` and an instance profile able to read the
   configured Secrets Manager references;
-- the persistent DSH home at `/root/.dsh`, including the `tod` profile;
+- the persistent DSH home at `/root/.dsh-phase2`, including the `tod` profile;
 - Node and pnpm versions satisfying the repository lockfile and engine policy.
 
-The workflow does not start or stop the instance, force-reset a dirty checkout,
-rotate credentials, or expose a public port. A stopped instance is an explicit
-operator action followed by a new workflow run. Browser-session authorization
-records remain process-local and are recreated after a service restart; model
-API keys continue to resolve from Secrets Manager at request time.
+The workflow does not start or stop the instance, force-reset tracked checkout
+drift, rotate credentials, or expose a public port. Non-colliding untracked
+operational files remain in place. A stopped instance is an explicit operator
+action followed by a new workflow run. Browser-session authorization records
+remain process-local and are recreated after a service restart; model API keys
+continue to resolve from Secrets Manager at request time.
 
 ## Manual operation and rollback
 
