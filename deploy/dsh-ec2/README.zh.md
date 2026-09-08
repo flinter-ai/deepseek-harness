@@ -17,8 +17,9 @@ runtime、profile、provider 或部署文件时运行，也可以手动输入明
 2. 通过 GitHub OIDC 和范围受限的部署 role 认证 AWS；
 3. 对已停止的 EC2 或 SSM 离线目标直接拒绝；
 4. 通过 `AWS-RunShellScript` 将 `deploy.sh` 发送到目标；
-5. 验证 checkout origin、拒绝脏的 live tree、备份 profile 文件、使用冻结
-   lockfile 安装依赖、构建 provider 和 profile，并重新执行 profile bundle 安装；
+5. 验证 checkout origin、拒绝 tracked drift 或与目标 commit 冲突的 untracked
+   文件、备份 profile 文件、使用冻结 lockfile 安装依赖、构建 provider 和
+   profile，并重新执行 profile bundle 安装；
 6. 通过 EC2 instance role 解析 Ark 引用，重启 `dsh.service`，检查 `3080` 端口，
    期望未认证根路径返回 HTTP `401`，并检查凭据形状的环境变量不存在。
 
@@ -55,16 +56,18 @@ fail closed。
 
 - `/opt/dsh-phase2` 下的 live checkout，且 `origin` 为规范的
   `https://github.com/flinter-ai/deepseek-harness.git` source；
-- clean checkout、`dsh.service` unit，以及监听 `3080` 的 active 服务；
+- 没有 tracked drift 的 checkout、`dsh.service` unit，以及监听 `3080` 的 active
+  服务；
 - 报告为 `Online` 的 SSM agent，以及能够读取配置的 Secrets Manager 引用的
   instance profile；
-- `/root/.dsh` 下的持久 DSH home，包括 `tod` profile；
+- `/root/.dsh-phase2` 下的持久 DSH home，包括 `tod` profile；
 - 满足仓库 lockfile 和 engine policy 的 Node 与 pnpm 版本。
 
-工作流不会启动或停止 instance，不会强制 reset 脏 checkout，不会轮换凭据，
-也不会开放 public port。停止状态必须由 operator 明确处理，然后重新运行工作流。
-浏览器 session 授权记录仍然保存在进程内，服务重启后会重新创建；模型 API 密钥
-继续在请求时从 Secrets Manager 解析。
+工作流不会启动或停止 instance，不会强制 reset tracked checkout drift，不会
+轮换凭据，也不会开放 public port。与目标 commit 不冲突的 untracked operational
+文件会保留。停止状态必须由 operator 明确处理，然后重新运行工作流。浏览器
+session 授权记录仍然保存在进程内，服务重启后会重新创建；模型 API 密钥继续在
+请求时从 Secrets Manager 解析。
 
 ## 手动操作和回滚
 

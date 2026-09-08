@@ -8,7 +8,7 @@ set -Eeuo pipefail
 readonly REPOSITORY_ROOT="${DSH_REPOSITORY_ROOT:-/opt/dsh-phase2}"
 readonly PROFILE_NAME="${DSH_PROFILE:-tod}"
 readonly SERVICE_NAME="${DSH_SERVICE:-dsh.service}"
-readonly HOME_ROOT="${DSH_HOME:-/root/.dsh}"
+readonly HOME_ROOT="${DSH_HOME:-/root/.dsh-phase2}"
 readonly PORT_NUMBER="${DSH_PORT:-3080}"
 readonly DEPLOY_SHA="${DSH_DEPLOY_SHA:-}"
 readonly EXPECTED_REMOTE="${DSH_DEPLOY_REMOTE:-}"
@@ -90,10 +90,27 @@ ACTUAL_REMOTE=$(git -C "$REPOSITORY_ROOT" remote get-url origin)
 [[ "$(canonical_remote "$ACTUAL_REMOTE")" == "$(canonical_remote "$EXPECTED_REMOTE")" ]] \
   || die 'the live checkout origin does not match the workflow repository'
 
-if [[ -n "$(git -C "$REPOSITORY_ROOT" status --porcelain=v1)" ]]; then
-  printf 'dsh-ec2-deploy: live checkout is dirty; refusing to overwrite it\n' >&2
-  git -C "$REPOSITORY_ROOT" status --short >&2
-  die 'reconcile the live checkout before deployment'
+git -C "$REPOSITORY_ROOT" fetch --no-tags --prune origin "$DEPLOY_SHA"
+git -C "$REPOSITORY_ROOT" cat-file -e "$DEPLOY_SHA^{commit}" \
+  || die "requested commit is unavailable from the live checkout origin: $DEPLOY_SHA"
+
+if ! git -C "$REPOSITORY_ROOT" diff --quiet HEAD -- \
+  || ! git -C "$REPOSITORY_ROOT" diff --cached --quiet; then
+  printf 'dsh-ec2-deploy: live checkout has tracked drift; refusing to overwrite it\n' >&2
+  git -C "$REPOSITORY_ROOT" status --short --untracked-files=no >&2
+  die 'reconcile the tracked live checkout before deployment'
+fi
+
+UNTRACKED_CONFLICTS=()
+while IFS= read -r -d '' file; do
+  if git -C "$REPOSITORY_ROOT" cat-file -e "$DEPLOY_SHA:$file" 2>/dev/null; then
+    UNTRACKED_CONFLICTS+=("$file")
+  fi
+done < <(git -C "$REPOSITORY_ROOT" ls-files --others --exclude-standard -z)
+if (( ${#UNTRACKED_CONFLICTS[@]} > 0 )); then
+  printf 'dsh-ec2-deploy: untracked files collide with the target commit:\n' >&2
+  printf '  %s\n' "${UNTRACKED_CONFLICTS[@]}" >&2
+  die 'move or remove the colliding local files before deployment'
 fi
 
 systemctl cat "$SERVICE_NAME" >/dev/null 2>&1 || die "systemd unit is missing: $SERVICE_NAME"
@@ -116,10 +133,6 @@ for file in "${PROFILE_FILES[@]}"; do
   fi
 done
 rollback_ready=1
-
-run_logged fetch git -C "$REPOSITORY_ROOT" fetch --no-tags --prune origin "$DEPLOY_SHA"
-git -C "$REPOSITORY_ROOT" cat-file -e "$DEPLOY_SHA^{commit}" \
-  || die "requested commit is unavailable from the live checkout origin: $DEPLOY_SHA"
 
 systemctl stop "$SERVICE_NAME"
 switched=1
