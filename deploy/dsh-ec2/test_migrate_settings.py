@@ -1,6 +1,8 @@
 from importlib.util import module_from_spec, spec_from_file_location
 import pathlib
 import stat
+import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -64,6 +66,29 @@ class MigrateSettingsTest(unittest.TestCase):
             path.chmod(0o600)
             MIGRATE.atomic_write(path, MIGRATE.converge(SETTINGS)[0])
             self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
+
+    def test_check_mode_accepts_only_current_settings(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "settings.yaml"
+            path.write_text(SETTINGS)
+            stale = subprocess.run(
+                [sys.executable, str(SCRIPT), "--check", str(path)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(stale.returncode, 0)
+            self.assertIn("ark-model-compat=not-current", stale.stderr)
+
+            path.write_text(MIGRATE.converge(SETTINGS)[0])
+            current = subprocess.run(
+                [sys.executable, str(SCRIPT), "--check", str(path)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(current.returncode, 0, current.stderr)
+            self.assertEqual(current.stdout.strip(), "ark-model-compat=current")
 
     def test_fails_closed_without_the_exact_provider(self) -> None:
         with self.assertRaisesRegex(ValueError, "ark-agent-plan"):
