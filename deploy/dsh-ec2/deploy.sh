@@ -9,6 +9,7 @@ readonly REPOSITORY_ROOT="${DSH_REPOSITORY_ROOT:-/opt/dsh-phase2}"
 readonly PROFILE_NAME="${DSH_PROFILE:-tod}"
 readonly SERVICE_NAME="${DSH_SERVICE:-dsh.service}"
 readonly HOME_ROOT="${DSH_HOME:-/root/.dsh-phase2}"
+readonly SETTINGS_FILE="$HOME_ROOT/settings.yaml"
 readonly PORT_NUMBER="${DSH_PORT:-3080}"
 readonly DEPLOY_SHA="${DSH_DEPLOY_SHA:-}"
 readonly EXPECTED_REMOTE="${DSH_DEPLOY_REMOTE:-}"
@@ -52,6 +53,9 @@ restore_profile() {
       rm -f "$PROFILE_DIR/$file"
     fi
   done
+  if [[ -e "$BACKUP_DIR/settings.yaml" ]]; then
+    cp -a "$BACKUP_DIR/settings.yaml" "$SETTINGS_FILE"
+  fi
 }
 
 migrate_legacy_worker_overlay() {
@@ -116,6 +120,7 @@ trap rollback EXIT
 git -C "$REPOSITORY_ROOT" rev-parse --git-dir >/dev/null 2>&1 || die "not a Git checkout: $REPOSITORY_ROOT"
 PROFILE_DIR="$HOME_ROOT/profiles/$PROFILE_NAME"
 [[ -d "$PROFILE_DIR" ]] || die "profile directory is missing: $PROFILE_DIR"
+[[ -f "$SETTINGS_FILE" ]] || die "settings file is missing: $SETTINGS_FILE"
 ACTUAL_REMOTE=$(git -C "$REPOSITORY_ROOT" remote get-url origin)
 [[ "$(canonical_remote "$ACTUAL_REMOTE")" == "$(canonical_remote "$EXPECTED_REMOTE")" ]] \
   || die 'the live checkout origin does not match the workflow repository'
@@ -154,6 +159,7 @@ BACKUP_DIR="$BACKUP_ROOT/$TIMESTAMP-$PREVIOUS_SHA"
 PROFILE_FILES=(package.json pnpm-lock.yaml pnpm-workspace.yaml cordis.patch.yml)
 declare -A PROFILE_FILE_PRESENT=()
 mkdir -p "$BACKUP_DIR/profile"
+cp -a "$SETTINGS_FILE" "$BACKUP_DIR/settings.yaml"
 for file in "${PROFILE_FILES[@]}"; do
   if [[ -e "$PROFILE_DIR/$file" ]]; then
     cp -a "$PROFILE_DIR/$file" "$BACKUP_DIR/profile/$file"
@@ -171,6 +177,7 @@ run_logged checkout git -C "$REPOSITORY_ROOT" checkout --detach "$DEPLOY_SHA"
 run_logged install pnpm -C "$REPOSITORY_ROOT" install --frozen-lockfile
 run_logged build-provider pnpm -C "$REPOSITORY_ROOT" --filter @deepseek-ai/dsh-credentials-aws-secrets-manager run build
 run_logged build-profile pnpm -C "$REPOSITORY_ROOT" --filter @deepseek-ai/dsh-aws-worker-profile run build
+run_logged settings-compat python3 "$REPOSITORY_ROOT/deploy/dsh-ec2/migrate-settings.py" "$SETTINGS_FILE"
 migrate_legacy_worker_overlay
 run_logged profile-install env DSH_HOME="$HOME_ROOT" DSH_ROOT="$REPOSITORY_ROOT" pnpm -C "$REPOSITORY_ROOT" dsh plugin --profile "$PROFILE_NAME" add --save-exact "$REPOSITORY_ROOT/packages/flinter/dsh-aws-worker-profile"
 run_logged dump-config env DSH_HOME="$HOME_ROOT" DSH_ROOT="$REPOSITORY_ROOT" pnpm -C "$REPOSITORY_ROOT" dsh --profile "$PROFILE_NAME" --dump-config
@@ -181,6 +188,8 @@ grep -q 'ARK_PLAN_API_KEY: flinter/dsh-ark-agent-plan' "$BACKUP_DIR/dump-config.
   || die 'the Ark secret mapping is absent from the composed profile'
 grep -q 'allowWrites: false' "$BACKUP_DIR/dump-config.log" \
   || die 'the AWS credential provider is not read-only'
+grep -q 'supportsDeveloperRole: false' "$BACKUP_DIR/dump-config.log" \
+  || die 'the ARK model is not configured for its supported system role'
 
 if ! (
   cd "$REPOSITORY_ROOT"
