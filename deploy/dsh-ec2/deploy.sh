@@ -54,6 +54,36 @@ restore_profile() {
   done
 }
 
+migrate_legacy_worker_overlay() {
+  local patch_file="$PROFILE_DIR/cordis.patch.yml"
+  local bundle_patch="$REPOSITORY_ROOT/packages/flinter/dsh-aws-worker-profile/cordis.patch.yml"
+  local marker='# Public AWS worker profile overlay.'
+  grep -Fqx "$marker" "$patch_file" || return 0
+
+  local marker_count
+  marker_count=$(grep -Fxc "$marker" "$patch_file" || true)
+  [[ "$marker_count" == 1 ]] || die 'the legacy AWS worker overlay marker is ambiguous'
+
+  local retained_file legacy_file
+  retained_file=$(mktemp "$PROFILE_DIR/.cordis.patch.retained.XXXXXX")
+  legacy_file=$(mktemp "$PROFILE_DIR/.cordis.patch.legacy.XXXXXX")
+  awk -v marker="$marker" -v retained="$retained_file" -v legacy="$legacy_file" '
+    $0 == marker { found = 1 }
+    found { print > legacy; next }
+    { print > retained }
+    END { if (!found) exit 1 }
+  ' "$patch_file"
+  if ! cmp -s "$legacy_file" "$bundle_patch"; then
+    rm -f "$retained_file" "$legacy_file"
+    die 'the legacy AWS worker overlay differs from the supported bundle'
+  fi
+  chmod --reference="$patch_file" "$retained_file"
+  chown --reference="$patch_file" "$retained_file"
+  mv "$retained_file" "$patch_file"
+  rm -f "$legacy_file"
+  printf 'dsh-ec2-deploy: legacy-worker-overlay=migrated\n'
+}
+
 completed=0
 rollback_ready=0
 switched=0
@@ -66,7 +96,7 @@ rollback() {
   set +e
   printf 'dsh-ec2-deploy: rollback=started\n' >&2
   if (( switched == 1 )); then
-    git checkout --detach "$PREVIOUS_SHA" >/dev/null 2>&1
+    git -C "$REPOSITORY_ROOT" checkout --detach "$PREVIOUS_SHA" >/dev/null 2>&1
   fi
   restore_profile
   if (( SERVICE_WAS_ACTIVE == 1 )); then
@@ -141,6 +171,7 @@ run_logged checkout git -C "$REPOSITORY_ROOT" checkout --detach "$DEPLOY_SHA"
 run_logged install pnpm -C "$REPOSITORY_ROOT" install --frozen-lockfile
 run_logged build-provider pnpm -C "$REPOSITORY_ROOT" --filter @deepseek-ai/dsh-credentials-aws-secrets-manager run build
 run_logged build-profile pnpm -C "$REPOSITORY_ROOT" --filter @deepseek-ai/dsh-aws-worker-profile run build
+migrate_legacy_worker_overlay
 run_logged profile-install env DSH_HOME="$HOME_ROOT" DSH_ROOT="$REPOSITORY_ROOT" pnpm -C "$REPOSITORY_ROOT" dsh plugin --profile "$PROFILE_NAME" add --save-exact "$REPOSITORY_ROOT/packages/flinter/dsh-aws-worker-profile"
 run_logged dump-config env DSH_HOME="$HOME_ROOT" DSH_ROOT="$REPOSITORY_ROOT" pnpm -C "$REPOSITORY_ROOT" dsh --profile "$PROFILE_NAME" --dump-config
 

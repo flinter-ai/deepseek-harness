@@ -21,8 +21,8 @@ manually with an explicit Git ref. The workflow:
 4. sends `deploy.sh` to the target through `AWS-RunShellScript`;
 5. verifies the checkout origin, rejects tracked drift or untracked files that
    collide with the target commit, backs up the profile files, installs the
-   frozen lockfile, builds the provider and profile, and reapplies the profile
-   bundle;
+   frozen lockfile, builds the provider and profile, migrates an exact legacy
+   AWS overlay to the supported profile bundle, and reapplies that bundle;
 6. resolves the Ark reference through the EC2 instance role, restarts
    `dsh.service`, checks port `3080`, expects HTTP `401` from the unauthenticated
    root, and checks that credential-shaped environment variables are absent.
@@ -31,6 +31,11 @@ The workflow is serialized so two deployments cannot mutate the same profile
 at once. The remote script rolls back the Git revision and profile files if a
 post-switch step fails. Backups stay on the host under
 `/var/lib/dsh-phase2/deploy-backups`.
+
+The one-time legacy migration is fail-closed: it removes the user-patch tail
+only when that tail is byte-for-byte identical to the checked-in AWS worker
+bundle. Any customized or ambiguous overlay stops deployment and is restored
+from the profile backup.
 
 ## One-time repository and AWS configuration
 

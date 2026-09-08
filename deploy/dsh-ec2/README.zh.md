@@ -19,13 +19,18 @@ runtime、profile、provider 或部署文件时运行，也可以手动输入明
 4. 通过 `AWS-RunShellScript` 将 `deploy.sh` 发送到目标；
 5. 验证 checkout origin、拒绝 tracked drift 或与目标 commit 冲突的 untracked
    文件、备份 profile 文件、使用冻结 lockfile 安装依赖、构建 provider 和
-   profile，并重新执行 profile bundle 安装；
+   profile，把完全匹配的旧 AWS overlay 迁移到受支持的 profile bundle，并重新
+   执行该 bundle 安装；
 6. 通过 EC2 instance role 解析 Ark 引用，重启 `dsh.service`，检查 `3080` 端口，
    期望未认证根路径返回 HTTP `401`，并检查凭据形状的环境变量不存在。
 
 工作流串行化，因此两个部署不会同时修改同一份 profile。远端脚本在切换
 commit 后的步骤失败时回滚 Git revision 和 profile 文件。备份保留在主机的
 `/var/lib/dsh-phase2/deploy-backups` 下。
+
+一次性的旧 overlay 迁移会 fail closed：只有 user patch 的尾部与仓库内 AWS
+worker bundle 逐字节一致时才会移除。任何自定义或有歧义的 overlay 都会停止部署，
+并从 profile 备份恢复。
 
 ## 一次性 GitHub 和 AWS 配置
 
