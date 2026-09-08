@@ -37,6 +37,7 @@ describe('FLINTER alpha provider/profile layer', () => {
     expect(settings.providers['ark-agent-plan'].defaultContextWindow).toBe(PI_AI_DEFAULTS.contextWindow)
     expect(settings.providers['ark-agent-plan'].models[0]).toMatchObject(FLINTER_MODEL_CAPACITIES.arkCodeLatest)
     expect(settings.providers['ark-agent-plan'].models[0].reasoningEfforts).toEqual({ off: null, high: 'high' })
+    expect(settings.providers['ark-agent-plan'].models[0].compat).toEqual({ supportsDeveloperRole: false })
     expect(settings.providers.modelflare.models[0]).toMatchObject(FLINTER_MODEL_CAPACITIES.modelflareGpt56Sol)
     expect(settings.providers.modelflare.models[0].reasoningEfforts).toEqual({ off: null, high: 'high' })
     expect(Object.isFrozen(settings.providers.modelflare.models[0].reasoningEfforts)).toBe(false)
