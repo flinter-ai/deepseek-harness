@@ -181,6 +181,7 @@ run_logged settings-compat python3 "$REPOSITORY_ROOT/deploy/dsh-ec2/migrate-sett
 migrate_legacy_worker_overlay
 run_logged profile-install env DSH_HOME="$HOME_ROOT" DSH_ROOT="$REPOSITORY_ROOT" pnpm -C "$REPOSITORY_ROOT" dsh plugin --profile "$PROFILE_NAME" add --save-exact "$REPOSITORY_ROOT/packages/flinter/dsh-aws-worker-profile"
 run_logged dump-config env DSH_HOME="$HOME_ROOT" DSH_ROOT="$REPOSITORY_ROOT" pnpm -C "$REPOSITORY_ROOT" dsh --profile "$PROFILE_NAME" --dump-config
+run_logged settings-compat-check python3 "$REPOSITORY_ROOT/deploy/dsh-ec2/migrate-settings.py" --check "$SETTINGS_FILE"
 
 grep -q 'credentials-aws-secrets-manager' "$BACKUP_DIR/dump-config.log" \
   || die 'the AWS credential provider is absent from the composed profile'
@@ -188,9 +189,6 @@ grep -q 'ARK_PLAN_API_KEY: flinter/dsh-ark-agent-plan' "$BACKUP_DIR/dump-config.
   || die 'the Ark secret mapping is absent from the composed profile'
 grep -q 'allowWrites: false' "$BACKUP_DIR/dump-config.log" \
   || die 'the AWS credential provider is not read-only'
-grep -q 'supportsDeveloperRole: false' "$BACKUP_DIR/dump-config.log" \
-  || die 'the ARK model is not configured for its supported system role'
-
 if ! (
   cd "$REPOSITORY_ROOT"
   TSX_TSCONFIG_PATH="$REPOSITORY_ROOT/tsconfig.base.json" \

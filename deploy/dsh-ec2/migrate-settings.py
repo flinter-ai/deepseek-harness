@@ -121,10 +121,19 @@ def atomic_write(path: pathlib.Path, content: str) -> None:
 
 
 def main() -> None:
-    if len(sys.argv) != 2:
-        raise SystemExit(f"usage: {sys.argv[0]} <settings.yaml>")
-    path = pathlib.Path(sys.argv[1])
+    arguments = sys.argv[1:]
+    check_only = bool(arguments and arguments[0] == "--check")
+    if check_only:
+        arguments = arguments[1:]
+    if len(arguments) != 1:
+        raise SystemExit(f"usage: {sys.argv[0]} [--check] <settings.yaml>")
+    path = pathlib.Path(arguments[0])
     updated, changed = converge(path.read_text())
+    if check_only:
+        if changed:
+            raise SystemExit("ark-model-compat=not-current")
+        print("ark-model-compat=current")
+        return
     if changed:
         atomic_write(path, updated)
     print(f"ark-model-compat={'migrated' if changed else 'already-current'}")
