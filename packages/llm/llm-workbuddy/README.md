@@ -75,7 +75,7 @@ Read these pages when the package-level contract is not enough.
 
 - [llm-pi-ai adapter](../llm-pi-ai/README.md) — shared OpenAI-completions transport, credentials, streaming, and retry policy.
 - [dsh-llm service](../llm/README.md) — provider-neutral service that registers the route.
-- [WorkBuddy gateway handoff](../../../LOCAL-LLM-API-HANDOFF.md) — local gateway ownership and operational notes when available in the checkout.
+- WorkBuddy gateway handoff — local gateway ownership and operational notes belong to the separately managed gateway checkout.
 
 <a id="model-experience"></a>
 ## Model Experience

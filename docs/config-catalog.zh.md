@@ -1420,6 +1420,30 @@ export type Config = Readonly<Record<string, never>>
 
 来源：[`packages/llm/llm-retry/src/index.ts:24`](../packages/llm/llm-retry/src/index.ts)
 
+<a id="deepseek-aidsh-llm-workbuddy"></a>
+
+## `@deepseek-ai/dsh-llm-workbuddy`
+
+需要：`llm`
+
+```ts config-catalog
+/** Configuration facts for the WorkBuddy provider route. */
+export interface WorkbuddyConfig {
+  /** Label shown by provider-selection surfaces. */
+  displayName?: string
+  /** Credential reference resolved for the gateway request. */
+  apiKeyEnv?: string
+  /** OpenAI-compatible WorkBuddy gateway endpoint. */
+  baseURL?: string
+  /** Optional replacement for the fixed advertised model catalog. */
+  models?: PiAiModelProfile[]
+}
+```
+
+依赖于：[`PiAiModelProfile`](../packages/llm/llm-pi-ai/src/index.ts)
+
+来源：[`packages/llm/llm-workbuddy/src/config.ts:31`](../packages/llm/llm-workbuddy/src/config.ts)
+
 <a id="deepseek-aidsh-lsp-stdio"></a>
 
 ## `@deepseek-ai/dsh-lsp-stdio`
