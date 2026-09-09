@@ -1,5 +1,6 @@
 import type { PiAiModelProfile, PiAiReasoningEfforts } from '@deepseek-ai/dsh-llm-pi-ai'
 
+/** Fixed model identifiers advertised by the separately managed WorkBuddy gateway. */
 export const WORKBUDDY_MODELS: readonly string[] = [
   'deepseek-v3', 'deepseek-v3-0324', 'deepseek-v3-1',
   'deepseek-v3-0324-lkeap', 'deepseek-v3-1-lkeap',
@@ -12,6 +13,7 @@ export const WORKBUDDY_MODELS: readonly string[] = [
   'hy3', 'hy3-preview', 'hy3-preview-agent', 'hy4-preview',
 ] as const
 
+/** Model identifiers for which the gateway accepts a reasoning-effort profile. */
 export const WORKBUDDY_THINKING_CAPABLE: ReadonlySet<string> = new Set([
   'deepseek-v3', 'deepseek-v3-0324', 'deepseek-v3-1',
   'deepseek-r1', 'deepseek-r1-0528', 'deepseek-v4-flash', 'deepseek-v4-pro',
@@ -21,6 +23,7 @@ export const WORKBUDDY_THINKING_CAPABLE: ReadonlySet<string> = new Set([
   'hunyuan-2.0-thinking',
 ])
 
+/** Ordered reasoning-effort labels exposed for thinking-capable WorkBuddy models. */
 export const WORKBUDDY_REASONING_EFFORTS: PiAiReasoningEfforts = Object.freeze({
   off: 'none',
   low: 'low',
@@ -29,6 +32,9 @@ export const WORKBUDDY_REASONING_EFFORTS: PiAiReasoningEfforts = Object.freeze({
   max: 'max',
 })
 
+/** Build fresh pi-ai model profiles from the fixed WorkBuddy catalog.
+ * @returns model profiles with reasoning capabilities for each advertised id.
+ */
 export function workbuddyCatalog(): PiAiModelProfile[] {
   return WORKBUDDY_MODELS.map(id => ({
     id,
