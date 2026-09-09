@@ -75,7 +75,7 @@ kind: "package-reference"
 
 - [llm-pi-ai 适配器](../llm-pi-ai/README.zh.md) — 共享的 OpenAI Completions 传输、凭据、流式处理和重试策略。
 - [dsh-llm 服务](../llm/README.zh.md) — 注册该路由的提供方无关服务。
-- [WorkBuddy 网关交接](../../../LOCAL-LLM-API-HANDOFF.md) — 本地网关归属和运行说明（若当前 checkout 包含该文件）。
+- WorkBuddy 网关交接 — 本地网关归属和运行说明属于独立管理的网关 checkout。
 
 <a id="model-experience"></a>
 ## 模型体验
