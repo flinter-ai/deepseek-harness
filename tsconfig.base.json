@@ -362,6 +362,8 @@
       "@deepseek-ai/dsh-llm-replay/invariant": ["./packages/test-support/llm-replay/src/invariant.ts"],
       "@deepseek-ai/dsh-llm-retry": ["./packages/llm/llm-retry/src"],
       "@deepseek-ai/dsh-llm-retry/invariant": ["./packages/llm/llm-retry/src/invariant.ts"],
+      "@deepseek-ai/dsh-llm-workbuddy": ["./packages/llm/llm-workbuddy/src"],
+      "@deepseek-ai/dsh-llm-workbuddy/invariant": ["./packages/llm/llm-workbuddy/src/invariant.ts"],
       "@deepseek-ai/dsh-loader-smoke": ["./packages/test-support/loader-smoke/src"],
       "@deepseek-ai/dsh-loader-smoke/invariant": ["./packages/test-support/loader-smoke/src/invariant.ts"],
       "@deepseek-ai/dsh-lsp": ["./packages/lsp/lsp/src"],
