@@ -2,7 +2,7 @@
 
 Status: implemented
 
-English | [English](2026-08-29-diagnose-pi-ai-stream-timeouts.md)
+[English](2026-08-29-diagnose-pi-ai-stream-timeouts.md) | 中文
 
 ## Problem
 
