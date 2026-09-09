@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-29-diagnose-pi-ai-stream-timeouts.md
 2026-08-29-diagnose-pi-ai-stream-timeouts.md: c0245c75aae360f8c74d547da322cdd6924da94f
-2026-08-29-diagnose-pi-ai-stream-timeouts.zh.md: ada27be22157654a8f6b5e34722ee02afbc2edae
+2026-08-29-diagnose-pi-ai-stream-timeouts.zh.md: 6f9a9b9489febc64ba1bbe9733156eb15338b717
