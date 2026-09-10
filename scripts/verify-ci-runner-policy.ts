@@ -137,6 +137,7 @@ function resolveMatrixValues(
     const generatorSource = readFileSync(generator, 'utf8')
     return [...generatorSource.matchAll(/'[^']+'\s*:\s*'([^']+)'/g)]
       .map(match => match[1])
+      .filter((value): value is string => typeof value === 'string')
       .filter(isRunnerSelector)
   } catch {
     return []
