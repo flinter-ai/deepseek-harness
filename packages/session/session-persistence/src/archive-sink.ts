@@ -1,5 +1,3 @@
-import type { SessionId } from '@deepseek-ai/dsh-session'
-import type { SessionPersistenceRevision } from './revision.ts'
 import type { SessionEventArchiveSegmentV1 } from './archive-segment.ts'
 
 /**
@@ -15,26 +13,25 @@ export type ArchiveSinkPutResult = 'STORED' | 'ALREADY_PRESENT'
 export interface ArchiveFenceToken {
   /** The lease/attempt scope this token protects. */
   readonly scope: string
-  /** Monotonically increasing generation within the scope. */
+  /** Monotonically increasing safe-integer generation within the scope. */
   readonly generation: number
-  /** Opaque token value; never placed in logs or user-facing evidence. */
+  /**
+   * Opaque token value for the exact generation; never placed in logs or
+   * user-facing evidence. A different value at the same generation is a
+   * different fence and must not be accepted as the current writer.
+   */
   readonly value: string
 }
 
 /**
  * The identity a sink compares before accepting a segment.
  *
- * A segment id is an idempotency key, not an authorization grant. The content
- * digests are retained in the identity so a reused id with different bytes is
- * a hard conflict rather than an overwrite.
+ * A segment id is an idempotency key, not an authorization grant. The encoded
+ * segment carries the complete immutable identity and content digests, so a
+ * reused id with different bytes is a hard conflict rather than an overwrite.
  */
 export interface ArchiveSegmentWrite {
   readonly segmentId: string
-  readonly sessionId: SessionId
-  readonly sourceRevision: SessionPersistenceRevision
-  readonly highWatermarkSeq: number
-  readonly payloadSha256: string
-  readonly decodedEventStreamSha256: string
   readonly segment: SessionEventArchiveSegmentV1
 }
 
@@ -59,10 +56,13 @@ export class ArchiveSinkError extends Error {
  *
  * The sink is the authority for finalization semantics, while the control
  * plane remains the authority for issuing and advancing fence tokens. A sink
- * MUST validate the fence before idempotency lookup, reject an older
+ * MUST validate the fence before idempotency lookup, reject an older writer
  * generation after a newer writer has fenced it, and never overwrite an
- * accepted object. It MUST return `ALREADY_PRESENT` only when the complete
- * identity and both content digests match. A reused `segmentId` with any
+ * accepted object. Fence state is per `scope`; an equal generation with a
+ * different `value` is also stale. Fence validation, idempotency lookup, and
+ * first-write publication MUST be one atomic conditional operation in the
+ * backend. It MUST return `ALREADY_PRESENT` only when the segment id and every
+ * immutable field of the encoded segment match. A reused `segmentId` with any
  * mismatch is `ARCHIVE_IDENTITY_CONFLICT`.
  *
  * This is a contract-only seam. It does not register a runtime service, choose
