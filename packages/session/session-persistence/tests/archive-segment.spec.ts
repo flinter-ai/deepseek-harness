@@ -79,6 +79,14 @@ describe('SessionEventArchiveSegmentV1', () => {
       .toThrow('invalid SessionEventArchiveSegmentV1 metadata')
   })
 
+  it('rejects non-object metadata before reading payload fields', () => {
+    const invalidValues: unknown[] = [null, [], 'not-an-object']
+    for (const invalid of invalidValues) {
+      expect(() => decodeSessionEventArchiveSegmentV1(invalid))
+        .toThrow('invalid SessionEventArchiveSegmentV1 metadata')
+    }
+  })
+
   it('rejects a payload whose decoded stream checksum is wrong', () => {
     const segment = encodeSessionEventArchiveSegmentV1(snapshot, ARCHIVE_FIXTURE)
     expect(() => decodeSessionEventArchiveSegmentV1({

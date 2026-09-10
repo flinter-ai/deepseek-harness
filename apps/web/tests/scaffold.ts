@@ -810,13 +810,20 @@ function rawSessionLog(session: Session): string {
 }
 
 function normalizeWebSessionVolatiles(log: string): string {
-  const normalizeValue = (value: unknown): unknown => {
+  const normalizeValue = (value: unknown, key?: string): unknown => {
+    // Browser prompts carry the browser's host-derived IANA zone. Keep the
+    // field in the canonical event shape but make persisted replay portable
+    // across developer machines and hosted runners.
+    if (key === 'clientTimeZone') return '{{clientTimeZone}}'
     if (typeof value === 'string') {
       return value.replace(/Anonymous user: [^.]+(?=\. Session sharing)/g, 'Anonymous user: {{anonymousUserId}}')
     }
-    if (Array.isArray(value)) return value.map(normalizeValue)
+    if (Array.isArray(value)) return value.map(item => normalizeValue(item))
     if (value !== null && typeof value === 'object') {
-      return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, normalizeValue(item)]))
+      return Object.fromEntries(Object.entries(value).map(([entryKey, item]) => [
+        entryKey,
+        normalizeValue(item, entryKey),
+      ]))
     }
     return value
   }

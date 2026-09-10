@@ -75,7 +75,7 @@ export function encodeSessionEventArchiveSegmentV1(
  * @returns The validated segment and its lossless canonical event stream.
  */
 export function decodeSessionEventArchiveSegmentV1(
-  segment: SessionEventArchiveSegmentV1,
+  segment: unknown,
 ): DecodedSessionEventArchiveSegmentV1 {
   validateSegmentMetadata(segment)
   const payload = Buffer.from(segment.payloadBase64, 'base64')
