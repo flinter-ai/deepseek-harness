@@ -32,7 +32,7 @@ env:
 
 jobs:
   preview:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, ci-linux]
     name: cloudflare pages preview
     # GitHub Pages is the canonical PR preview surface. Keep this workflow
     # visible in Actions, but permanently skip its deployment job so public PR

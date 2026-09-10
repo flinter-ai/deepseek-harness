@@ -12,7 +12,7 @@ env:
   DSH_TELEMETRY_DISABLED: '1'
 
 # Pull-request execution policy (2026-08-30): keep only fast, deterministic,
-# Linux/package-integrity checks on GitHub-hosted runners. The required remote
+# Linux/package-integrity checks on the AWS self-hosted runner. The required remote
 # checks are Node 24 static validation, the keyless Python SDK suite, the
 # Linux release-shaped Python runtime targets, and this workflow's aggregate
 # verdict.
@@ -45,11 +45,11 @@ concurrency:
 
 jobs:
 
-  # Pull-request jobs use standard GitHub-hosted runners so a PR cannot remain
-  # queued for an organization-specific runner pool that is unavailable.
+  # Pull-request Linux jobs use the dedicated AWS self-hosted runner. The
+  # runner contract and online-registration check live outside this workflow.
   node-24:
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, ci-linux]
     name: node 24 / static
     env:
       DSH_GATE_CONCURRENCY: '2'
@@ -97,11 +97,11 @@ jobs:
     # LOCAL_ONLY: exhaustive coverage is too broad for every PR and remains
     # available through the explicit command documented above.
     if: false
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, ci-linux]
     name: node 24 / coverage
     env:
-      # Standard hosted runners have fewer cores than the former enterprise
-      # pool, so keep the instrumented workload bounded.
+      # The dedicated runner has fewer cores than the former enterprise pool,
+      # so keep the instrumented workload bounded.
       DSH_COVERAGE_MAX_WORKERS: '2'
       DSH_COVERAGE_PARTITIONS: '4'
       DSH_GATE_CONCURRENCY: '2'
@@ -126,8 +126,8 @@ jobs:
           store_path=$(PNPM_CONFIG_STORE_DIR="$store_root" pnpm store path --silent)
           echo "path=$store_path" >> "$GITHUB_OUTPUT"
 
-      # Restore the hosted pnpm archive when available; a cache miss remains a
-      # normal cold-install path on standard runners.
+      # Restore the pnpm archive when available; a cache miss remains a normal
+      # cold-install path on the self-hosted runner.
       - uses: actions/cache/restore@v4
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
@@ -155,7 +155,7 @@ jobs:
     # LOCAL_ONLY: this composite includes snapshots, browser execution,
     # compatibility, package, documentation, and built-artifact consumers.
     if: false
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, ci-linux]
     name: node 24 / snapshots and artifacts
     env:
       DSH_GATE_CONCURRENCY: '2'
@@ -214,7 +214,7 @@ jobs:
           if (( install_status != 0 )); then exit "$install_status"; fi
           exit "$sandbox_status"
 
-      - name: Install Playwright Chromium and hosted dependencies
+      - name: Install Playwright Chromium and Linux dependencies
         run: pnpm --filter @deepseek-ai/dsh-web-frontend exec playwright install --with-deps chromium
 
       - name: Run compatibility, snapshot, and artifact gates
@@ -225,7 +225,7 @@ jobs:
     # LOCAL_ONLY: extra Node versions are compatibility evidence, not the
     # required AWS/Linux PR gate. Run `pnpm run check:node-compat` manually.
     if: false
-    # Each compatibility contract receives an independent standard hosted job.
+    # Each compatibility contract receives an independent self-hosted Linux job.
     runs-on: ${{ matrix.runner }}
     name: ${{ matrix.name }}
     env:
@@ -237,10 +237,12 @@ jobs:
         include:
           - node: 26
             name: node 26
-            runner: ubuntu-latest
+            runner: ci-linux
             gate_concurrency: '1'
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - uses: pnpm/action-setup@v4
         with:
@@ -266,16 +268,18 @@ jobs:
   node-22-19-skipped:
     if: false
     name: node 22.19
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, ci-linux]
     steps:
       - run: echo "Node 22.19 PR compatibility validation is intentionally skipped for the AWS/Linux profile."
 
   python-sdk:
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, ci-linux]
     name: python 3.10 / keyless SDK
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-python@v6.3.0
         with:
@@ -307,7 +311,7 @@ jobs:
   python-runtime-windows-skipped:
     if: false
     name: python runtime / release-shaped matrix / node24-win-x64
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, ci-linux]
     steps:
       - run: echo "Windows release-shaped PR validation is intentionally skipped for the AWS/Linux profile."
 
@@ -316,7 +320,7 @@ jobs:
   python-runtime-macos-skipped:
     if: false
     name: python runtime / release-shaped matrix / node24-macos-arm64
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, ci-linux]
     steps:
       - run: echo "macOS release-shaped PR validation is intentionally skipped for the AWS/Linux profile."
 
@@ -329,7 +333,7 @@ jobs:
     # The AWS/Linux pull-request policy does not execute Windows validation.
     # Keep the job declaration so GitHub records an explicit skipped check.
     if: false
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, ci-linux]
     name: windows node 24 / wine blocking
     timeout-minutes: 15
     steps:
@@ -551,7 +555,7 @@ jobs:
   # 'cancelled' and 'skipped'.
   all-checks-passed:
     name: all checks passed
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, ci-linux]
     needs: [node-24, python-sdk, python-runtime]
     if: always() && github.event_name == 'pull_request'
     steps:

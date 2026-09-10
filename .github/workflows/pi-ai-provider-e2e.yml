@@ -26,11 +26,13 @@ env:
 
 jobs:
   e2e:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, ci-linux]
     name: Azure OpenAI Responses + Anthropic Messages
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - uses: pnpm/action-setup@v4
 

@@ -28,11 +28,13 @@ defaults:
 jobs:
   matrix:
     name: Matrix
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, linux, x64, ci-linux]
     outputs:
       prebuilds: ${{ steps.matrix.outputs.prebuilds }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - id: matrix
         run: echo "prebuilds=$(node ./scripts/github-matrix.mjs release-prebuild)" >> "$GITHUB_OUTPUT"
@@ -46,6 +48,8 @@ jobs:
       matrix: ${{ fromJson(needs.matrix.outputs.prebuilds) }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: pnpm/action-setup@v4
         with:
@@ -82,9 +86,11 @@ jobs:
   pack:
     name: Pack npm tarballs
     needs: build-prebuilds
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, linux, x64, ci-linux]
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: pnpm/action-setup@v4
         with:
@@ -141,7 +147,7 @@ jobs:
     name: Publish to npm
     if: inputs.publish
     needs: pack
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, linux, x64, ci-linux]
     environment: npm-publish
     permissions:
       contents: read

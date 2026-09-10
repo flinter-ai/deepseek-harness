@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import * as yaml from 'js-yaml'
 import { describe, expect, it } from 'vitest'
+import { SELF_HOSTED_LINUX_RUNNER, validateRepository } from './verify-ci-runner-policy'
 
 const root = resolve(import.meta.dirname, '..')
 const runnerPrivatePnpmDestination = /^\$\{\{ runner\.temp \}\}\/setup-pnpm-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}$/
@@ -96,7 +97,7 @@ describe('CI workflow', () => {
     ))
 
     // Windows jobs remain declared for explicit skipped PR checks.
-    expect(windows['runs-on']).toBe('ubuntu-latest')
+    expect(windows['runs-on']).toEqual([...SELF_HOSTED_LINUX_RUNNER])
     expect(windows.name).toBe('windows node 24 / wine blocking')
     expect(windows.if).toBe(false)
     expect(commandSteps.some(step => step.run.includes('wine-windows-gates.sh'))).toBe(true)
@@ -142,15 +143,16 @@ describe('CI workflow', () => {
 
     // wine-apt-cache: master-only, seeds the Wine apt cache, lives in ci-master.
     expect(wineAptCache.if).toBe("github.event_name == 'push' && github.ref == 'refs/heads/master'")
-    expect(wineAptCache['runs-on']).toBe('ubuntu-latest')
+    expect(wineAptCache['runs-on']).toEqual([...SELF_HOSTED_LINUX_RUNNER])
 
-    // Both serial references are master-only, diagnostic, and standard-hosted.
+    // Both serial references are master-only; Linux uses the dedicated
+    // self-hosted runner while Windows remains on its native hosted runner.
     expect(serialLinux.if).toBe("github.event_name == 'push' && github.ref == 'refs/heads/master'")
-    expect(serialLinux['runs-on']).toBe('ubuntu-latest')
-    expect(serialLinux.name).toBe('serial / linux (standard hosted)')
+    expect(serialLinux['runs-on']).toEqual([...SELF_HOSTED_LINUX_RUNNER])
+    expect(serialLinux.name).toBe('serial / linux (self-hosted)')
     expect(serialWindows.if).toBe("github.event_name == 'push' && github.ref == 'refs/heads/master'")
     expect(serialWindows['runs-on']).toBe('windows-latest')
-    expect(serialWindows.name).toBe('serial / windows (standard hosted)')
+    expect(serialWindows.name).toBe('serial / windows (hosted)')
 
     // Aggregate: Windows is deliberately outside the AWS/Linux PR verdict.
     expect(aggregate.needs).not.toContain('windows')
@@ -160,40 +162,33 @@ describe('CI workflow', () => {
     expect(aggregate.needs).not.toContain('windows-observational')
     expect(aggregate.needs).not.toContain('serial-windows-standard')
 
-    // Automatic PR Linux jobs and the verdict use standard hosted runners.
+    // Automatic PR Linux jobs and the verdict use the dedicated self-hosted runner.
     for (const [jobName, job] of [['node-24', node24], ['node-24-coverage', node24Coverage], ['node-24-consumers', node24Consumers]] as const) {
-      expect(job['runs-on'], `${jobName} must use the standard Linux runner`).toBe('ubuntu-latest')
+      expect(job['runs-on'], `${jobName} must use the self-hosted Linux runner`).toEqual([...SELF_HOSTED_LINUX_RUNNER])
     }
-    expect(aggregate['runs-on']).toBe('ubuntu-latest')
+    expect(aggregate['runs-on']).toEqual([...SELF_HOSTED_LINUX_RUNNER])
 
-    // PR preview uses the same standard hosted Linux boundary.
-    expect(JSON.stringify(workflow)).not.toMatch(/dsh-(?:ubuntu|windows)|vm-backup|dsh-win-ci|DSH_CI_FAILOVER|self-hosted/)
-    expect(JSON.stringify(masterWorkflow)).not.toMatch(/dsh-(?:ubuntu|windows)|vm-backup|dsh-win-ci|DSH_CI_FAILOVER|self-hosted/)
+    // PR and master workflows must not carry legacy private-pool selectors.
+    expect(JSON.stringify(workflow)).not.toMatch(/dsh-(?:ubuntu|windows)|vm-backup|dsh-win-ci|DSH_CI_FAILOVER/)
+    expect(JSON.stringify(masterWorkflow)).not.toMatch(/dsh-(?:ubuntu|windows)|vm-backup|dsh-win-ci|DSH_CI_FAILOVER/)
     const preview = workflowJob(previewWorkflow, 'preview')
-    expect(preview['runs-on']).toBe('ubuntu-latest')
+    expect(preview['runs-on']).toEqual([...SELF_HOSTED_LINUX_RUNNER])
   })
 
-  it('keeps every workflow on standard GitHub-hosted runner selectors', () => {
-    const forbidden = /dsh-(?:ubuntu|windows)|vm-backup|dsh-win-ci|DSH_CI_FAILOVER|self-hosted/
-    const workflowFiles = readdirSync(resolve(root, '.github/workflows'))
-      .filter(file => file.endsWith('.yml') || file.endsWith('.yaml'))
-
-    expect(workflowFiles.length).toBeGreaterThan(0)
-    for (const file of workflowFiles) {
-      const workflow = loadWorkflow(`.github/workflows/${file}`)
-      expect(JSON.stringify(workflow), `${file} must not select a custom or self-hosted runner`)
-        .not.toMatch(forbidden)
-    }
+  it('keeps every workflow on an approved runner selector', () => {
+    expect(readdirSync(resolve(root, '.github/workflows'))
+      .some(file => file.endsWith('.yml') || file.endsWith('.yaml'))).toBe(true)
+    expect(validateRepository(root)).toEqual([])
   })
 
-  it('runs the runner policy independently on a standard hosted runner', () => {
+  it('runs the runner policy independently on the self-hosted Linux runner', () => {
     const policy = loadWorkflow('.github/workflows/runner-policy.yml')
     const job = workflowJob(policy, 'runner-policy')
 
     expect(policy.on).toMatchObject({ pull_request: null, workflow_dispatch: null })
     expect(job).toMatchObject({
-      'runs-on': 'ubuntu-latest',
-      name: 'standard hosted runner policy',
+      'runs-on': [...SELF_HOSTED_LINUX_RUNNER],
+      name: 'self-hosted Linux runner policy',
     })
     const verifyStep = (job.steps as unknown[]).find(step => isRecord(step) && step.name === 'Verify all workflow runner selectors')
     expect(verifyStep).toMatchObject({ run: 'pnpm run verify-ci-runner-policy' })
@@ -257,8 +252,8 @@ describe('CI workflow', () => {
     // cache seeder and the two drills. Any job reachable on push would start
     // accumulating uncancelled runs, so the set is pinned here.
     const NOT_PUSH_REACHABLE = new Set([
-      "github.event_name == 'workflow_dispatch' && inputs.suite == 'standard-hosted-benchmark'",
-      "github.event_name == 'workflow_dispatch' && inputs.suite == 'standard-hosted-consolidated'",
+      "github.event_name == 'workflow_dispatch' && inputs.suite == 'self-hosted-benchmark'",
+      "github.event_name == 'workflow_dispatch' && inputs.suite == 'self-hosted-consolidated'",
     ])
     const pushReachable = Object.entries(workflow.jobs)
       .filter(([, job]) => {
@@ -275,10 +270,10 @@ describe('CI workflow', () => {
     // A manual rerun still cancels a superseded active measurement. The
     // historical benchmark itself is permanently skipped, while the retained
     // consolidated reference keeps its bounded matrix shape documented.
-    const benchmark = workflow.jobs['standard-hosted-benchmark']
-    if (!isRecord(benchmark)) throw new TypeError('standard-hosted-benchmark must be defined')
+    const benchmark = workflow.jobs['self-hosted-benchmark']
+    if (!isRecord(benchmark)) throw new TypeError('self-hosted-benchmark must be defined')
     expect(benchmark.if).toBe(false)
-    for (const name of ['standard-hosted-benchmark', 'standard-hosted-consolidated']) {
+    for (const name of ['self-hosted-benchmark', 'self-hosted-consolidated']) {
       const job = workflow.jobs[name]
       if (!isRecord(job) || !isRecord(job.strategy)) {
         throw new TypeError(`${name} must define a matrix strategy`)

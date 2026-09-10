@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Ubuntu's package transaction scans the hosted image's full dpkg database and
+# Ubuntu's package transaction scans the runner image's full dpkg database and
 # runs post-install hooks. CI needs only the signed-archive payload, so pin and
 # verify that payload before extracting it into the ephemeral runner directory.
 readonly BUBBLEWRAP_VERSION='0.9.0-1ubuntu0.1'
@@ -12,7 +12,7 @@ readonly BUBBLEWRAP_URL="https://archive.ubuntu.com/ubuntu/pool/main/b/bubblewra
 : "${GITHUB_PATH:?prepare-ci-bubblewrap requires GITHUB_PATH}"
 
 if [[ "$(uname -s)" != 'Linux' || "$(uname -m)" != 'x86_64' ]]; then
-  echo 'prepare-ci-bubblewrap supports only Linux x86_64 hosted runners' >&2
+  echo 'prepare-ci-bubblewrap supports only Linux x86_64 runners' >&2
   exit 1
 fi
 

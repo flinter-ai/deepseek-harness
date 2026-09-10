@@ -2,18 +2,23 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import * as yaml from 'js-yaml'
 
+// Linux x64 jobs must use the dedicated self-hosted selector below. These are
+// the only hosted labels reserved for non-x64 platform exceptions.
 export const STANDARD_GITHUB_RUNNERS = new Set([
-  'ubuntu-latest',
-  'ubuntu-24.04',
   'ubuntu-24.04-arm',
   'windows-latest',
   'windows-2025',
   'macos-latest',
 ])
 
-const FORBIDDEN_RUNNER_MARKER = /\b(?:self-hosted|vm-backup|dsh-win-ci|dsh-(?:ubuntu|windows)|DSH_CI_FAILOVER_[A-Z_]+)\b/
+export const SELF_HOSTED_LINUX_RUNNER = ['self-hosted', 'linux', 'x64', 'ci-linux'] as const
+export const SELF_HOSTED_LINUX_LABEL = SELF_HOSTED_LINUX_RUNNER[SELF_HOSTED_LINUX_RUNNER.length - 1]
+
+const FORBIDDEN_RUNNER_MARKER = /\b(?:vm-backup|dsh-win-ci|dsh-(?:ubuntu|windows)|DSH_CI_FAILOVER_[A-Z_]+)\b/
 const MATRIX_RUNNER = /^\$\{\{\s*matrix\.(runner|os)\s*\}\}$/
 const GENERATED_MATRIX = /fromJSON\(needs\.(plan|matrix)\.outputs\.(matrix|ci|prebuilds)\)/i
+
+type RunnerSelector = string | string[]
 
 export type RunnerPolicyViolation = {
   file: string
@@ -27,7 +32,7 @@ export function validateWorkflowSource(
 ): RunnerPolicyViolation[] {
   const violations: RunnerPolicyViolation[] = []
   if (FORBIDDEN_RUNNER_MARKER.test(source)) {
-    violations.push({ file, message: 'contains a forbidden custom or self-hosted runner marker' })
+    violations.push({ file, message: 'contains a forbidden legacy private-runner marker' })
   }
 
   let workflow: unknown
@@ -61,8 +66,10 @@ export function validateWorkflowSource(
       } else {
         validateSelector(violations, file, `${jobName}: runs-on`, selector)
       }
+    } else if (Array.isArray(selector) && selector.every(value => typeof value === 'string')) {
+      validateSelector(violations, file, `${jobName}: runs-on`, selector)
     } else {
-      violations.push({ file, message: `${jobName}: runs-on must be one standard string label; runner arrays and other values are forbidden` })
+      violations.push({ file, message: `${jobName}: runs-on must be an approved hosted label or the exact self-hosted Linux selector` })
     }
   }
 
@@ -84,13 +91,13 @@ function resolveMatrixValues(
   dimension: string,
   workflowSource: string,
   repositoryRoot: string,
-): string[] {
+): RunnerSelector[] {
   const strategy = job.strategy
   if (isRecord(strategy) && isRecord(strategy.matrix) && Array.isArray(strategy.matrix.include)) {
     return strategy.matrix.include
       .filter(isRecord)
       .map(row => row[dimension])
-      .filter((value): value is string => typeof value === 'string')
+      .filter(isRunnerSelector)
   }
 
   const matrixExpression = isRecord(strategy)
@@ -105,9 +112,19 @@ function resolveMatrixValues(
   // The SDK matrix is assembled in the workflow's shell case statement. Every
   // runner assignment must be a literal from the standard allowlist.
   if (/needs\.plan\.outputs\.matrix/i.test(matrixExpression)) {
-    const workflowAssignments = [...workflowSource.matchAll(/\brunner=([A-Za-z0-9_.-]+)/g)]
-      .map(match => match[1])
-      .filter((value): value is string => typeof value === 'string')
+    const workflowAssignments = [...workflowSource.matchAll(/\brunner=(?:(['\"])(.*?)\1|([A-Za-z0-9_.-]+))/g)]
+      .map(match => match[2] ?? match[3])
+      .map((value) => {
+        if (value === undefined) return undefined
+        if (!value.startsWith('[')) return value
+        try {
+          const parsed: unknown = JSON.parse(value)
+          return isRunnerSelector(parsed) ? parsed : undefined
+        } catch {
+          return undefined
+        }
+      })
+      .filter(isRunnerSelector)
     if (workflowAssignments.length > 0) return workflowAssignments
     return []
   }
@@ -120,7 +137,7 @@ function resolveMatrixValues(
     const generatorSource = readFileSync(generator, 'utf8')
     return [...generatorSource.matchAll(/'[^']+'\s*:\s*'([^']+)'/g)]
       .map(match => match[1])
-      .filter((value): value is string => typeof value === 'string')
+      .filter(isRunnerSelector)
   } catch {
     return []
   }
@@ -130,11 +147,24 @@ function validateSelector(
   violations: RunnerPolicyViolation[],
   file: string,
   location: string,
-  selector: string,
+  selector: RunnerSelector,
 ): void {
-  if (!STANDARD_GITHUB_RUNNERS.has(selector)) {
-    violations.push({ file, message: `${location} selects '${selector}', which is not an approved standard GitHub-hosted label` })
+  if (typeof selector === 'string') {
+    if (STANDARD_GITHUB_RUNNERS.has(selector) || selector === SELF_HOSTED_LINUX_LABEL) return
+    violations.push({ file, message: `${location} selects '${selector}', which is not an approved hosted label or self-hosted label` })
+    return
   }
+
+  if (selector.length === SELF_HOSTED_LINUX_RUNNER.length
+    && selector.every((label, index) => label === SELF_HOSTED_LINUX_RUNNER[index])) {
+    return
+  }
+  violations.push({ file, message: `${location} must use the exact self-hosted Linux selector [${SELF_HOSTED_LINUX_RUNNER.join(', ')}] when selecting a runner array` })
+}
+
+function isRunnerSelector(value: unknown): value is RunnerSelector {
+  return typeof value === 'string'
+    || (Array.isArray(value) && value.every(item => typeof item === 'string'))
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -148,6 +178,6 @@ if (process.argv[1]?.endsWith('verify-ci-runner-policy.ts')) {
     for (const violation of violations) console.error(`::error file=${violation.file}::${violation.message}`)
     process.exitCode = 1
   } else {
-    console.log(`verify-ci-runner-policy: ${readdirSync(resolve(repositoryRoot, '.github/workflows')).filter(file => /\.ya?ml$/.test(file)).length} workflow file(s) use approved standard GitHub-hosted runners`)
+    console.log(`verify-ci-runner-policy: ${readdirSync(resolve(repositoryRoot, '.github/workflows')).filter(file => /\.ya?ml$/.test(file)).length} workflow file(s) use approved hosted or self-hosted runner selectors`)
   }
 }
