@@ -83,6 +83,40 @@ describe('PiAiAdapter provider routing', () => {
     expect(server.headers[0]?.['user-agent']).toBe(userAgent())
   })
 
+  it.each(['opencode', 'opencode-go'])('sends per-request session headers for %s over profile collisions', async (provider) => {
+    const server = await mockServer([{ events: textEvents }, { events: textEvents }])
+    const adapter = adapterOf({ [provider]: {
+      api: 'openai-completions',
+      baseURL: server.url,
+      models: [{ id: 'test-model' }],
+      headers: {
+        'x-company': 'private',
+        'User-Agent': 'wrong',
+        'X-OpenCode-Session': 'static-session',
+        'X-OpenCode-Client': 'wrong-client',
+      },
+    } })
+    for (const sessionId of ['session-first', 'session-second']) {
+      for await (const _chunk of adapter.stream({ provider, model: 'test-model', messages: [], sessionId: sessionId as never })) { /* drain */ }
+    }
+    expect(server.headers.map(headers => headers['x-opencode-session'])).toEqual(['session-first', 'session-second'])
+    for (const headers of server.headers) {
+      expect(headers['x-opencode-client']).toBe('pi')
+      expect(headers['x-company']).toBe('private')
+      expect(headers['user-agent']).toBe(userAgent())
+    }
+  })
+
+  it('omits generated OpenCode headers without a session ID', async () => {
+    const server = await mockServer([{ events: textEvents }])
+    const adapter = adapterOf({ 'opencode-go': {
+      api: 'openai-completions', baseURL: server.url, models: [{ id: 'test-model' }],
+    } })
+    for await (const _chunk of adapter.stream({ provider: 'opencode-go', model: 'test-model', messages: [] })) { /* drain */ }
+    expect(server.headers[0]?.['x-opencode-session']).toBeUndefined()
+    expect(server.headers[0]?.['x-opencode-client']).toBeUndefined()
+  })
+
   it('forwards common stream options and profile reasoning', async () => {
     const server = await mockServer([{ events: textEvents }])
     const ctx = await harness(server.url, {
@@ -108,6 +142,8 @@ describe('PiAiAdapter provider routing', () => {
       thinking: { type: 'enabled' },
       reasoning_effort: 'max',
     })
+    expect(server.headers[0]?.['x-opencode-session']).toBeUndefined()
+    expect(server.headers[0]?.['x-opencode-client']).toBeUndefined()
   })
 
   it('uses a dynamic request effort and reports unsupported efforts before network I/O', async () => {
