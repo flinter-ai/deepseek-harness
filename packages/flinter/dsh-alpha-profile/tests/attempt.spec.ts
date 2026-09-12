@@ -26,6 +26,7 @@ function workerEnvironment(
     DSH_SESSION_ROOT: join(root, 'sessions', 's_org_job'),
     DSH_LEASE_OWNER: 'worker-b',
     DSH_LEASE_GENERATION: String(attempt + 4),
+    DSH_COMPUTE_BACKEND: 'codesandbox',
     DSH_COMPUTE_TIER: 'cpu',
     DSH_WORKER_ATTEMPT_COUNT: String(attempt),
     DSH_CALLBACK_URL: 'https://control.example.test/webhooks/dsh-worker/lifecycle',
@@ -167,10 +168,11 @@ describe('non-Orca worker attempt runtime', () => {
       expect(manifest).toEqual(expectedManifest)
       expect(onDisk).toEqual(expectedManifest)
       expect(onDisk).toMatchObject({
-        schemaVersion: 1,
+        schemaVersion: 2,
         dshSessionId: 's_org_job',
         leaseGeneration: 5,
         workerAttemptCount: 1,
+        computeBackend: 'codesandbox',
         executorTaskId: 'ecs-task-123',
         provider: 'modelflare',
         model: 'gpt-5.6-sol',
@@ -254,6 +256,7 @@ describe('non-Orca worker attempt runtime', () => {
       expect(launch.args.at(-2)).toBe('')
       expect(launch.args.at(-1)).toBe(task)
       expect(launch.env.DSH_SESSION_ID).toBe('s_org_job')
+      expect(launch.env.DSH_COMPUTE_BACKEND).toBe('codesandbox')
       expect(launch.env.DSH_ATTEMPT_ROOT).toBe(paths.attemptRoot)
       expect(launch.env.MODELFLARE_API_KEY).toBeUndefined()
       await execFileAsync(launch.file, launch.args, {
