@@ -242,6 +242,12 @@ grep -q 'credentials-aws-secrets-manager' "$BACKUP_DIR/dump-config.log" \
   || die 'the AWS credential provider is absent from the composed profile'
 grep -q 'ARK_PLAN_API_KEY: flinter/dsh-ark-agent-plan' "$BACKUP_DIR/dump-config.log" \
   || die 'the Ark secret mapping is absent from the composed profile'
+grep -q 'OPENROUTER_API_KEY: flinter/dsh-openrouter' "$BACKUP_DIR/dump-config.log" \
+  || die 'the shared OpenRouter secret mapping is absent from the composed profile'
+grep -q 'OPENROUTER_RELACE_SEARCH_API_KEY: flinter/dsh-openrouter-relace-search' "$BACKUP_DIR/dump-config.log" \
+  || die 'the Relace Search secret mapping is absent from the composed profile'
+grep -q 'OPENROUTER_RELACE_APPLY_API_KEY: flinter/dsh-openrouter-relace-apply-3' "$BACKUP_DIR/dump-config.log" \
+  || die 'the Relace Apply secret mapping is absent from the composed profile'
 grep -q 'allowWrites: false' "$BACKUP_DIR/dump-config.log" \
   || die 'the AWS credential provider is not read-only'
 if ! (
@@ -292,12 +298,12 @@ HTTP_STATUS=$(curl --silent --show-error --output /dev/null --write-out '%{http_
 [[ "$HTTP_STATUS" == 401 ]] || die "authenticated Web endpoint health check returned HTTP $HTTP_STATUS"
 
 SYSTEMD_ENV=$(systemctl show "$SERVICE_NAME" -p Environment --value)
-if grep -qE '(ARK_PLAN_API_KEY|DEEPSEEK_API_KEY|MODELFLARE_API_KEY|GMI_SERVING_API_KEY)=' <<<"$SYSTEMD_ENV"; then
+if grep -qE '(ARK_PLAN_API_KEY|DEEPSEEK_API_KEY|MODELFLARE_API_KEY|GMI_SERVING_API_KEY|OPENROUTER_API_KEY|OPENROUTER_RELACE_SEARCH_API_KEY|OPENROUTER_RELACE_APPLY_API_KEY)=' <<<"$SYSTEMD_ENV"; then
   die 'a credential value is present in the systemd environment'
 fi
 SERVICE_PID=$(systemctl show "$SERVICE_NAME" -p MainPID --value)
 if [[ "$SERVICE_PID" =~ ^[0-9]+$ ]] && (( SERVICE_PID > 0 )) \
-  && tr '\0' '\n' <"/proc/$SERVICE_PID/environ" | grep -qE '^(ARK_PLAN_API_KEY|DEEPSEEK_API_KEY|MODELFLARE_API_KEY|GMI_SERVING_API_KEY)='; then
+  && tr '\0' '\n' <"/proc/$SERVICE_PID/environ" | grep -qE '^(ARK_PLAN_API_KEY|DEEPSEEK_API_KEY|MODELFLARE_API_KEY|GMI_SERVING_API_KEY|OPENROUTER_API_KEY|OPENROUTER_RELACE_SEARCH_API_KEY|OPENROUTER_RELACE_APPLY_API_KEY)='; then
   die 'a credential value is present in the DSH process environment'
 fi
 

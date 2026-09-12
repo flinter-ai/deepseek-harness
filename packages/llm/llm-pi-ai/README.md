@@ -90,6 +90,30 @@ Each profile may set a `retryPolicy`; omission uses normal mode with five retrie
 
 The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-llm-pi-ai) is the exhaustive source for every accepted field and its JSDoc.
 
+### Use Relace search and Apply-3 from the harness
+
+The package exports `RELACE_PROVIDER_PROFILES` for explicit composition into
+the `llm-pi-ai.providers` map. It defines the OpenRouter credential reference
+`OPENROUTER_API_KEY`, the models `relace/relace-search` and
+`relace/relace-apply-3`, and the OpenRouter base URL; it never contains a key.
+For independently vaulted OpenRouter keys, `buildRelaceProviderProfiles()`
+accepts separate Search and Apply credential references without changing the
+route or model identifiers. `buildRelaceSearchGenerateOptions()` supplies the
+existing DSH agent loop with Relace's five exact strict tools and a five-turn
+read-only prompt. The host must enforce the five-turn bound. A host uses
+`createRelaceSearchToolBridge()` to connect those names to workspace-scoped
+callbacks; the `bash` callback is deliberately host-controlled and the bridge
+does not implement writes. The project workflow is documented in
+`.dsh/skills/relace-harness/SKILL.md`.
+
+`buildRelaceApplyGenerateOptions()` is a separate one-shot request. Its user
+message is formatted as `<instruction>`, `<code>`, and `<update>` tags, and it
+declares no tools or response-format hint. The returned model content is only a
+candidate result: `parseRelaceApplyResponse()` normalizes it, but this package
+never writes merged code to disk. The formatter enforces a bounded request and
+the optional instruction's single-line form. Keep Apply-3 out of the search
+loop and keep both routes opt-in in the harness composition.
+
 ### Sign in to a provider
 
 A provider pi-ai ships a login for can be signed into through the harness authorization seam: the flow offers OAuth or an interactive key prompt (a key is typed into pi-ai's own login prompt, not into the settings form), and the resulting credential is stored in the harness credential store at `llm-pi-ai/<provider id>`. The stored sign-in authenticates its route beneath any `apiKeyEnv` override and refreshes itself under the store's cross-process lock; signing out deletes the stored record. A hand-declared route key outside the record grammar — a lowercase hyphenated identifier — cannot be signed into, because a record write for it refuses with `LlmError('UNSTORABLE_PROVIDER_ID')`; such a route authenticates through `apiKeyEnv` or ambient provider settings instead.
