@@ -8,12 +8,12 @@ on:
       suite:
         description: Manual CI suite to run
         required: true
-        default: standard-hosted-consolidated
+        default: self-hosted-consolidated
         type: choice
         options:
-          - standard-hosted-consolidated
+          - self-hosted-consolidated
 
-# A master push may carry only the two standard-hosted serial references and the
+# A master push may carry only the two self-hosted/Linux serial references and the
 # Wine apt cache seeder; the serial references outlast the interval between
 # master merges, so push is exempt from cancellation. workflow_dispatch keeps
 # cancelling so a re-dispatched manual run replaces its stale measurement.
@@ -38,7 +38,7 @@ jobs:
   wine-apt-cache:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     name: wine apt cache
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, ci-linux]
     timeout-minutes: 10
     steps:
       - name: Compose Wine apt cache key
@@ -60,15 +60,14 @@ jobs:
           cp /var/cache/apt/archives/*.deb "$HOME/wine-debs/"
           du -sh "$HOME/wine-debs"
 
-  # Standard-hosted serial reference: every master push re-runs the complete
+  # Self-hosted serial reference: every master push re-runs the complete
   # unsharded aggregate with bounded concurrency. This workflow never listens
   # to pull_request, so the reference does not appear in PR checks. It uses the
-  # same ephemeral hosted boundary as the required PR jobs and therefore never
-  # depends on repository-specific runner registration.
+  # same dedicated Linux runner boundary as the required PR jobs.
   serial-linux-standard:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    name: serial / linux (standard hosted)
-    runs-on: ubuntu-latest
+    name: serial / linux (self-hosted)
+    runs-on: [self-hosted, linux, x64, ci-linux]
     steps:
       # DSH_ARCHIVE_BASE_REF below compares the frozen-archive gate against
       # github.event.before, so full history is required: depth 2 would miss it
@@ -76,6 +75,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - uses: pnpm/action-setup@v4
         with:
@@ -88,7 +88,7 @@ jobs:
       - name: Install (immutable)
         run: pnpm install --frozen-lockfile
 
-      - name: Install Playwright Chromium and hosted dependencies
+      - name: Install Playwright Chromium and Linux dependencies
         run: pnpm --filter @deepseek-ai/dsh-web-frontend exec playwright install --with-deps chromium
 
       - name: Prepare bubblewrap (unrestrict userns)
@@ -105,9 +105,9 @@ jobs:
           DSH_SNAPSHOT_MAX_CONCURRENCY: '1'
         run: pnpm run check:ci:linux-primary
 
-  # TODO(hosted-serial-ci): Re-enable the one remaining disabled hosted serial
+  # TODO(native-platform-ci): Re-enable the one remaining disabled macOS serial
   # reference job (serial-macos) before release. Re-enabling serial-macos does
-  # not restore a Linux hosted-cache producer: decide whether to add a master
+  # not restore a Linux cache producer: decide whether to add a master
   # seeder or remove the restore-only steps if cold starts become a concern.
   serial-macos:
     if: false
@@ -115,6 +115,8 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - uses: pnpm/action-setup@v4
         with:
@@ -136,16 +138,18 @@ jobs:
           DSH_SNAPSHOT_MAX_CONCURRENCY: '1'
         run: pnpm run check:ci
 
-  # Standard-hosted Windows serial reference: every master push re-runs the
+  # Hosted Windows serial reference: every master push re-runs the
   # complete unsharded Windows inventory. This workflow never listens to
   # pull_request, so the reference does not appear in PR checks.
   serial-windows-standard:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    name: serial / windows (standard hosted)
+    name: serial / windows (hosted)
     runs-on: windows-latest
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Enable Developer Mode (symlink support)
         shell: pwsh
@@ -176,7 +180,7 @@ jobs:
   # Historical benchmark definition. Benchmark/observational jobs are
   # permanently skipped; the retained body documents the old measurement
   # shape without making it a live CI gate.
-  standard-hosted-benchmark:
+  self-hosted-benchmark:
     if: false
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
@@ -186,13 +190,15 @@ jobs:
       matrix:
         include:
           - platform: linux
-            runner: ubuntu-latest
+            runner: ci-linux
             workload: typecheck
           - platform: windows
             runner: windows-latest
             workload: production-site
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - uses: pnpm/action-setup@v4
         with:
@@ -222,11 +228,11 @@ jobs:
         if: matrix.platform == 'windows'
         run: pnpm run docs:build
 
-  # Manual measurement of the low-fanout standard-hosted topology. Linux runs
+  # Manual measurement of the low-fanout self-hosted topology. Linux runs
   # the complete unsharded primary aggregate with bounded in-runner parallelism;
   # Windows runs the blocking build targets through run-gates.
-  standard-hosted-consolidated:
-    if: github.event_name == 'workflow_dispatch' && inputs.suite == 'standard-hosted-consolidated'
+  self-hosted-consolidated:
+    if: github.event_name == 'workflow_dispatch' && inputs.suite == 'self-hosted-consolidated'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     strategy:
@@ -235,13 +241,15 @@ jobs:
       matrix:
         include:
           - platform: linux
-            runner: ubuntu-latest
+            runner: ci-linux
             workers: '2'
           - platform: windows
             runner: windows-latest
             workers: '2'
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - uses: pnpm/action-setup@v4
         with:

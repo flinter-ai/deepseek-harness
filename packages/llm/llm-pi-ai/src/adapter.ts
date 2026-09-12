@@ -201,9 +201,18 @@ function reasoningInfo(
   }
 }
 
-/** Merge deployment headers while removing case-insensitive attribution collisions. */
-function requestHeaders(headers: Readonly<Record<string, string>> | undefined): Record<string, string> {
-  const attribution = attributionHeaders()
+/** Harness attribution and per-request OpenCode identity win case-insensitive profile collisions. */
+function requestHeaders(
+  headers: Readonly<Record<string, string>> | undefined,
+  model: Model<Api>,
+  sessionId: GenerateOptions['sessionId'],
+): Record<string, string> {
+  const attribution: Record<string, string> = attributionHeaders()
+  if (sessionId && (model.provider === 'opencode' || model.provider === 'opencode-go'
+    || URL.parse(model.baseUrl)?.hostname === 'opencode.ai')) {
+    attribution['x-opencode-session'] = String(sessionId)
+    attribution['x-opencode-client'] = 'pi'
+  }
   const reserved = new Set(Object.keys(attribution).map(name => name.toLowerCase()))
   return {
     ...Object.fromEntries(Object.entries(headers ?? {}).filter(([name]) => !reserved.has(name.toLowerCase()))),
@@ -348,6 +357,7 @@ export class PiAiAdapter extends LlmAdapter {
       : AbortSignal.any([options.signal, consumer.signal])
     const streamIdleTimeoutMs = profile.streamIdleTimeoutMs
     using watchdog = idleWatchdog(upstream, streamIdleTimeoutMs, 'LLM_STREAM_IDLE_TIMEOUT')
+    let emittedChunks = 0
 
     try {
       const containsImage = options.messages.some(message => contentHasImage(message.content))
@@ -378,9 +388,7 @@ export class PiAiAdapter extends LlmAdapter {
         ...options.maxTokens === undefined ? {} : { maxTokens: options.maxTokens },
         ...options.sessionId === undefined ? {} : { sessionId: String(options.sessionId) },
         signal: watchdog.signal,
-        // Profile headers are deployment-owned; attribution names are
-        // Harness-owned and therefore win collisions.
-        headers: requestHeaders(profile.headers),
+        headers: requestHeaders(profile.headers, model, options.sessionId),
       })
       const iterator = toStreamChunks(events, model.contextWindow, options.signal)[Symbol.asyncIterator]()
       let exhausted = false
@@ -393,6 +401,7 @@ export class PiAiAdapter extends LlmAdapter {
             exhausted = true
             return
           }
+          emittedChunks += 1
           yield result.value
         }
       } finally {
@@ -407,7 +416,14 @@ export class PiAiAdapter extends LlmAdapter {
       }
     } catch (error: unknown) {
       if (timeoutOf(watchdog.signal, 'LLM_STREAM_IDLE_TIMEOUT') !== undefined) {
-        throw new LlmError(`pi-ai stream idle timeout after ${streamIdleTimeoutMs}ms`, 'TIMEOUT', { cause: error })
+        const phase = emittedChunks === 0
+          ? 'before the first translated stream event'
+          : `after ${emittedChunks} translated stream events`
+        throw new LlmError(
+          `pi-ai stream idle timeout after ${streamIdleTimeoutMs}ms ${phase} for provider "${options.provider}", model "${options.model}"`,
+          'TIMEOUT',
+          { cause: error },
+        )
       }
       if (options.signal?.aborted) {
         throw new LlmError('pi-ai request aborted by caller', 'ABORTED', { cause: error })

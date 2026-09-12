@@ -13,7 +13,7 @@ import { platformDirs, readJson, root } from './repo.mjs';
 
 /** GitHub runner per prebuilds.json `platform` value — native builders only, no cross toolchain. */
 const RUNNERS = {
-  'linux-x64': 'ubuntu-24.04',
+  'linux-x64': 'ci-linux',
   'linux-arm64': 'ubuntu-24.04-arm',
 };
 

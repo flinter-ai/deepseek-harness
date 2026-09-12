@@ -13,6 +13,8 @@ import { SESSION_FORMAT_VERSION, Session, SessionId, TOOL_NOT_STARTED, TOOL_OUTC
 import type { SessionEvent, SessionHeader, SurfaceEventType, SurfaceIntent } from '@deepseek-ai/dsh-session'
 import { ToolCallId, MessageId, createMessage, freezeMessage } from '@deepseek-ai/dsh-llm'
 import type { SessionPersistence } from '../src/index.ts'
+import { decodeSessionEventArchiveSegmentV1, encodeSessionEventArchiveSegmentV1 } from '../src/archive-segment.ts'
+import type { SessionArchiveEvent } from '../src/archive.ts'
 
 /** A backend under test plus its teardown. */
 export interface ContractBackend {
@@ -436,8 +438,118 @@ export function runPersistenceContract(name: string, make: () => Promise<Contrac
  * This deliberately uses only the public service seam, so JSONL and SQLite
  * prove the same HWM/page behavior despite their different physical formats.
  */
-export function runArchiveSnapshotContract(name: string, make: () => Promise<ContractBackend>): void {
+export function runArchiveSnapshotContract(name: string, make: () => Promise<ContractBackend & {
+  reopen: () => Promise<SessionPersistence>
+}>): void {
   describe(`Session archive snapshot contract: ${name}`, () => {
+    it('resumes a serialized archive checkpoint after closing and reopening the backend', async () => {
+      const backend = await make()
+      try {
+        const id = SessionId(`archive-restart-${name}`)
+        const expected = [...oneTurnLog(), {
+          type: 'plugin/opaque', seq: 6, time: 7,
+          data: { text: '档案', nested: { retained: true } },
+        } as unknown as SessionEvent]
+        await backend.persistence.create(meta(id))
+        await backend.persistence.append(id, expected)
+        const snapshot = await backend.persistence.beginArchiveSnapshot(id)
+        expect(snapshot).not.toBeNull()
+        const first = await backend.persistence.readArchiveSnapshotPage(snapshot!, -1, 2)
+        expect(first.events).toEqual(expected.slice(0, 2))
+        const checkpoint = JSON.stringify({ snapshot, afterSeq: first.nextAfterSeq })
+        await backend.persistence.append(id, [{ type: 'turn/start', seq: 7, time: 8, data: { turn: 2 } }])
+        const reopened = await backend.reopen()
+        expect(reopened).not.toBe(backend.persistence)
+        const resumed = JSON.parse(checkpoint) as { snapshot: NonNullable<typeof snapshot>; afterSeq: number }
+        const events = [...first.events]
+        let cursor: number | null = resumed.afterSeq
+        for (let count = 0; cursor !== null && count < expected.length; count++) {
+          const page = await reopened.readArchiveSnapshotPage(resumed.snapshot, cursor, 2)
+          expect(page.events.length).toBeLessThanOrEqual(2)
+          expect(page.sourceRevision).toBe(snapshot!.sourceRevision)
+          if (page.nextAfterSeq !== null) expect(page.nextAfterSeq).toBeGreaterThan(cursor)
+          events.push(...page.events)
+          cursor = page.nextAfterSeq
+        }
+        expect(cursor).toBeNull()
+        expect(events).toEqual(expected)
+        const segment = encodeSessionEventArchiveSegmentV1(resumed.snapshot, events)
+        expect(decodeSessionEventArchiveSegmentV1(segment).events).toEqual(expected)
+        const current = await reopened.beginArchiveSnapshot(id)
+        expect(current?.highWatermarkSeq).toBe(7)
+        await expect(reopened.readArchiveSnapshotPage({
+          ...resumed.snapshot, opaquePrefixToken: 'invalid-checkpoint',
+        }, resumed.afterSeq, 2)).rejects.toThrow('STALE_SNAPSHOT')
+      } finally {
+        await backend.dispose()
+      }
+    })
+
+    it('excludes appends made after backend reopen from an older archive checkpoint', async () => {
+      const backend = await make()
+      try {
+        const id = SessionId(`archive-restart-append-${name}`)
+        const expected = oneTurnLog()
+        await backend.persistence.create(meta(id))
+        await backend.persistence.append(id, expected)
+        const captured = await backend.persistence.beginArchiveSnapshot(id)
+        expect(captured).not.toBeNull()
+        const checkpoint = JSON.stringify(captured)
+        const reopened = await backend.reopen()
+        await reopened.append(id, [{ type: 'turn/start', seq: 6, time: 7, data: { turn: 2 } }])
+        const snapshot = JSON.parse(checkpoint) as NonNullable<typeof captured>
+        const page = await reopened.readArchiveSnapshotPage(snapshot, -1, 10)
+        expect(page.events).toEqual(expected)
+        expect(page.nextAfterSeq).toBeNull()
+        expect(decodeSessionEventArchiveSegmentV1(
+          encodeSessionEventArchiveSegmentV1(snapshot, page.events),
+        ).events).toEqual(expected)
+        expect((await reopened.beginArchiveSnapshot(id))?.highWatermarkSeq).toBeGreaterThan(5)
+      } finally {
+        await backend.dispose()
+      }
+    })
+
+    it('round-trips a paginated persisted prefix through the archive codec without its later suffix', async () => {
+      const { persistence, dispose } = await make()
+      try {
+        const id = SessionId(`archive-codec-${name}`)
+        const expected = [...oneTurnLog(), {
+          type: 'plugin/opaque', seq: 6, time: 7,
+          data: { text: '档案', nested: { retained: true } },
+        } as unknown as SessionEvent]
+        await persistence.create(meta(id))
+        await persistence.append(id, expected)
+        const captured = await persistence.beginArchiveSnapshot(id)
+        expect(captured).not.toBeNull()
+        // Serialization exercises checkpoint transport, not backend restart.
+        const snapshot = JSON.parse(JSON.stringify(captured)) as NonNullable<typeof captured>
+        await persistence.append(id, [{ type: 'turn/start', seq: 7, time: 8, data: { turn: 2 } }])
+        const events: SessionArchiveEvent[] = []
+        let afterSeq = -1
+        for (let pageIndex = 0; pageIndex < expected.length; pageIndex++) {
+          const page = await persistence.readArchiveSnapshotPage(snapshot, afterSeq, 2)
+          expect(page.events.length).toBeLessThanOrEqual(2)
+          expect(page.sourceRevision).toBe(snapshot.sourceRevision)
+          events.push(...page.events)
+          if (page.nextAfterSeq === null) break
+          expect(page.nextAfterSeq).toBeGreaterThan(afterSeq)
+          afterSeq = page.nextAfterSeq
+        }
+        expect(events).toEqual(expected)
+        const segment = encodeSessionEventArchiveSegmentV1(snapshot, events)
+        const decoded = decodeSessionEventArchiveSegmentV1(JSON.parse(JSON.stringify(segment)))
+        expect(decoded.events).toEqual(expected)
+        expect(decoded.segment.highWatermarkSeq).toBe(6)
+        expect(decoded.segment.eventCount).toBe(expected.length)
+        expect(() => decodeSessionEventArchiveSegmentV1({
+          ...segment, decodedEventStreamSha256: '0'.repeat(64),
+        })).toThrow('SHA-256 mismatch')
+      } finally {
+        await dispose()
+      }
+    })
+
     it('keeps pages bounded at the captured HWM while later appends remain selectable', async () => {
       const { persistence, dispose } = await make()
       try {

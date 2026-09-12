@@ -115,13 +115,22 @@ runPersistenceContract('jsonl-none', async () => {
 
 runArchiveSnapshotContract('jsonl-none', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'dsh-jsonl-archive-'))
-  const ctx = new Context()
-  await ctx.plugin(SessionStore)
-  const fiber = await ctx.plugin(JsonlSessionPersistence, { root: dir, compression: 'none' })
+  const mount = async () => {
+    const next = new Context()
+    await next.plugin(SessionStore)
+    await next.plugin(JsonlSessionPersistence, { root: dir, compression: 'none' })
+    return next
+  }
+  let ctx = await mount()
   return {
     persistence: ctx.sessionPersistence,
+    reopen: async () => {
+      await ctx.fiber.dispose()
+      ctx = await mount()
+      return ctx.sessionPersistence
+    },
     dispose: async () => {
-      await fiber.dispose()
+      await ctx.fiber.dispose()
       await rm(dir, { recursive: true, force: true })
     },
   }

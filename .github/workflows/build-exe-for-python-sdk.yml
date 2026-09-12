@@ -62,7 +62,7 @@ jobs:
   plan:
     name: plan targets
     if: inputs.ci || inputs.release || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, ci-linux]
     timeout-minutes: 5
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
@@ -70,6 +70,8 @@ jobs:
       repository-version: ${{ steps.version.outputs.repository-version }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Resolve repository version
         id: version
@@ -97,10 +99,10 @@ jobs:
           for raw in "${targets[@]}"; do
             t="$(echo "$raw" | xargs)" # trim surrounding whitespace
             [ -z "$t" ] && continue
-            # Native-only: hosted arm64 Linux uses ubuntu-24.04-arm, while
-            # macos-latest is Apple Silicon.
+            # Native-only: Linux x64 uses the dedicated EC2 runner; hosted
+            # ARM64, macOS, and Windows retain their native platform runners.
             case "$t" in
-              node24-linux-x64)   runner=ubuntu-latest ;;
+              node24-linux-x64)   runner=ci-linux ;;
               node24-linux-arm64) runner=ubuntu-24.04-arm ;;
               node24-macos-arm64) runner=macos-latest ;;
               node24-win-x64)     runner=windows-2025 ;;
@@ -121,10 +123,12 @@ jobs:
   sdk-wheel:
     needs: plan
     name: deepseek_harness_sdk-${{ needs.plan.outputs.version }}-py3-none-any.whl
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, ci-linux]
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-python@v6.3.0
         with:
@@ -157,6 +161,8 @@ jobs:
         include: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - uses: pnpm/action-setup@v4
         with:

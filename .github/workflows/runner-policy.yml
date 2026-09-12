@@ -11,11 +11,13 @@ permissions:
 
 jobs:
   runner-policy:
-    name: standard hosted runner policy
-    runs-on: ubuntu-latest
+    name: self-hosted Linux runner policy
+    runs-on: [self-hosted, linux, x64, ci-linux]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - uses: pnpm/action-setup@v4
 

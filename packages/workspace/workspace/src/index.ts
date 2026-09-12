@@ -352,9 +352,9 @@ export class WorkspaceRegistry extends Service {
    * @param sessionId - Session that will operate in the worktree.
    */
   claimSession(handle: WorkspaceHandle, sessionId: SessionId): Promise<void> {
-    return this.enqueueOperation(async () => {
+    return this.enqueueOperation(() => {
       const workspace = this.requireHandle(handle)
-      if (workspace.worktree === undefined) return
+      if (workspace.worktree === undefined) return Promise.resolve()
       for (const [workspaceId, owner] of this.worktreeLeases) {
         if (owner === sessionId && workspaceId !== workspace.id) {
           throw new WorkspaceSessionLeaseConflictError(workspace.id, sessionId, owner)
@@ -365,6 +365,7 @@ export class WorkspaceRegistry extends Service {
         throw new WorkspaceSessionLeaseConflictError(workspace.id, sessionId, owner)
       }
       this.worktreeLeases.set(workspace.id, sessionId)
+      return Promise.resolve()
     })
   }
 
@@ -374,10 +375,11 @@ export class WorkspaceRegistry extends Service {
    */
   releaseSession(sessionId: SessionId): Promise<void> {
     if (this.state === undefined) return Promise.resolve()
-    return this.enqueueOperation(async () => {
+    return this.enqueueOperation(() => {
       for (const [workspaceId, owner] of this.worktreeLeases) {
         if (owner === sessionId) this.worktreeLeases.delete(workspaceId)
       }
+      return Promise.resolve()
     })
   }
 

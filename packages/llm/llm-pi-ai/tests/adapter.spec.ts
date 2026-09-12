@@ -123,6 +123,40 @@ describe('PiAiAdapter provider routing', () => {
     expect(server.headers[0]?.['user-agent']).toBe(userAgent())
   })
 
+  it.each(['opencode', 'opencode-go'])('sends per-request session headers for %s over profile collisions', async (provider) => {
+    const server = await mockServer([{ events: textEvents }, { events: textEvents }])
+    const adapter = adapterOf({ [provider]: {
+      api: 'openai-completions',
+      baseURL: server.url,
+      models: [{ id: 'test-model' }],
+      headers: {
+        'x-company': 'private',
+        'User-Agent': 'wrong',
+        'X-OpenCode-Session': 'static-session',
+        'X-OpenCode-Client': 'wrong-client',
+      },
+    } })
+    for (const sessionId of ['session-first', 'session-second']) {
+      for await (const _chunk of adapter.stream({ provider, model: 'test-model', messages: [], sessionId: sessionId as never })) { /* drain */ }
+    }
+    expect(server.headers.map(headers => headers['x-opencode-session'])).toEqual(['session-first', 'session-second'])
+    for (const headers of server.headers) {
+      expect(headers['x-opencode-client']).toBe('pi')
+      expect(headers['x-company']).toBe('private')
+      expect(headers['user-agent']).toBe(userAgent())
+    }
+  })
+
+  it('omits generated OpenCode headers without a session ID', async () => {
+    const server = await mockServer([{ events: textEvents }])
+    const adapter = adapterOf({ 'opencode-go': {
+      api: 'openai-completions', baseURL: server.url, models: [{ id: 'test-model' }],
+    } })
+    for await (const _chunk of adapter.stream({ provider: 'opencode-go', model: 'test-model', messages: [] })) { /* drain */ }
+    expect(server.headers[0]?.['x-opencode-session']).toBeUndefined()
+    expect(server.headers[0]?.['x-opencode-client']).toBeUndefined()
+  })
+
   it('forwards common stream options and profile reasoning', async () => {
     const server = await mockServer([{ events: textEvents }])
     const ctx = await harness(server.url, {
@@ -150,6 +184,8 @@ describe('PiAiAdapter provider routing', () => {
     })
     expect(server.requests[0]).not.toHaveProperty('dsh_session_log')
     expect(server.requests[0]).not.toHaveProperty('dsh_plugin_packages')
+    expect(server.headers[0]?.['x-opencode-session']).toBeUndefined()
+    expect(server.headers[0]?.['x-opencode-client']).toBeUndefined()
   })
 
   it('uses a dynamic request effort and reports unsupported efforts before network I/O', async () => {
@@ -417,7 +453,13 @@ describe('PiAiAdapter provider routing', () => {
     const ctx = await harness(server.url, { streamIdleTimeoutMs: 20 })
 
     const result = await assemble(ctx, { model: 'deepseek-v4-flash', messages: [] })
-    expect(result.finish).toMatchObject({ kind: 'error', failure: { code: 'TIMEOUT' } })
+    expect(result.finish).toMatchObject({
+      kind: 'error',
+      failure: {
+        code: 'TIMEOUT',
+        message: 'pi-ai stream idle timeout after 20ms before the first translated stream event for provider "deepseek", model "deepseek-v4-flash"',
+      },
+    })
     await Promise.race([
       server.responseClosed,
       new Promise<never>((_resolve, reject) => {
@@ -427,6 +469,27 @@ describe('PiAiAdapter provider routing', () => {
 
     expect(server.paths).toEqual(['/chat/completions'])
     expect(server.closedResponses).toBe(1)
+  })
+
+  it('identifies a timeout after translated stream events', async () => {
+    const server = await mockServer([{ events: textEvents, stallAfterEvents: 2 }])
+    const ctx = await harness(server.url, { streamIdleTimeoutMs: 20 })
+
+    const result = await assemble(ctx, { model: 'deepseek-v4-flash', messages: [] })
+    expect(result.finish).toMatchObject({
+      kind: 'error',
+      failure: {
+        code: 'TIMEOUT',
+      },
+    })
+    if (result.finish.kind !== 'error') throw new Error('expected an error finish')
+    expect(result.finish.failure.message).toMatch(
+      /^pi-ai stream idle timeout after 20ms after [1-9][0-9]* translated stream events /,
+    )
+    expect(result.finish.failure.message).toContain(
+      'for provider "deepseek", model "deepseek-v4-flash"',
+    )
+    await server.responseClosed
   })
 })
 

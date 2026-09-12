@@ -246,7 +246,7 @@ export class AwsSecretsManagerCredentialProvider extends CredentialProvider {
   }
 
   * [Service.init](): Generator<() => void, void, void> {
-    yield () => this.client.destroy()
+    yield () => { this.client.destroy() }
   }
 }
 

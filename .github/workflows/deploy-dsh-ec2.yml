@@ -32,7 +32,7 @@ concurrency:
 jobs:
   deploy:
     name: DSH Web / EC2
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, linux, x64, ci-linux]
     timeout-minutes: 30
     environment:
       name: dsh-ec2-production

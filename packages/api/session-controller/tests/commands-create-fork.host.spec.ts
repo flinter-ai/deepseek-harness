@@ -108,6 +108,7 @@ describe('Session creation failures', () => {
   it('maps a worktree lease conflict and releases a claimed lease on creation failure', async () => {
     const conflict = await baseContext()
     const workspaceId = 'workspace-lease' as WorkspaceId
+    const attachSession = vi.fn()
     const workspace = {
       id: workspaceId,
       path: '/workspace',
@@ -117,7 +118,7 @@ describe('Session creation failures', () => {
         worktree: { repositoryRoot: '/repo', branch: 'dsh/workspace/test', commit: 'a'.repeat(40) },
       },
       worktree: { repositoryRoot: '/repo', branch: 'dsh/workspace/test', commit: 'a'.repeat(40) },
-      attachSession: vi.fn(),
+      attachSession,
     } as unknown as Workspace
     const claimSession = vi.fn().mockRejectedValue(new WorkspaceSessionLeaseConflictError(
       workspaceId,
@@ -137,7 +138,7 @@ describe('Session creation failures', () => {
       sessionId: SessionId('requested'),
     }), 'workspace-lease-conflict')
     expect(claimSession).toHaveBeenCalledWith(workspace.handle, SessionId('requested'))
-    expect(workspace.attachSession).not.toHaveBeenCalled()
+    expect(attachSession).not.toHaveBeenCalled()
     await conflict.fiber.dispose()
 
     const release = await baseContext()

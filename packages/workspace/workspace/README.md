@@ -64,6 +64,11 @@ ctx.workspaceRegistry.list() // shows the project, newest first
 Use `createWorktree()` when a project owns source code that a session may edit. It creates one branch and one worktree below `worktreeRoot` (by default under the resolved DSH home), and the returned `WorkspaceHandle` is the intended shared project identity. This slice wires it through the session controller, terminal, local file-reference, and skill adapters; editor, code-memory, InstaCloud, and GitHub/PR adapters are not present here and remain `NOT_RUN`. Wired adapters pass the same handle and call `resolvePath()` for every path; they do not derive a second checkout from the process cwd:
 
 ```ts
+import type { Context } from '@deepseek-ai/cordis'
+import '@deepseek-ai/dsh-workspace'
+
+declare const ctx: Context
+
 const project = await ctx.workspaceRegistry.createWorktree({
   repository: '/path/to/repository',
 })
