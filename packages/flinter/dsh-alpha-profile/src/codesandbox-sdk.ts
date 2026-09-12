@@ -39,10 +39,30 @@ export interface CodeSandboxSdkRuntimeOptions {
   readonly title?: string
   readonly description?: string
   readonly tags?: readonly string[]
+  /** Optional tracked source archive to seed into each managed sandbox. */
+  readonly workspaceSeed?: CodeSandboxWorkspaceSeed
+}
+
+/** A host-created, tracked-only source archive for one exact DSH revision. */
+export interface CodeSandboxWorkspaceSeed {
+  /** The archive bytes; provider credentials must not be included. */
+  readonly archive: Uint8Array
+  /** The exact source revision represented by `archive`. */
+  readonly sourceSha: string
+  /** SHA-256 of `archive`, computed by the host before the SDK call. */
+  readonly archiveSha256: string
+  /** Destination inside the sandbox workspace. Defaults to `/project/sandbox`. */
+  readonly root?: string
+}
+
+interface NormalizedWorkspaceSeed extends CodeSandboxWorkspaceSeed {
+  readonly root: string
 }
 
 type SdkSandbox = Pick<Sandbox, 'id' | 'connect'>
-type SdkClient = Pick<SandboxClient, 'commands' | 'dispose'>
+type SdkClient = Pick<SandboxClient, 'commands' | 'dispose'> & {
+  readonly fs: Pick<SandboxClient['fs'], 'writeFile'>
+}
 type SdkCommand = Pick<Command, 'waitUntilComplete' | 'kill'>
 
 const SDK_TIERS = new Map(
@@ -71,6 +91,31 @@ function resolveTier(value: string): VMTier {
   return tier
 }
 
+function requiredHex(value: unknown, field: string, exactLength?: number): string {
+  const normalized = requiredText(value, field).toLowerCase()
+  const pattern = exactLength === undefined
+    ? /^[0-9a-f]{40,64}$/
+    : new RegExp(`^[0-9a-f]{${exactLength}}$`)
+  if (!pattern.test(normalized)) {
+    throw new Error(`CodeSandbox ${field} must be a hexadecimal SHA`)
+  }
+  return normalized
+}
+
+function normalizeWorkspaceSeed(seed: CodeSandboxWorkspaceSeed): NormalizedWorkspaceSeed {
+  if (!(seed.archive instanceof Uint8Array) || seed.archive.byteLength === 0) {
+    throw new Error('CodeSandbox workspaceSeed archive must be non-empty bytes')
+  }
+  const root = seed.root === undefined ? '/project/sandbox' : requiredText(seed.root, 'workspaceSeed root')
+  if (!root.startsWith('/')) throw new Error('CodeSandbox workspaceSeed root must be absolute')
+  return Object.freeze({
+    archive: seed.archive,
+    sourceSha: requiredHex(seed.sourceSha, 'workspaceSeed sourceSha'),
+    archiveSha256: requiredHex(seed.archiveSha256, 'workspaceSeed archiveSha256', 64),
+    root,
+  })
+}
+
 function cloneEnvironment(environment: Readonly<Record<string, string>>): Record<string, string> {
   const output: Record<string, string> = {}
   for (const [name, value] of Object.entries(environment)) {
@@ -92,6 +137,19 @@ function shellQuote(value: string, field: string): string {
 function literalCommand(argv: readonly string[], cwd: string): string {
   if (argv.length === 0) throw new Error('CodeSandbox argv must not be empty')
   return `cd ${shellQuote(cwd, 'cwd')} && exec ${argv.map((value, index) => shellQuote(value, `argv[${index}]`)).join(' ')}`
+}
+
+function workspaceSeedCommand(seed: NormalizedWorkspaceSeed): string {
+  const archivePath = '/tmp/dsh-source.tar.gz'
+  const stampPath = `${seed.root}/.dsh-source-sha`
+  return [
+    `test "$(sha256sum ${shellQuote(archivePath, 'workspaceSeed archive')} | awk '{print $1}')" = ${shellQuote(seed.archiveSha256, 'workspaceSeed archiveSha256')}`,
+    `mkdir -p ${shellQuote(seed.root, 'workspaceSeed root')}`,
+    `tar -xzf ${shellQuote(archivePath, 'workspaceSeed archive')} -C ${shellQuote(seed.root, 'workspaceSeed root')} --overwrite --no-same-owner`,
+    `printf '%s\\n' ${shellQuote(seed.sourceSha, 'workspaceSeed sourceSha')} > ${shellQuote(stampPath, 'workspaceSeed stamp')}`,
+    `test "$(cat ${shellQuote(stampPath, 'workspaceSeed stamp')})" = ${shellQuote(seed.sourceSha, 'workspaceSeed sourceSha')}`,
+    `rm -f ${shellQuote(archivePath, 'workspaceSeed archive')}`,
+  ].join(' && ')
 }
 
 function wrapCommand(command: SdkCommand, client: SdkClient, signal?: AbortSignal): CodeSandboxCommand {
@@ -143,6 +201,7 @@ function wrapCommand(command: SdkCommand, client: SdkClient, signal?: AbortSigna
 export class CodeSandboxSdkRuntime implements CodeSandboxRuntime {
   private readonly sdk: CodeSandboxSdkClient
   private readonly metadata: Pick<CodeSandboxSdkRuntimeOptions, 'title' | 'description' | 'tags'>
+  private readonly workspaceSeed: NormalizedWorkspaceSeed | undefined
 
   constructor(options: CodeSandboxSdkRuntimeOptions = {}) {
     this.metadata = {
@@ -152,6 +211,9 @@ export class CodeSandboxSdkRuntime implements CodeSandboxRuntime {
         : { description: requiredText(options.description, 'description') }),
       ...(options.tags === undefined ? {} : { tags: [...options.tags] }),
     }
+    this.workspaceSeed = options.workspaceSeed === undefined
+      ? undefined
+      : normalizeWorkspaceSeed(options.workspaceSeed)
     if (options.sdk !== undefined) {
       this.sdk = options.sdk
       return
@@ -181,7 +243,14 @@ export class CodeSandboxSdkRuntime implements CodeSandboxRuntime {
         websocket: options.automaticWakeupConfig.websocket,
       },
     })
-    return this.wrapSandbox(sandbox)
+    const managed = this.wrapSandbox(sandbox)
+    try {
+      if (this.workspaceSeed !== undefined) await managed.seedWorkspace(this.workspaceSeed)
+      return managed
+    } catch (error) {
+      await this.sdk.sandboxes.shutdown(sandbox.id).catch(() => undefined)
+      throw error
+    }
   }
 
   async disposeSandbox(sandbox: CodeSandboxSdkRuntimeSandbox): Promise<void> {
@@ -191,6 +260,16 @@ export class CodeSandboxSdkRuntime implements CodeSandboxRuntime {
   private wrapSandbox(sandbox: SdkSandbox): CodeSandboxSdkRuntimeSandbox {
     return {
       id: sandbox.id,
+      seedWorkspace: async (seed) => {
+        const normalized = normalizeWorkspaceSeed(seed)
+        const client = await sandbox.connect({ permission: 'write' })
+        try {
+          await client.fs.writeFile('/tmp/dsh-source.tar.gz', normalized.archive)
+          await client.commands.run(workspaceSeedCommand(normalized), { cwd: normalized.root })
+        } finally {
+          client.dispose()
+        }
+      },
       connect: async (options) => {
         const client = await sandbox.connect({
           permission: 'write',
@@ -223,6 +302,7 @@ export class CodeSandboxSdkRuntime implements CodeSandboxRuntime {
 /** The runtime-owned sandbox handle exposed to `CodeSandboxComputeBackend`. */
 export interface CodeSandboxSdkRuntimeSandbox {
   readonly id: string
+  seedWorkspace(seed: CodeSandboxWorkspaceSeed): Promise<void>
   connect(options: Readonly<{
     readonly env: Readonly<Record<string, string>>
   }>): Promise<CodeSandboxClient>

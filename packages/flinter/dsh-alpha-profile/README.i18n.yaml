@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/flinter/dsh-alpha-profile/README.md
-README.md: 5a14eda97018f8107ed9c2e3e4918cabbc15deaa
-README.zh.md: 2d97bda105b57dba06a76b382ccc96d4aec564b1
+README.md: f946b1d31c80c095f649353b0395909179db4ae9
+README.zh.md: bd1bd496b4e7209670d0e011d05413d790ea5c91

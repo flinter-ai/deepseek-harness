@@ -87,6 +87,64 @@ describe('official CodeSandbox SDK runtime', () => {
     expect(JSON.stringify({ createOptions, connectOptions, runOptions })).not.toContain('API_KEY')
   })
 
+  it('seeds a tracked source archive and stamps the exact source revision', async () => {
+    let uploadedPath: string | undefined
+    let uploadedBytes: Uint8Array | undefined
+    let seedCommand: string | undefined
+    let seedCwd: string | undefined
+    let disposed = 0
+    let shutdownId: string | undefined
+    const client = {
+      fs: {
+        async writeFile(path: string, content: Uint8Array) {
+          uploadedPath = path
+          uploadedBytes = content
+        },
+      },
+      commands: {
+        async run(command: string, options: { cwd: string }) {
+          seedCommand = command
+          seedCwd = options.cwd
+          return 'seeded'
+        },
+      },
+      dispose() { disposed += 1 },
+    }
+    const sandbox = {
+      id: 'sandbox-seeded',
+      async connect() { return client },
+    }
+    const sdk = {
+      sandboxes: {
+        async create() { return sandbox },
+        async shutdown(id: string) { shutdownId = id },
+      },
+    } as unknown as CodeSandboxSdkClient
+    const archive = new Uint8Array([1, 2, 3])
+    const sourceSha = 'a'.repeat(40)
+    const archiveSha256 = 'b'.repeat(64)
+    const runtime = new CodeSandboxSdkRuntime({
+      sdk,
+      workspaceSeed: { archive, sourceSha, archiveSha256 },
+    })
+
+    const managed = await runtime.createSandbox({
+      vmTier: 'pico',
+      hibernationTimeoutSeconds: 120,
+      automaticWakeupConfig: { http: true, websocket: false },
+    })
+    await runtime.disposeSandbox(managed)
+
+    expect(uploadedPath).toBe('/tmp/dsh-source.tar.gz')
+    expect(uploadedBytes).toBe(archive)
+    expect(seedCwd).toBe('/project/sandbox')
+    expect(seedCommand).toContain(`'${archiveSha256}'`)
+    expect(seedCommand).toContain(`'${sourceSha}'`)
+    expect(seedCommand).toContain('--no-same-owner')
+    expect(disposed).toBe(1)
+    expect(shutdownId).toBe('sandbox-seeded')
+  })
+
   it('requires a host token when no SDK test double is supplied', () => {
     const previous = process.env.CSB_API_KEY
     delete process.env.CSB_API_KEY

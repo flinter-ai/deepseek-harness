@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-12-codesandbox-sdk-runtime.md
-2026-09-12-codesandbox-sdk-runtime.md: 68319ae85b4bba0205547ddbc77a0065cd0e2638
-2026-09-12-codesandbox-sdk-runtime.zh.md: 49befbdaec88313805baa7232636b9ea13fad34e
+2026-09-12-codesandbox-sdk-runtime.md: c01abdcfb7b66d8de3f1da3df0bfabbd70438e5b
+2026-09-12-codesandbox-sdk-runtime.zh.md: 2c3e1eb074e7574de553c7cad3c260a847f5ac39

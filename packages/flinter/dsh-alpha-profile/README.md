@@ -65,13 +65,22 @@ const runtime = new CodeSandboxSdkRuntime({ apiToken: process.env.CSB_API_KEY })
 const backend = new CodeSandboxComputeBackend({ runtime, vmTier: 'pico' })
 ```
 
-The runtime creates private VMs, maps the bounded tier/hibernation policy,
-connects with the SDK, runs a fixed shell-quoted transport that preserves
-literal argv values, and shuts the VM down after completion. The token and
-provider credentials are never forwarded to the sandbox environment. The
+The runtime creates private CodeSandbox sandboxes (CodeSandbox implements them
+with microVMs), maps the bounded tier/hibernation policy, connects with the
+SDK, runs a fixed shell-quoted transport that preserves literal argv values,
+and shuts the sandbox down after completion. The token and provider
+credentials are never forwarded to the sandbox environment. The
 official `csb` CLI is useful for listing, hibernating, shutting down, and
 managing preview/host-token resources; it complements the SDK but is not the
 command-execution adapter.
+
+For an exact DSH checkout, the host may also provide `workspaceSeed` containing
+a tracked-only source archive, its source SHA, and the archive SHA-256. The
+runtime writes that archive into the sandbox, verifies both hashes, and
+extracts it into `/project/sandbox` before the worker command runs. This is
+explicit sandbox seeding: `templateId` is only an optional CodeSandbox
+bootstrap/fork source, not a replacement for the GitHub source of truth or an
+AWS persistence layer.
 
 The control plane or executor must still provide shared admission and durable
 fencing. `DshComputeAdmission` is process-local evidence and cannot by itself

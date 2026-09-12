@@ -65,11 +65,19 @@ const runtime = new CodeSandboxSdkRuntime({ apiToken: process.env.CSB_API_KEY })
 const backend = new CodeSandboxComputeBackend({ runtime, vmTier: 'pico' })
 ```
 
-runtime 会创建 private VM、映射受限的 tier/休眠策略、通过 SDK 连接，使用
-保留 literal argv 语义的固定 shell-quoted transport 执行命令，并在完成后
-shutdown。token 和 provider credential 都不会转发到 sandbox 环境。官方
+runtime 会创建 private CodeSandbox sandbox（底层由 CodeSandbox 使用
+microVM 实现），映射受限的 tier/休眠策略、通过 SDK 连接，使用保留
+literal argv 语义的固定 shell-quoted transport 执行命令，并在完成后
+shutdown sandbox。token 和 provider credential 都不会转发到 sandbox 环境。官方
 `csb` CLI 适合 list、hibernate、shutdown 以及 preview/host-token 资源管理；
 它与 SDK 互补，但不是命令执行 adapter。
+
+如果需要精确的 DSH checkout，宿主还可以提供 `workspaceSeed`，其中包含
+只来自 tracked files 的 source archive、source SHA 和 archive SHA-256。
+runtime 会通过 SDK 将 archive 写入 sandbox，校验两个 hash，再在 worker
+命令启动前解包到 `/project/sandbox`。这就是明确的 sandbox seeding：
+`templateId` 只是可选的 CodeSandbox bootstrap/fork 来源，不取代 GitHub
+source of truth，也不是 AWS 持久化层。
 
 control plane 或 executor 仍必须提供共享 admission 与持久 fencing。
 `DshComputeAdmission` 只是进程内证据，不能单独证明多主机的分布式容量。
