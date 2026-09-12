@@ -11,7 +11,7 @@ let server: Server | undefined
 afterEach(async () => {
   await context?.fiber.dispose()
   context = undefined
-  if (server !== undefined) await new Promise<void>(resolve => server!.close(() => resolve()))
+  if (server !== undefined) await new Promise<void>((resolve) => { server!.close(() => { resolve() }) })
   server = undefined
   vi.unstubAllEnvs()
 })
@@ -25,7 +25,8 @@ describe('workbuddy DSH integration', () => {
 
     server = createServer((request, response) => {
       let body = ''
-      request.on('data', (chunk) => { body += chunk.toString() })
+      request.setEncoding('utf8')
+      request.on('data', (chunk: string) => { body += chunk })
       request.on('end', () => {
         requestPath = request.url
         authorization = request.headers.authorization
@@ -40,7 +41,7 @@ describe('workbuddy DSH integration', () => {
         ].join('\n\n'))
       })
     })
-    await new Promise<void>(resolve => server!.listen(0, '127.0.0.1', () => resolve()))
+    await new Promise<void>((resolve) => { server!.listen(0, '127.0.0.1', () => { resolve() }) })
     const address = server.address()
     if (address === null || typeof address === 'string') throw new Error('integration server did not bind')
 

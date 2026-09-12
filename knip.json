@@ -22,6 +22,17 @@
     "lightningcss"
   ],
   "workspaces": {
+    "packages/session/session-persistence": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.e2e.ts",
+        "tests/fixtures/archive-crash-child.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ]
+    },
     ".": {
       "entry": [
         "scripts/**/*.mjs",

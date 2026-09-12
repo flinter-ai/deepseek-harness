@@ -64,6 +64,11 @@ ctx.workspaceRegistry.list() // shows the project, newest first
 当项目拥有会被 session 修改的 source code 时，使用 `createWorktree()`。它会在 `worktreeRoot` 下（默认位于解析后的 DSH home）创建一个 branch 与一个 worktree；返回的 `WorkspaceHandle` 是预期共享的项目 identity。本 slice 已将它接入 session controller、terminal、local file-reference 与 skill adapter；editor、code-memory、InstaCloud 与 GitHub/PR adapter 在此处不存在，仍为 `NOT_RUN`。已接入的 adapter 传递同一个 handle，并对每个路径调用 `resolvePath()`；不会从 process cwd 再推导第二个 checkout：
 
 ```ts
+import type { Context } from '@deepseek-ai/cordis'
+import '@deepseek-ai/dsh-workspace'
+
+declare const ctx: Context
+
 const project = await ctx.workspaceRegistry.createWorktree({
   repository: '/path/to/repository',
 })
