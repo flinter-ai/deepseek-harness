@@ -13,6 +13,8 @@ import { SESSION_FORMAT_VERSION, Session, SessionId, TOOL_NOT_STARTED, TOOL_OUTC
 import type { SessionEvent, SessionHeader, SurfaceEventType, SurfaceIntent } from '@deepseek-ai/dsh-session'
 import { ToolCallId, MessageId, createMessage, freezeMessage } from '@deepseek-ai/dsh-llm'
 import type { SessionPersistence } from '../src/index.ts'
+import { decodeSessionEventArchiveSegmentV1, encodeSessionEventArchiveSegmentV1 } from '../src/archive-segment.ts'
+import type { SessionArchiveEvent } from '../src/archive.ts'
 
 /** A backend under test plus its teardown. */
 export interface ContractBackend {
@@ -438,6 +440,46 @@ export function runPersistenceContract(name: string, make: () => Promise<Contrac
  */
 export function runArchiveSnapshotContract(name: string, make: () => Promise<ContractBackend>): void {
   describe(`Session archive snapshot contract: ${name}`, () => {
+    it('round-trips a paginated persisted prefix through the archive codec without its later suffix', async () => {
+      const { persistence, dispose } = await make()
+      try {
+        const id = SessionId(`archive-codec-${name}`)
+        const expected = [...oneTurnLog(), {
+          type: 'plugin/opaque', seq: 6, time: 7,
+          data: { text: '档案', nested: { retained: true } },
+        } as unknown as SessionEvent]
+        await persistence.create(meta(id))
+        await persistence.append(id, expected)
+        const captured = await persistence.beginArchiveSnapshot(id)
+        expect(captured).not.toBeNull()
+        // Serialization exercises checkpoint transport, not backend restart.
+        const snapshot = JSON.parse(JSON.stringify(captured)) as NonNullable<typeof captured>
+        await persistence.append(id, [{ type: 'turn/start', seq: 7, time: 8, data: { turn: 2 } }])
+        const events: SessionArchiveEvent[] = []
+        let afterSeq = -1
+        for (let pageIndex = 0; pageIndex < expected.length; pageIndex++) {
+          const page = await persistence.readArchiveSnapshotPage(snapshot, afterSeq, 2)
+          expect(page.events.length).toBeLessThanOrEqual(2)
+          expect(page.sourceRevision).toBe(snapshot.sourceRevision)
+          events.push(...page.events)
+          if (page.nextAfterSeq === null) break
+          expect(page.nextAfterSeq).toBeGreaterThan(afterSeq)
+          afterSeq = page.nextAfterSeq
+        }
+        expect(events).toEqual(expected)
+        const segment = encodeSessionEventArchiveSegmentV1(snapshot, events)
+        const decoded = decodeSessionEventArchiveSegmentV1(JSON.parse(JSON.stringify(segment)))
+        expect(decoded.events).toEqual(expected)
+        expect(decoded.segment.highWatermarkSeq).toBe(6)
+        expect(decoded.segment.eventCount).toBe(expected.length)
+        expect(() => decodeSessionEventArchiveSegmentV1({
+          ...segment, decodedEventStreamSha256: '0'.repeat(64),
+        })).toThrow('SHA-256 mismatch')
+      } finally {
+        await dispose()
+      }
+    })
+
     it('keeps pages bounded at the captured HWM while later appends remain selectable', async () => {
       const { persistence, dispose } = await make()
       try {
