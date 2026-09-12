@@ -15,6 +15,7 @@ export type TestSqlName =
   | 'insert-corrupt-event'
   | 'measure-write-traffic'
   | 'replace-events-with-nonstrict-table'
+  | 'rewrite-archive-event-time'
   | 'select-last-event'
   | 'select-page-size'
   | 'select-event-rowids'

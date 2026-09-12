@@ -124,6 +124,20 @@ runArchiveSnapshotContract('jsonl-none', async () => {
   let ctx = await mount()
   return {
     persistence: ctx.sessionPersistence,
+    rewriteFirstEventTime: async (id, time) => {
+      const path = rawLogPath(dir, undefined, id)
+      let changed = false
+      const lines = (await readFile(path, 'utf8')).trimEnd().split('\n').map((line) => {
+        const event = JSON.parse(line) as { type?: string; seq?: number; time?: number }
+        if (event.type === 'turn/start' && event.seq === 0) {
+          event.time = time
+          changed = true
+        }
+        return JSON.stringify(event)
+      })
+      expect(changed).toBe(true)
+      await writeFile(path, `${lines.join('\n')}\n`)
+    },
     reopen: async () => {
       await ctx.fiber.dispose()
       ctx = await mount()

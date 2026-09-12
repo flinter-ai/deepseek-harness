@@ -440,8 +440,33 @@ export function runPersistenceContract(name: string, make: () => Promise<Contrac
  */
 export function runArchiveSnapshotContract(name: string, make: () => Promise<ContractBackend & {
   reopen: () => Promise<SessionPersistence>
+  rewriteFirstEventTime: (id: SessionId, time: number) => Promise<void>
 }>): void {
   describe(`Session archive snapshot contract: ${name}`, () => {
+    it('rejects a physically changed prefix before and after backend reopen', async () => {
+      const backend = await make()
+      try {
+        const id = SessionId(`archive-physical-mutation-${name}`)
+        await backend.persistence.create(meta(id))
+        await backend.persistence.append(id, oneTurnLog())
+        const snapshot = await backend.persistence.beginArchiveSnapshot(id)
+        expect(snapshot).not.toBeNull()
+        const checkpoint = JSON.parse(JSON.stringify(snapshot)) as NonNullable<typeof snapshot>
+        expect((await backend.persistence.readArchiveSnapshotPage(checkpoint, -1, 10)).events[0]?.time).toBe(1)
+        await backend.rewriteFirstEventTime(id, 99)
+        await expect(backend.persistence.readArchiveSnapshotPage(checkpoint, -1, 10))
+          .rejects.toMatchObject({ code: 'STALE_SNAPSHOT' })
+        const reopened = await backend.reopen()
+        await expect(reopened.readArchiveSnapshotPage(checkpoint, -1, 10))
+          .rejects.toMatchObject({ code: 'STALE_SNAPSHOT' })
+        const fresh = await reopened.beginArchiveSnapshot(id)
+        expect(fresh).not.toBeNull()
+        expect((await reopened.readArchiveSnapshotPage(fresh!, -1, 10)).events[0]?.time).toBe(99)
+      } finally {
+        await backend.dispose()
+      }
+    })
+
     it('resumes a serialized archive checkpoint after closing and reopening the backend', async () => {
       const backend = await make()
       try {
