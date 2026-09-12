@@ -221,6 +221,16 @@ runArchiveSnapshotContract('sqlite', async () => {
   let ctx = await mount()
   return {
     persistence: ctx.sessionPersistence,
+    rewriteFirstEventTime: (id, time) => {
+      const db = new DatabaseSync(path)
+      try {
+        const result = db.prepare(testSql('rewrite-archive-event-time')).run(time, id)
+        expect(Number(result.changes)).toBe(1)
+      } finally {
+        db.close()
+      }
+      return Promise.resolve()
+    },
     reopen: async () => {
       await ctx.fiber.dispose()
       ctx = await mount()
