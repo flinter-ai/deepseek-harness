@@ -90,6 +90,26 @@ kind: "package-reference"
 
 生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-llm-pi-ai)是每个受支持字段及其 JSDoc 的穷尽式真源。
 
+### 在 harness 中使用 Relace search 与 Apply-3
+
+本包导出 `RELACE_PROVIDER_PROFILES`，可显式合并到 `llm-pi-ai.providers`
+配置。它声明 OpenRouter 凭据引用 `OPENROUTER_API_KEY`、
+`relace/relace-search` 与 `relace/relace-apply-3` 模型以及 OpenRouter 基础
+URL；其中绝不包含 key。若 Search 与 Apply 使用分别保管的 OpenRouter key，
+可以向 `buildRelaceProviderProfiles()` 传入两个独立的凭据引用，而不改变
+路由或模型标识。`buildRelaceSearchGenerateOptions()` 把 Relace 要求的五个
+严格工具与五轮只读 prompt 交给现有 DSH agent loop；五轮上限必须由 host
+执行。host 使用 `createRelaceSearchToolBridge()` 将这些名称连接到 workspace
+范围内的回调；`bash` 回调必须由 host 控制，bridge 本身不实现写操作。项目
+工作流记录在 `.dsh/skills/relace-harness/SKILL.md`。
+
+`buildRelaceApplyGenerateOptions()` 是独立的一次性请求。它的 user message
+使用 `<instruction>`、`<code>` 与 `<update>` 标签，并且不声明 tools 或
+response-format hint。`parseRelaceApplyResponse()` 只负责规范化返回内容；
+本包不会把合并后的代码写入磁盘。formatter 会执行请求大小上限，并要求
+可选 instruction 为单行。Apply-3 不得混入 search loop，两个路由都应在
+harness composition 中显式启用。
+
 ### 登录提供方
 
 pi-ai 提供登录的提供方可以通过 harness 授权 seam 登录：流程提供 OAuth 或交互式密钥提示（密钥键入 pi-ai 自己的登录提示，而非设置表单），得到的凭据存储在 harness 凭据存储的 `llm-pi-ai/<provider id>` 记录中。存储的登录在其路由的 `apiKeyEnv` 覆盖之下完成认证，并在存储的跨进程锁下自行刷新；退出登录即删除存储记录。落在记录文法之外——小写连字符标识符——的手工声明路由键无法登录，因为对它的记录写入会以 `LlmError('UNSTORABLE_PROVIDER_ID')` 拒绝；这类路由改用 `apiKeyEnv` 或提供方 ambient 设置认证。
