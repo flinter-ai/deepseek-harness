@@ -39,6 +39,9 @@ Mount it in an AWS worker profile after disabling the base profile's local crede
           MODELFLARE_API_KEY: flinter/dsh-modelflare
           GMI_SERVING_API_KEY: flinter/dsh-gmi-serving
           DEEPSEEK_API_KEY: flinter/dsh-deepseek-official
+          OPENROUTER_API_KEY: flinter/dsh-openrouter
+          OPENROUTER_RELACE_SEARCH_API_KEY: flinter/dsh-openrouter-relace-search
+          OPENROUTER_RELACE_APPLY_API_KEY: flinter/dsh-openrouter-relace-apply-3
         secretFormat: json
         allowWrites: false
 ```
@@ -50,6 +53,12 @@ The names above are public routing metadata. The secret contents are supplied on
 ```
 
 The default profile is read-only for AWS references. `resolve` and `describe` perform request-time reads through the standard AWS SDK credential chain. `set` and `unset` fail closed unless a separately reviewed deployment explicitly enables `allowWrites`. The provider also keeps the DSH browser-session grant record in process-local memory; it never writes that record to AWS, and it is recreated on the next DSH process start.
+
+The three OpenRouter references above are optional harness routes. The shared
+`OPENROUTER_API_KEY` reference can serve both Relace Search and Apply-3, or the
+two route-specific references can be vaulted and rotated independently. The
+provider only resolves the named reference; it does not know or copy Jacq's
+encrypted desktop session credential.
 
 ### Configuration
 

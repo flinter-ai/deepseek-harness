@@ -84,6 +84,35 @@ export type {
 } from './config.ts'
 export { recordKeyFor } from './auth.ts'
 export { supportedProtocols } from './provider.ts'
+export {
+  buildRelaceProviderProfiles,
+  buildRelaceApplyGenerateOptions,
+  buildRelaceSearchGenerateOptions,
+  buildRelaceSearchUserPrompt,
+  createRelaceSearchToolBridge,
+  formatRelaceApplyPrompt,
+  parseRelaceApplyResponse,
+  relaceSearchToolSchemas,
+  RELACE_APPLY_MODEL,
+  RELACE_APPLY_PROVIDER,
+  RELACE_OPENROUTER_BASE_URL,
+  RELACE_DEFAULT_CREDENTIAL_REFS,
+  RELACE_PROVIDER_PROFILES,
+  RELACE_SEARCH_MAX_TURNS,
+  RELACE_SEARCH_MODEL,
+  RELACE_SEARCH_PROVIDER,
+  RELACE_SEARCH_SYSTEM_PROMPT,
+  RELACE_SEARCH_TOOLS,
+} from './relace.ts'
+export type {
+  RelaceApplyResult,
+  RelaceProviderCredentialRefs,
+  RelaceSearchReport,
+  RelaceSearchToolBridge,
+  RelaceSearchToolHandlers,
+  RelaceSearchToolName,
+  RelaceSearchToolSchema,
+} from './relace.ts'
 
 export const name = 'llm-pi-ai'
 export const inject = ['llm']

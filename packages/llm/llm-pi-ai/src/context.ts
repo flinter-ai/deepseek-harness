@@ -124,6 +124,12 @@ function toolsOf(options: GenerateOptions): PiTool[] | undefined {
     // ToolSchema.parameters is a JSON Schema object; pi-ai's TSchema
     // (TypeBox) is structurally JSON Schema, so it assigns directly.
     parameters: tool.parameters,
+    ...(tool.strict === undefined ? {} : {
+      constrainedSampling: {
+        type: 'json_schema' as const,
+        strict: tool.strict ? 'require' as const : 'prefer' as const,
+      },
+    }),
   }))
 }
 

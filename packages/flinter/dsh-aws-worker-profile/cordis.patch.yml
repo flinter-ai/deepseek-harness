@@ -16,5 +16,8 @@
           MODELFLARE_API_KEY: flinter/dsh-modelflare
           GMI_SERVING_API_KEY: flinter/dsh-gmi-serving
           DEEPSEEK_API_KEY: flinter/dsh-deepseek-official
+          OPENROUTER_API_KEY: flinter/dsh-openrouter
+          OPENROUTER_RELACE_SEARCH_API_KEY: flinter/dsh-openrouter-relace-search
+          OPENROUTER_RELACE_APPLY_API_KEY: flinter/dsh-openrouter-relace-apply-3
         secretFormat: json
         allowWrites: false

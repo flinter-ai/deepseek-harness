@@ -39,6 +39,9 @@ kind: "package-reference"
           MODELFLARE_API_KEY: flinter/dsh-modelflare
           GMI_SERVING_API_KEY: flinter/dsh-gmi-serving
           DEEPSEEK_API_KEY: flinter/dsh-deepseek-official
+          OPENROUTER_API_KEY: flinter/dsh-openrouter
+          OPENROUTER_RELACE_SEARCH_API_KEY: flinter/dsh-openrouter-relace-search
+          OPENROUTER_RELACE_APPLY_API_KEY: flinter/dsh-openrouter-relace-apply-3
         secretFormat: json
         allowWrites: false
 ```
@@ -50,6 +53,11 @@ kind: "package-reference"
 ```
 
 默认 profile 对 AWS 引用为只读。`resolve` 和 `describe` 通过 AWS SDK 标准凭据链在请求时读取。除非经过单独审查并明确启用 `allowWrites`，否则 `set` 和 `unset` 会安全失败。provider 还会将 DSH 浏览器会话授权记录保存在进程内存中；该记录不会写入 AWS，并会在下次 DSH 进程启动时重新生成。
+
+上面的三个 OpenRouter 引用是可选的 harness 路由。共享的
+`OPENROUTER_API_KEY` 可以同时服务 Relace Search 与 Apply-3，也可以把两个
+路由专用引用分别保管并独立轮换。provider 只解析指定引用，不了解也不会复制
+Jacq 的加密桌面 session 凭据。
 
 ### 配置
 

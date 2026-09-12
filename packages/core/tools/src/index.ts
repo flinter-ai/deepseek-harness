@@ -1253,7 +1253,7 @@ export class ToolRuntime extends Service {
 
   /** Project one definition onto the model-facing schema fields. */
   private schemaOf(definition: ToolDefinition, detachParameters: boolean): ToolSchema {
-    const { name, description, parameters } = definition
+    const { name, description, parameters, strict } = definition
     const detached = detachParameters ? snapshotJsonValue(parameters) : parameters
     if (detached === undefined) {
       throw new Error(`tool "${name}" parameters must be lossless JSON before schema projection`)
@@ -1262,6 +1262,7 @@ export class ToolRuntime extends Service {
       name,
       description,
       parameters: detached,
+      ...(strict === undefined ? {} : { strict }),
     }
   }
 
