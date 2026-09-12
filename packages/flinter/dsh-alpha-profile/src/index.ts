@@ -12,6 +12,7 @@ import type { SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
 export * from './worker.ts'
 export * from './attempt.ts'
 export * from './lifecycle.ts'
+export * from './compute.ts'
 
 /** Environment-variable references used by the supported FLINTER routes. */
 export const FLINTER_CREDENTIAL_REFS = Object.freeze({

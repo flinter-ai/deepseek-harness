@@ -41,6 +41,23 @@ Use the profile when a host needs FLINTER's provider settings or needs to launch
 
 The local `tod` launcher remains the source-checkout convenience wrapper. The AWS worker profile is a thin, read-only overlay for a later deployment probe; it is not a deployment manifest and does not contain account or secret material.
 
+## One worker contract, selectable compute
+
+`DSH_COMPUTE_BACKEND` selects `codesandbox`, `ec2`, or `local`; an unset value
+defaults to `codesandbox`. The local launcher stamps that default explicitly,
+while the EC2 public-web systemd overlay stamps `ec2` explicitly so an old
+host cannot be mislabeled during a gradual migration. The selected backend
+does not change the DSH session or JSONL persistence root: storage remains the
+durable authority and compute is replaceable.
+
+`readDshComputeAdmissionPolicy()` defaults to one active worker, a 30-minute
+wall-time limit, a five-minute idle limit, and a five-minute CodeSandbox
+hibernation timeout. `DshComputeAdmission` additionally allows only one active
+attempt per session, so a replacement must be physically and logically fenced
+before it acquires a new lease. The CodeSandbox adapter receives a narrow
+SDK-shaped runtime from its host; it does not own credentials, persistence, or
+the DSH runner loop.
+
 ## Known Limitations and Deferred Work
 
 - **Live provider capacity is not proven by configuration** — mock endpoints validate shape and selection; paid provider calls and AWS deployment remain separate evidence gates.
