@@ -43,6 +43,7 @@ try {
   process.stdout.write(JSON.stringify({
     action: calls[0],
     persistence: result.persistence,
+    computeBackend: result.environment.computeBackend,
     computeTier: result.environment.computeTier,
   }) + '\n')
 } catch (error: unknown) {

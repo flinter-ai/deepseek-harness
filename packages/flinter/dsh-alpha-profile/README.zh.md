@@ -43,6 +43,20 @@ kind: "package-reference"
 
 本地 `tod` launcher 仍是 source checkout 的便利封装。AWS worker profile 是后续部署 probe 使用的精简只读 overlay；它不是部署清单，也不包含账户或 secret 材料。
 
+## 一个 worker 合约、可切换的计算平台
+
+`DSH_COMPUTE_BACKEND` 在 `codesandbox`、`ec2` 与 `local` 之间选择；未设置
+时默认使用 `codesandbox`。本地启动器会显式写入这个默认值，而 EC2 公网
+Web 的 systemd overlay 会显式写入 `ec2`，这样渐进迁移期间不会把旧主机误标
+为其他平台。平台选择不会改变 DSH session 或 JSONL 持久化根目录：存储仍是
+持久化权威，计算资源可以替换。
+
+`readDshComputeAdmissionPolicy()` 默认只允许一个活动 worker，最长运行 30
+分钟、空闲 5 分钟，CodeSandbox 休眠超时为 5 分钟。`DshComputeAdmission`
+还会限制每个 session 同时只有一个 attempt，因此 replacement 必须先完成
+物理与逻辑 fencing，才能取得新的 lease。CodeSandbox adapter 由 host 注入
+窄化的 SDK 形状；它不拥有凭据、持久化或 DSH runner loop。
+
 <a id="attempt-safety"></a>
 ## Attempt safety
 

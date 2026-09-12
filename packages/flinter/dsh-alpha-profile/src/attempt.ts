@@ -58,12 +58,13 @@ export interface WorkerAttemptRootOptions {
 
 /** The launch record written once, before an attempt starts work. */
 export interface WorkerAttemptManifest {
-  readonly schemaVersion: 1
+  readonly schemaVersion: 2
   readonly dshSessionId: SessionIdValue
   readonly dshSessionRoot: string
   readonly leaseOwner: WorkerLeaseOwner
   readonly leaseGeneration: number
   readonly workerAttemptCount: number
+  readonly computeBackend: DshWorkerEnvironment['computeBackend']
   readonly computeTier: string
   readonly imageDigest: string
   readonly startedAt: string
@@ -297,12 +298,13 @@ export function buildWorkerAttemptManifest(
   const validated = validatedManifestOptions(options)
   const { launch } = validated.environment
   const manifest: WorkerAttemptManifest = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     dshSessionId: SessionId(manifestText(launch.dshSessionId, 'dshSessionId')),
     dshSessionRoot: manifestText(launch.dshSessionRoot, 'dshSessionRoot'),
     leaseOwner: WorkerLeaseOwner(manifestText(launch.leaseOwner, 'leaseOwner')),
     leaseGeneration: launch.leaseGeneration,
     workerAttemptCount: launch.workerAttemptCount,
+    computeBackend: validated.environment.computeBackend,
     computeTier: manifestText(validated.environment.computeTier, 'computeTier'),
     imageDigest: manifestText(validated.environment.imageDigest, 'imageDigest'),
     startedAt: validated.startedAt,
@@ -423,6 +425,7 @@ export function buildDshAttemptLaunch(input: DshAttemptLaunchInput): DshAttemptL
     DSH_SESSION_ROOT: paths.sessionRoot,
     DSH_LEASE_OWNER: launch.leaseOwner,
     DSH_LEASE_GENERATION: String(launch.leaseGeneration),
+    DSH_COMPUTE_BACKEND: input.environment.computeBackend,
     DSH_COMPUTE_TIER: input.environment.computeTier,
     DSH_WORKER_ATTEMPT_COUNT: String(launch.workerAttemptCount),
     DSH_CALLBACK_URL: input.environment.callbackUrl,

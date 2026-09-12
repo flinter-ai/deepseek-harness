@@ -13,6 +13,7 @@ function workerEnvironment(attempt: number): NodeJS.ProcessEnv {
     DSH_SESSION_ROOT: '/home/orca/.dsh/sessions/org/s_process',
     DSH_LEASE_OWNER: attempt === 0 ? 'worker-a' : 'worker-b',
     DSH_LEASE_GENERATION: String(attempt === 0 ? 4 : 5),
+    DSH_COMPUTE_BACKEND: 'codesandbox',
     DSH_COMPUTE_TIER: 'cpu',
     DSH_WORKER_ATTEMPT_COUNT: String(attempt),
     DSH_CALLBACK_URL: 'https://control.example.test/webhooks/dsh-worker/lifecycle',
@@ -41,6 +42,7 @@ describe('alpha worker driver process contract', () => {
         name: '@deepseek-ai/dsh-session-persistence-jsonl',
         config: { root: '/home/orca/.dsh/sessions/org/s_process', compression: 'zstd' },
       },
+      computeBackend: 'codesandbox',
       computeTier: 'cpu',
     })
   })

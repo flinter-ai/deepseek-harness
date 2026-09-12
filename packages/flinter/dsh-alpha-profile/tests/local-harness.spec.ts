@@ -82,9 +82,13 @@ describe('Phase 1 local DSH_HOME rotation seam', () => {
       await writeFile(fakePnpm, [
         '#!/bin/sh',
         'set -eu',
+        '[ "${DSH_COMPUTE_BACKEND:-}" = codesandbox ]',
         'if [ "${DEEPSEEK_API_KEY+x}" = x ] || [ "${ARK_API_KEY+x}" = x ] ||',
         '   [ "${ARK_PLAN_API_KEY+x}" = x ] || [ "${MODELFLARE_API_KEY+x}" = x ] ||',
-        '   [ "${GMI_SERVING_API_KEY+x}" = x ]; then',
+        '   [ "${GMI_SERVING_API_KEY+x}" = x ] || [ "${OPENROUTER_API_KEY+x}" = x ] ||',
+        '   [ "${OPENROUTER_RELACE_SEARCH_API_KEY+x}" = x ] ||',
+        '   [ "${OPENROUTER_RELACE_APPLY_API_KEY+x}" = x ] || [ "${RELACE_SEARCH_API_KEY+x}" = x ] ||',
+        '   [ "${RELACE_APPLY_API_KEY+x}" = x ]; then',
         '  exit 7',
         'fi',
         'touch "$LAUNCH_MARKER"',
@@ -107,6 +111,11 @@ describe('Phase 1 local DSH_HOME rotation seam', () => {
           ARK_PLAN_API_KEY: 'must-not-reach-child',
           MODELFLARE_API_KEY: 'must-not-reach-child',
           GMI_SERVING_API_KEY: 'must-not-reach-child',
+          OPENROUTER_API_KEY: 'must-not-reach-child',
+          OPENROUTER_RELACE_SEARCH_API_KEY: 'must-not-reach-child',
+          OPENROUTER_RELACE_APPLY_API_KEY: 'must-not-reach-child',
+          RELACE_SEARCH_API_KEY: 'must-not-reach-child',
+          RELACE_APPLY_API_KEY: 'must-not-reach-child',
         },
       })
       await expect(readFile(marker, 'utf8')).resolves.toBe('')
