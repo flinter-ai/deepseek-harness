@@ -39,6 +39,11 @@ allowBuilds:
   # need, so we deny them — install still succeeds.
   '@google/genai': false
   protobufjs: false
+  # Optional ws accelerators are not required by the DSH runtime. Deny their
+  # native build scripts explicitly so filtered macOS installs remain
+  # reproducible under pnpm's strict build-script policy.
+  bufferutil: false
+  utf-8-validate: false
   node-addon-require-builtin: false
   # JSONL durability calls MoveFileExW with write-through publication on Windows.
   koffi: true
