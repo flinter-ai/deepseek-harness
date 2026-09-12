@@ -32,6 +32,44 @@ commit 后的步骤失败时回滚 Git revision 和 profile 文件。备份保�
 worker bundle 逐字节一致时才会移除。任何自定义或有歧义的 overlay 都会停止部署，
 并从 profile 备份恢复。
 
+## 稳定的 Cloudflare ingress（主机一次性配置）
+
+DSH 服务仍然只绑定 loopback。经过审查的 public path 是一个独立的
+Cloudflare named tunnel：`dsh-ec2-phase2` 把
+`dsh-web.useflinter.com` 转发到 `127.0.0.1:3080`，不需要为 EC2
+security group 增加 ingress 规则。仓库中受保护的 tunnel 配置和 systemd unit 是：
+
+- `cloudflared/dsh-ec2-phase2.yml`；
+- `cloudflared/dsh-ec2-phase2-named-tunnel.service`；以及
+- `systemd/10-dsh-web-public-host.conf`。
+
+tunnel credential 永远不会存入 Git。配置主机前，由账户负责人把 credential
+安全地放到 `/etc/cloudflared/dsh-ec2-phase2.json`，owner 为
+`ubuntu:ubuntu`、权限为 `600`，并确保维护中的
+`/home/ubuntu/bin/cloudflared` 存在。然后从 live checkout 以 root 执行仓库内
+installer：
+
+```bash
+sudo env DSH_REPOSITORY_ROOT=/opt/dsh-phase2 \
+  /opt/dsh-phase2/deploy/dsh-ec2/install-ingress.sh
+```
+
+installer 会校验 credential 权限、DSH 健康状态和 `cloudflared` ingress 语法，
+只安装仓库中逐字匹配的文件，并启用 tunnel。它拒绝覆盖不一致的受管文件。
+只有在审查现有文件后才可以显式使用 `--replace`；被替换的 unit/config/drop-in
+会复制到主机上的带时间戳 backup。installer 不创建 DNS record 或 tunnel
+credential；这些仍属于账户负责人的操作。
+
+普通 deployment script 会在每次代码部署时执行更严格的 preflight：把 live
+tunnel config、tunnel unit 和 DSH trusted-host drop-in 与请求的 deployment SHA
+逐一比较，检查 tunnel credential 的 owner/权限和服务状态；任何不一致都会在
+停止 DSH 之前失败。这样后续 deployment 或重新配置不会悄悄恢复过时的启动路径，
+也不会丢失 stable hostname 的信任配置。
+
+public hostname 仍然需要 DSH 的 authority-bound browser token 和 session cookie。
+请为 stable hostname 创建新的 token；为 `127.0.0.1` 创建的 cookie 按设计不能用于
+public authority。本仓库路径不会安装 Cloudflare Access policy。
+
 ## 一次性 GitHub 和 AWS 配置
 
 创建受保护的 GitHub Actions environment `dsh-ec2-production`，并设置以下非

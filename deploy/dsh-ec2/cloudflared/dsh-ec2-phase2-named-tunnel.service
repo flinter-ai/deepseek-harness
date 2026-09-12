@@ -1,0 +1,19 @@
+[Unit]
+Description=Named Cloudflare tunnel for DSH Web EC2
+After=network-online.target dsh.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu
+ExecStart=/home/ubuntu/bin/cloudflared --no-autoupdate --config /etc/cloudflared/dsh-ec2-phase2.yml tunnel run dsh-ec2-phase2
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
