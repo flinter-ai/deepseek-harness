@@ -15,6 +15,14 @@ readonly DEPLOY_SHA="${DSH_DEPLOY_SHA:-}"
 readonly EXPECTED_REMOTE="${DSH_DEPLOY_REMOTE:-}"
 readonly DEPLOY_REGION="${DSH_DEPLOY_AWS_REGION:-}"
 readonly BACKUP_ROOT="${DSH_DEPLOY_BACKUP_ROOT:-/var/lib/dsh-phase2/deploy-backups}"
+readonly PUBLIC_HOST='dsh-web.useflinter.com'
+readonly PUBLIC_TUNNEL_SERVICE='dsh-ec2-phase2-named-tunnel.service'
+readonly PUBLIC_TUNNEL_CONFIG='/etc/cloudflared/dsh-ec2-phase2.yml'
+readonly PUBLIC_TUNNEL_CREDENTIAL='/etc/cloudflared/dsh-ec2-phase2.json'
+readonly PUBLIC_TUNNEL_BINARY="${DSH_CLOUDFLARED_BIN:-/home/ubuntu/bin/cloudflared}"
+readonly PUBLIC_TUNNEL_CONFIG_SOURCE='deploy/dsh-ec2/cloudflared/dsh-ec2-phase2.yml'
+readonly PUBLIC_TUNNEL_UNIT_SOURCE='deploy/dsh-ec2/cloudflared/dsh-ec2-phase2-named-tunnel.service'
+readonly PUBLIC_HOST_DROPIN_SOURCE='deploy/dsh-ec2/systemd/10-dsh-web-public-host.conf'
 
 die() {
   printf 'dsh-ec2-deploy: error: %s\n' "$*" >&2
@@ -88,6 +96,52 @@ migrate_legacy_worker_overlay() {
   printf 'dsh-ec2-deploy: legacy-worker-overlay=migrated\n'
 }
 
+git_blob_matches_live_file() {
+  local source_path="$1"
+  local live_path="$2"
+  local expected_mode="$3"
+  local expected_owner="$4"
+  git -C "$REPOSITORY_ROOT" cat-file -e "$DEPLOY_SHA:$source_path" \
+    || die "the deployment revision is missing the protected ingress file: $source_path"
+  [[ -f "$live_path" ]] || die "the protected ingress file is missing: $live_path"
+  cmp -s "$live_path" <(git -C "$REPOSITORY_ROOT" show "$DEPLOY_SHA:$source_path") \
+    || die "the live protected ingress file differs from the deployment revision: $live_path"
+  [[ "$(stat -c '%a' "$live_path")" == "$expected_mode" ]] \
+    || die "the protected ingress file has the wrong mode: $live_path"
+  [[ "$(stat -c '%U:%G' "$live_path")" == "$expected_owner" ]] \
+    || die "the protected ingress file has the wrong owner: $live_path"
+}
+
+verify_public_ingress() {
+  local service_definition
+  [[ -x "$PUBLIC_TUNNEL_BINARY" ]] || die "cloudflared binary is missing: $PUBLIC_TUNNEL_BINARY"
+  [[ -f "$PUBLIC_TUNNEL_CREDENTIAL" ]] || die "named-tunnel credential is missing: $PUBLIC_TUNNEL_CREDENTIAL"
+  [[ "$(stat -c '%a' "$PUBLIC_TUNNEL_CREDENTIAL")" == 600 ]] \
+    || die 'named-tunnel credential must have mode 600'
+  [[ "$(stat -c '%U:%G' "$PUBLIC_TUNNEL_CREDENTIAL")" == 'ubuntu:ubuntu' ]] \
+    || die 'named-tunnel credential must be owned by ubuntu:ubuntu'
+
+  git_blob_matches_live_file "$PUBLIC_TUNNEL_CONFIG_SOURCE" "$PUBLIC_TUNNEL_CONFIG" 600 'ubuntu:ubuntu'
+  git_blob_matches_live_file "$PUBLIC_TUNNEL_UNIT_SOURCE" \
+    "/etc/systemd/system/$PUBLIC_TUNNEL_SERVICE" 644 'root:root'
+  git_blob_matches_live_file "$PUBLIC_HOST_DROPIN_SOURCE" \
+    '/etc/systemd/system/dsh.service.d/10-dsh-web-public-host.conf' 644 'root:root'
+
+  service_definition=$(systemctl cat "$SERVICE_NAME")
+  grep -Fq -- "/opt/dsh-phase2/packages/flinter/dsh-alpha-profile/local/launch.sh --trusted-host $PUBLIC_HOST" \
+    <<<"$service_definition" \
+    || die "the DSH service does not trust the stable public hostname: $PUBLIC_HOST"
+  systemctl is-enabled --quiet "$PUBLIC_TUNNEL_SERVICE" \
+    || die "the stable DSH tunnel is not enabled: $PUBLIC_TUNNEL_SERVICE"
+  systemctl is-active --quiet "$PUBLIC_TUNNEL_SERVICE" \
+    || die "the stable DSH tunnel is not active: $PUBLIC_TUNNEL_SERVICE"
+  "$PUBLIC_TUNNEL_BINARY" --no-autoupdate --config "$PUBLIC_TUNNEL_CONFIG" tunnel ingress validate \
+    >/dev/null 2>&1 \
+    || die 'the stable DSH tunnel configuration failed cloudflared validation'
+  printf 'dsh-ec2-deploy: ingress=verified host=%s tunnel-service=%s\n' \
+    "$PUBLIC_HOST" "$PUBLIC_TUNNEL_SERVICE"
+}
+
 completed=0
 rollback_ready=0
 switched=0
@@ -151,6 +205,7 @@ fi
 systemctl cat "$SERVICE_NAME" >/dev/null 2>&1 || die "systemd unit is missing: $SERVICE_NAME"
 systemctl is-active --quiet "$SERVICE_NAME" || die "service is not active: $SERVICE_NAME"
 ss -ltn | grep -qE ":${PORT_NUMBER}[[:space:]]" || die "service is not listening on port $PORT_NUMBER"
+verify_public_ingress
 
 PREVIOUS_SHA=$(git -C "$REPOSITORY_ROOT" rev-parse HEAD)
 SERVICE_WAS_ACTIVE=1

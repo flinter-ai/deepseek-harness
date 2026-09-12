@@ -37,6 +37,48 @@ only when that tail is byte-for-byte identical to the checked-in AWS worker
 bundle. Any customized or ambiguous overlay stops deployment and is restored
 from the profile backup.
 
+## Stable Cloudflare ingress (one-time host provisioning)
+
+The DSH service stays bound to loopback. The reviewed public path is a separate
+named Cloudflare tunnel, `dsh-ec2-phase2`, routing
+`dsh-web.useflinter.com` to `127.0.0.1:3080`; it does not require an EC2
+security-group ingress rule. The checked-in tunnel config and systemd unit are:
+
+- `cloudflared/dsh-ec2-phase2.yml`;
+- `cloudflared/dsh-ec2-phase2-named-tunnel.service`; and
+- `systemd/10-dsh-web-public-host.conf`.
+
+The tunnel credential is never stored in Git. Before provisioning, install the
+account-owned credential at `/etc/cloudflared/dsh-ec2-phase2.json` with owner
+`ubuntu:ubuntu` and mode `600`, and ensure the maintained
+`/home/ubuntu/bin/cloudflared` binary is present. Then run the checked-in
+installer as root from the live checkout:
+
+```bash
+sudo env DSH_REPOSITORY_ROOT=/opt/dsh-phase2 \
+  /opt/dsh-phase2/deploy/dsh-ec2/install-ingress.sh
+```
+
+The installer validates the credential permissions, DSH health, and
+`cloudflared` ingress syntax, installs only exact tracked files, and enables
+the tunnel. It refuses to overwrite a differing managed file. Use its
+explicit `--replace` mode only after reviewing the existing file; any replaced
+unit/config/drop-in is copied to a timestamped host backup. The installer does
+not create DNS records or tunnel credentials; those remain account-owner
+operations.
+
+The normal deployment script performs a stronger preflight on every code
+deployment: it compares the live tunnel config, tunnel unit, and DSH trusted-
+host drop-in with the requested deployment SHA, checks the tunnel credential
+mode/owner and service state, and fails before stopping DSH on any mismatch.
+This prevents a later deployment or reprovisioning step from silently
+restoring the obsolete launch path or losing the stable hostname trust.
+
+The public hostname still requires DSH's authority-bound browser token and
+session cookie. Mint a fresh token for the stable hostname; a cookie minted for
+`127.0.0.1` is intentionally not valid for the public authority. Cloudflare
+Access policy is not installed by this repository path.
+
 ## One-time repository and AWS configuration
 
 Create a protected GitHub Actions environment named `dsh-ec2-production` and
