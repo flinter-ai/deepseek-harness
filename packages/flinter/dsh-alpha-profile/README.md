@@ -41,10 +41,59 @@ Use the profile when a host needs FLINTER's provider settings or needs to launch
 
 The local `tod` launcher remains the source-checkout convenience wrapper. The AWS worker profile is a thin, read-only overlay for a later deployment probe; it is not a deployment manifest and does not contain account or secret material.
 
+## One worker contract, selectable compute
+
+`DSH_COMPUTE_BACKEND` selects `codesandbox`, `ec2`, or `local`; an unset value
+defaults to `codesandbox`. The local launcher stamps that default explicitly,
+while the EC2 public-web systemd overlay stamps `ec2` explicitly so an old
+host cannot be mislabeled during a gradual migration. The selected backend
+does not change the DSH session or JSONL persistence root: storage remains the
+durable authority and compute is replaceable.
+
+`readDshComputeAdmissionPolicy()` defaults to one active worker, a 30-minute
+wall-time limit, a five-minute idle limit, and a five-minute CodeSandbox
+hibernation timeout. `DshComputeAdmission` additionally allows only one active
+attempt per session, so a replacement must be physically and logically fenced
+before it acquires a new lease.
+
+`CodeSandboxSdkRuntime` is the official `@codesandbox/sdk` implementation of
+the CodeSandbox runtime seam. A host constructs it with a secret-store-backed
+`apiToken` or `CSB_API_KEY`, then passes it to `CodeSandboxComputeBackend`:
+
+```ts
+const runtime = new CodeSandboxSdkRuntime({ apiToken: process.env.CSB_API_KEY })
+const backend = new CodeSandboxComputeBackend({ runtime, vmTier: 'pico' })
+```
+
+The runtime creates private CodeSandbox sandboxes (CodeSandbox implements them
+with microVMs), maps the bounded tier/hibernation policy, connects with the
+SDK, runs a fixed shell-quoted transport that preserves literal argv values,
+and shuts the sandbox down after completion. The token and provider
+credentials are never forwarded to the sandbox environment. The
+official `csb` CLI is useful for listing, hibernating, shutting down, and
+managing preview/host-token resources; it complements the SDK but is not the
+command-execution adapter.
+
+For an exact DSH checkout, the host may also provide `workspaceSeed` containing
+a tracked-only source archive, its source SHA, and the archive SHA-256. The
+runtime writes that archive into the sandbox, verifies both hashes, and
+extracts it into `/project/sandbox` before the worker command runs. This is
+explicit sandbox seeding: `templateId` is only an optional CodeSandbox
+bootstrap/fork source, not a replacement for the GitHub source of truth or an
+AWS persistence layer.
+
+The control plane or executor must still provide shared admission and durable
+fencing. `DshComputeAdmission` is process-local evidence and cannot by itself
+prove distributed capacity across multiple hosts. EC2 deployments set
+`DSH_COMPUTE_BACKEND=ec2` explicitly in the protected systemd drop-in, so the
+CodeSandbox default applies only to hosts that intentionally select it.
+
 ## Known Limitations and Deferred Work
 
 - **Live provider capacity is not proven by configuration** — mock endpoints validate shape and selection; paid provider calls and AWS deployment remain separate evidence gates.
 - **The current route catalog is intentionally narrow** — adding models or reasoning levels requires explicit endpoint verification and profile review.
+- **A live CodeSandbox VM is not a model-credential bridge** — provider calls from a VM require a separately reviewed short-lived credential/broker path; raw provider keys remain host-owned.
+- **CodeSandbox workspace is not AWS persistence** — shutdown/resume preserves CodeSandbox files only. Session JSONL, manifests, and artifacts need a separately implemented AWS storage adapter or reviewed shared mount before a CodeSandbox worker is storage-ready.
 - **Native DSH events remain the L0 trace seam** — downstream trace-link may consume them later, but this package does not extend the Session codec.
 
 ## Attempt safety

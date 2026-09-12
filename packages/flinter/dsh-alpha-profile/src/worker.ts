@@ -15,6 +15,11 @@ import {
   type ModelSelection,
 } from '@deepseek-ai/dsh-agent'
 import { SessionId, type SessionId as SessionIdValue } from '@deepseek-ai/dsh-session'
+import {
+  DEFAULT_DSH_COMPUTE_BACKEND,
+  parseDshComputeBackend,
+  type DshComputeBackend,
+} from './compute.ts'
 
 /** The non-secret environment contract stamped by the control-plane launcher. */
 export const DSH_WORKER_ENV = Object.freeze({
@@ -22,6 +27,7 @@ export const DSH_WORKER_ENV = Object.freeze({
   sessionRoot: 'DSH_SESSION_ROOT',
   leaseOwner: 'DSH_LEASE_OWNER',
   leaseGeneration: 'DSH_LEASE_GENERATION',
+  computeBackend: 'DSH_COMPUTE_BACKEND',
   computeTier: 'DSH_COMPUTE_TIER',
   workerAttemptCount: 'DSH_WORKER_ATTEMPT_COUNT',
   callbackUrl: 'DSH_CALLBACK_URL',
@@ -41,6 +47,7 @@ export interface DshWorkerLaunchContract {
 /** The complete non-secret worker environment consumed by the alpha driver. */
 export interface DshWorkerEnvironment {
   readonly launch: DshWorkerLaunchContract
+  readonly computeBackend: DshComputeBackend
   readonly computeTier: string
   readonly callbackUrl: string
   /** A reference, never the callback secret itself. */
@@ -129,6 +136,7 @@ export function readDshWorkerEnvironment(env: NodeJS.ProcessEnv = process.env): 
   }
   return Object.freeze({
     launch,
+    computeBackend: parseDshComputeBackend(env[DSH_WORKER_ENV.computeBackend] ?? DEFAULT_DSH_COMPUTE_BACKEND),
     computeTier: requiredEnvironmentValue(env, DSH_WORKER_ENV.computeTier),
     callbackUrl,
     callbackHmacSecretRef: requiredEnvironmentValue(env, DSH_WORKER_ENV.callbackHmacSecretRef),

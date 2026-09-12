@@ -30,6 +30,7 @@ function environmentFor(launch: DshWorkerLaunchContract = firstLaunch): NodeJS.P
     DSH_SESSION_ROOT: launch.dshSessionRoot,
     DSH_LEASE_OWNER: launch.leaseOwner,
     DSH_LEASE_GENERATION: String(launch.leaseGeneration),
+    DSH_COMPUTE_BACKEND: 'codesandbox',
     DSH_COMPUTE_TIER: 'cpu',
     DSH_WORKER_ATTEMPT_COUNT: String(launch.workerAttemptCount),
     DSH_CALLBACK_URL: 'https://control.example.test/webhooks/dsh-worker/lifecycle',
@@ -121,10 +122,11 @@ describe('alpha worker/session adapter', () => {
       .toThrow('persistenceRoot must equal dshSessionRoot')
   })
 
-  it('reads all nine launcher fields and produces a JSONL composition row', () => {
+  it('reads all ten launcher fields and produces a JSONL composition row', () => {
     const environment = readDshWorkerEnvironment(environmentFor())
     expect(environment).toMatchObject({
       launch: firstLaunch,
+      computeBackend: 'codesandbox',
       computeTier: 'cpu',
       callbackUrl: 'https://control.example.test/webhooks/dsh-worker/lifecycle',
       callbackHmacSecretRef: 'flinter/dsh-callback-hmac',
@@ -187,6 +189,7 @@ describe('alpha worker/session adapter', () => {
       DSH_SESSION_ROOT: '/tmp/dsh/session-1',
       DSH_LEASE_OWNER: 'worker-a',
       DSH_LEASE_GENERATION: '1',
+      DSH_COMPUTE_BACKEND: 'codesandbox',
       DSH_COMPUTE_TIER: 'cpu',
       DSH_WORKER_ATTEMPT_COUNT: '0',
       DSH_CALLBACK_URL: 'https://user:secret@control.example.test/callback',

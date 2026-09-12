@@ -43,6 +43,47 @@ kind: "package-reference"
 
 本地 `tod` launcher 仍是 source checkout 的便利封装。AWS worker profile 是后续部署 probe 使用的精简只读 overlay；它不是部署清单，也不包含账户或 secret 材料。
 
+## 一个 worker 合约、可切换的计算平台
+
+`DSH_COMPUTE_BACKEND` 在 `codesandbox`、`ec2` 与 `local` 之间选择；未设置
+时默认使用 `codesandbox`。本地启动器会显式写入这个默认值，而 EC2 公网
+Web 的 systemd overlay 会显式写入 `ec2`，这样渐进迁移期间不会把旧主机误标
+为其他平台。平台选择不会改变 DSH session 或 JSONL 持久化根目录：存储仍是
+持久化权威，计算资源可以替换。
+
+`readDshComputeAdmissionPolicy()` 默认只允许一个活动 worker，最长运行 30
+分钟、空闲 5 分钟，CodeSandbox 休眠超时为 5 分钟。`DshComputeAdmission`
+还会限制每个 session 同时只有一个 attempt，因此 replacement 必须先完成
+物理与逻辑 fencing，才能取得新的 lease。
+
+`CodeSandboxSdkRuntime` 是 CodeSandbox runtime seam 的官方
+`@codesandbox/sdk` 实现。宿主从 secret store 提供 `apiToken` 或
+`CSB_API_KEY`，再把它交给 `CodeSandboxComputeBackend`：
+
+```ts
+const runtime = new CodeSandboxSdkRuntime({ apiToken: process.env.CSB_API_KEY })
+const backend = new CodeSandboxComputeBackend({ runtime, vmTier: 'pico' })
+```
+
+runtime 会创建 private CodeSandbox sandbox（底层由 CodeSandbox 使用
+microVM 实现），映射受限的 tier/休眠策略、通过 SDK 连接，使用保留
+literal argv 语义的固定 shell-quoted transport 执行命令，并在完成后
+shutdown sandbox。token 和 provider credential 都不会转发到 sandbox 环境。官方
+`csb` CLI 适合 list、hibernate、shutdown 以及 preview/host-token 资源管理；
+它与 SDK 互补，但不是命令执行 adapter。
+
+如果需要精确的 DSH checkout，宿主还可以提供 `workspaceSeed`，其中包含
+只来自 tracked files 的 source archive、source SHA 和 archive SHA-256。
+runtime 会通过 SDK 将 archive 写入 sandbox，校验两个 hash，再在 worker
+命令启动前解包到 `/project/sandbox`。这就是明确的 sandbox seeding：
+`templateId` 只是可选的 CodeSandbox bootstrap/fork 来源，不取代 GitHub
+source of truth，也不是 AWS 持久化层。
+
+control plane 或 executor 仍必须提供共享 admission 与持久 fencing。
+`DshComputeAdmission` 只是进程内证据，不能单独证明多主机的分布式容量。
+EC2 部署在受保护的 systemd drop-in 中显式设置
+`DSH_COMPUTE_BACKEND=ec2`，因此 CodeSandbox 默认值只适用于明确选择它的宿主。
+
 <a id="attempt-safety"></a>
 ## Attempt safety
 
@@ -62,6 +103,8 @@ kind: "package-reference"
 
 - **配置不能证明真实提供方容量**——mock endpoint 只验证形状与选择；付费提供方调用与 AWS 部署属于独立证据 gate。
 - **当前路由目录有意保持精简**——增加模型或 reasoning 等级需要明确的 endpoint 验证与 profile review。
+- **live CodeSandbox VM 不是 model credential bridge**——VM 内的 provider 调用需要另行审查的短期 credential/broker 路径；原始 provider key 仍由宿主持有。
+- **CodeSandbox workspace 不是 AWS 持久化**——shutdown/resume 只保留 CodeSandbox 文件。Session JSONL、manifest 和 artifact 在 CodeSandbox worker 达到 storage-ready 前，仍需要另行实现的 AWS storage adapter 或经过审查的共享挂载。
 - **真实 AWS 与下游迁移仍延期**——本包不扩展 Session codec，也不实现真实 AWS 部署或 trace-link；公开 AWS provider 只在 Phase 1 使用 mock 证据。
 
 <a id="dev-note"></a>
