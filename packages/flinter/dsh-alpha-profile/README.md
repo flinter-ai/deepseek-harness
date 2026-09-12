@@ -54,14 +54,37 @@ durable authority and compute is replaceable.
 wall-time limit, a five-minute idle limit, and a five-minute CodeSandbox
 hibernation timeout. `DshComputeAdmission` additionally allows only one active
 attempt per session, so a replacement must be physically and logically fenced
-before it acquires a new lease. The CodeSandbox adapter receives a narrow
-SDK-shaped runtime from its host; it does not own credentials, persistence, or
-the DSH runner loop.
+before it acquires a new lease.
+
+`CodeSandboxSdkRuntime` is the official `@codesandbox/sdk` implementation of
+the CodeSandbox runtime seam. A host constructs it with a secret-store-backed
+`apiToken` or `CSB_API_KEY`, then passes it to `CodeSandboxComputeBackend`:
+
+```ts
+const runtime = new CodeSandboxSdkRuntime({ apiToken: process.env.CSB_API_KEY })
+const backend = new CodeSandboxComputeBackend({ runtime, vmTier: 'pico' })
+```
+
+The runtime creates private VMs, maps the bounded tier/hibernation policy,
+connects with the SDK, runs a fixed shell-quoted transport that preserves
+literal argv values, and shuts the VM down after completion. The token and
+provider credentials are never forwarded to the sandbox environment. The
+official `csb` CLI is useful for listing, hibernating, shutting down, and
+managing preview/host-token resources; it complements the SDK but is not the
+command-execution adapter.
+
+The control plane or executor must still provide shared admission and durable
+fencing. `DshComputeAdmission` is process-local evidence and cannot by itself
+prove distributed capacity across multiple hosts. EC2 deployments set
+`DSH_COMPUTE_BACKEND=ec2` explicitly in the protected systemd drop-in, so the
+CodeSandbox default applies only to hosts that intentionally select it.
 
 ## Known Limitations and Deferred Work
 
 - **Live provider capacity is not proven by configuration** — mock endpoints validate shape and selection; paid provider calls and AWS deployment remain separate evidence gates.
 - **The current route catalog is intentionally narrow** — adding models or reasoning levels requires explicit endpoint verification and profile review.
+- **A live CodeSandbox VM is not a model-credential bridge** — provider calls from a VM require a separately reviewed short-lived credential/broker path; raw provider keys remain host-owned.
+- **CodeSandbox workspace is not AWS persistence** — shutdown/resume preserves CodeSandbox files only. Session JSONL, manifests, and artifacts need a separately implemented AWS storage adapter or reviewed shared mount before a CodeSandbox worker is storage-ready.
 - **Native DSH events remain the L0 trace seam** — downstream trace-link may consume them later, but this package does not extend the Session codec.
 
 ## Attempt safety
