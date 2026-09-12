@@ -33,6 +33,7 @@ import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { DSH_LAUNCH_ENVIRONMENT_KEY, type LaunchEnvironmentSnapshot } from '@deepseek-ai/dsh-launch-environment'
 import { provideCmdline, type AppReady } from '@deepseek-ai/dsh-cmdline'
 import { createProcessShutdown, type ProcessShutdown } from './process-shutdown.ts'
+import { assertDefaultModelReady } from './default-model-ready.ts'
 
 const NAME = 'dsh'
 
@@ -200,6 +201,13 @@ function suppressShutdownError(ctx: Context, signal: AbortSignal, error: unknown
   throw error
 }
 
+/** Re-read mutable startup ownership after an asynchronous boundary. */
+function profileIsActive(ctx: Context, signal: AbortSignal): boolean {
+  return !signal.aborted
+    && ctx.fiber.state === FiberState.ACTIVE
+    && ctx.get('loader') !== undefined
+}
+
 /**
  * Boot one profile invocation end to end and leave process lifetime to the
  * mounted plugins (or to a one-shot runner the composition mounts).
@@ -212,9 +220,10 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
   const appReady = createAppReady()
   const shutdown = createProcessShutdown(async () => { await app.current?.fiber.dispose() })
   const signalShutdown = new AbortController()
+  let fatalExitCode: number | undefined
   const interrupt = (code: number): void => {
     signalShutdown.abort()
-    shutdown.interrupt(code)
+    shutdown.interrupt(fatalExitCode ?? code)
   }
   // Signals own teardown throughout the startup window, not only after boot()
   // settles: an inserted provider can publish before sibling rows finish mounting.
@@ -301,7 +310,23 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
   if (!signalShutdown.signal.aborted
     && ctx.fiber.state === FiberState.ACTIVE
     && ctx.get('loader') !== undefined) {
-    appReady.commit()
+    try {
+      await assertDefaultModelReady(ctx)
+    } catch (error) {
+      // A signal/app exit can dispose adapters while capability resolution is
+      // awaiting. Otherwise report before bounded teardown, so a rejecting or
+      // wedged disposer cannot replace or suppress the capability diagnosis.
+      if (!profileIsActive(ctx, signalShutdown.signal)) return { ctx, shutdown }
+      const code = typeof error === 'object' && error !== null
+        && 'code' in error && typeof error.code === 'string' ? `[${error.code}] ` : ''
+      process.stderr.write(
+        `${NAME}: fatal load failure: ${code}${error instanceof Error ? error.stack ?? error.message : String(error)}\n`,
+      )
+      fatalExitCode = 1
+      await shutdown.shutdown(1)
+      return { ctx, shutdown }
+    }
+    if (profileIsActive(ctx, signalShutdown.signal)) appReady.commit()
   }
   return { ctx, shutdown }
 }
