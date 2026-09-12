@@ -212,16 +212,25 @@ runPersistenceContract('sqlite', async () => {
 
 runArchiveSnapshotContract('sqlite', async () => {
   const path = await freshDbPath('dsh-sqlite-archive-')
-  const ctx = new Context()
-  await ctx.plugin(SessionStore)
-  const fiber = await ctx.plugin(SessionPersistenceSqlite, { path })
+  const mount = async () => {
+    const next = new Context()
+    await next.plugin(SessionStore)
+    await next.plugin(SessionPersistenceSqlite, { path })
+    return next
+  }
+  let ctx = await mount()
   return {
     persistence: ctx.sessionPersistence,
+    reopen: async () => {
+      await ctx.fiber.dispose()
+      ctx = await mount()
+      return ctx.sessionPersistence
+    },
     dispose: async () => {
-      await fiber.dispose()
+      await ctx.fiber.dispose()
       await rm(path, { force: true })
-      await rm(join(path, '-wal'), { force: true })
-      await rm(join(path, '-shm'), { force: true })
+      await rm(`${path}-wal`, { force: true })
+      await rm(`${path}-shm`, { force: true })
     },
   }
 })
