@@ -91,6 +91,31 @@
     - id: settings-controller
       name: '@deepseek-ai/dsh-api-settings-controller'
 
+    # Shared durable draft API for Sandpack and direct DSH Web editing. The
+    # default bundle deliberately has no Git/PR publisher, so publish fails
+    # closed until a host deployment composes one explicitly.
+    - id: source-controller
+      name: '@deepseek-ai/dsh-api-source-controller'
+      config:
+        maxFiles: 200
+        maxFileBytes: 524288
+        maxTotalBytes: 2097152
+
+    # Host-only Git/PR execution. The row is inert unless a deployment supplies
+    # owner and repo; browser drafts can therefore use SourceDraftModel without
+    # accidentally gaining Git credentials or a publication side effect.
+    - id: source-publisher-github
+      name: '@deepseek-ai/dsh-host-source-publisher-github'
+      config:
+        repositoryRoot: !!js process.env.DSH_SOURCE_REPOSITORY_ROOT
+        worktreeRoot: !!js process.env.DSH_SOURCE_WORKTREE_ROOT
+        owner: !!js process.env.DSH_SOURCE_GITHUB_OWNER
+        repo: !!js process.env.DSH_SOURCE_GITHUB_REPO
+        baseBranch: !!js process.env.DSH_SOURCE_GITHUB_BASE_BRANCH ?? 'master'
+        remote: !!js process.env.DSH_SOURCE_GIT_REMOTE ?? 'origin'
+        branchPrefix: !!js process.env.DSH_SOURCE_BRANCH_PREFIX ?? 'dsh/source'
+        tokenEnv: !!js process.env.DSH_SOURCE_GITHUB_TOKEN_ENV ?? 'GITHUB_TOKEN'
+
     # Workspace commands and reconnect-safe projection over Typert Remote.
     - id: workspace-controller
       name: '@deepseek-ai/dsh-api-workspace-controller'
@@ -256,6 +281,11 @@
     # Background jobs: the session-header list over the jobsBySession mirror.
     - id: ui-jobs
       name: '@deepseek-ai/dsh-client-ui-jobs'
+
+    # Sandpack editor surface; persistence remains in source-controller and
+    # publication remains a Host-only operation behind the explicit buttons.
+    - id: ui-source-editor
+      name: '@deepseek-ai/dsh-client-ui-source-editor'
 
     # Goal surface: GoalBar in the input dock over the goal session projection.
     - id: ui-goal
