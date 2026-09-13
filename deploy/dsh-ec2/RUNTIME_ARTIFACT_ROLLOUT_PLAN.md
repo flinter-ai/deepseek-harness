@@ -1,14 +1,19 @@
 # DSH EC2 runtime artifact rollout plan
 
-**Status:** Local P0 implementation is complete and its gates pass on macOS
-arm64. The production workflow now targets a native Linux ARM64 builder plus
-versioned S3 publication. The Linux CI artifact, account-owned artifact store,
-and live EC2 activation gates remain pending; no production artifact has been
-published, pushed, merged, or deployed.
+**Status (2026-09-13):** The local P0 implementation and its macOS arm64
+rehearsal pass. Destination commit `efd48a1db2c3e147dc10148c680c61c009da7bd8`
+is pushed on draft PR #69 against the isolated upstream snapshot base; DSH and
+vendor release gates pass, while the unrelated Cloudflare/issue-policy checks
+still lack repository configuration and the long-session browser benchmark
+failed on its existing frame/replay fixture. A final local artifact for this
+SHA has a verified detached checksum and contains the workspace git-worktree
+runtime export. Native Linux arm64 CI artifact publication, the account-owned
+artifact store, and live EC2 activation remain pending; no production artifact
+has been published and nothing has been merged or deployed.
 
 **Source baseline:** `reconcile/dsh-ec2-upstream-20260913` at
-`ae3d4147a9408f590410a985d6de81ea24ce2777` (13 commits ahead of
-`upstream/master` at the time this plan was written).
+`efd48a1db2c3e147dc10148c680c61c009da7bd8`, based on the isolated
+`upstream/master` snapshot `c291e7961a515f6d7af9304e7fd1d257929aef26`.
 
 ## Objective
 
