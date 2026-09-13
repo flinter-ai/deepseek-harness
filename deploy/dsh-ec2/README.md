@@ -4,10 +4,10 @@ English | [中文](README.zh.md)
 
 This directory owns the repeatable deployment path for the existing DSH Web
 systemd service on EC2. It deploys a pinned Git commit through AWS Systems
-Manager (SSM), rebuilds the AWS credential provider and the FLINTER worker
-profile, reapplies the supported profile install command, and verifies the
-authenticated Web endpoint without putting model API keys in systemd or the
-process environment.
+Manager (SSM), rebuilds the host and client library artifacts required by DSH
+Web (including Typert and browser bundles), reapplies the supported profile
+install command, and verifies the authenticated Web endpoint without putting
+model API keys in systemd or the process environment.
 
 ## What runs automatically
 
@@ -21,8 +21,9 @@ manually with an explicit Git ref. The workflow:
 4. sends `deploy.sh` to the target through `AWS-RunShellScript`;
 5. verifies the checkout origin, rejects tracked drift or untracked files that
    collide with the target commit, backs up the profile files, installs the
-   frozen lockfile, builds the provider and profile, migrates an exact legacy
-   AWS overlay to the supported profile bundle, and reapplies that bundle;
+   frozen lockfile, builds the host and client library artifacts required by
+   DSH Web, migrates an exact legacy AWS overlay to the supported profile
+   bundle, and reapplies that bundle;
 6. resolves the Ark reference through the EC2 instance role, restarts
    `dsh.service`, checks port `3080`, expects HTTP `401` from the unauthenticated
    root, and checks that credential-shaped environment variables are absent.
