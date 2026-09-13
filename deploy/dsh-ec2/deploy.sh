@@ -175,6 +175,10 @@ verify_target_public_host_dropin() {
     || die "the DSH service does not point at the immutable current release: $CURRENT_RELEASE"
 }
 
+profile_uses_aws_worker_bundle() {
+  grep -Fq '@deepseek-ai/dsh-aws-worker-profile' "$PROFILE_DIR/package.json" 2>/dev/null
+}
+
 restore_target_public_host_dropin() {
   local target='/etc/systemd/system/dsh.service.d/10-dsh-web-public-host.conf'
   if [[ "${INGRESS_DROPIN_WAS_PRESENT:-0}" == 1 ]]; then
@@ -281,7 +285,9 @@ prepare_runtime_release() {
 switch_runtime_release() {
   local temporary
   if [[ -L "$CURRENT_RELEASE" ]]; then
-    PREVIOUS_RELEASE_TARGET=$(readlink -f "$CURRENT_RELEASE")
+    PREVIOUS_RELEASE_TARGET=$(readlink -e "$CURRENT_RELEASE" || true)
+    [[ -n "$PREVIOUS_RELEASE_TARGET" ]] \
+      || die "runtime current symlink does not resolve: $CURRENT_RELEASE"
   elif [[ -e "$CURRENT_RELEASE" ]]; then
     die "runtime current path is not a symlink: $CURRENT_RELEASE"
   else
@@ -411,9 +417,15 @@ run_logged settings-compat python3 "$MIGRATOR_PATH" "$SETTINGS_FILE"
 migrate_legacy_worker_overlay
 install_target_public_host_dropin
 switch_runtime_release
-run_logged dump-config env DSH_HOME="$HOME_ROOT" DSH_ROOT="$CURRENT_RELEASE" DSH_COMPUTE_BACKEND=ec2 \
-  node "$CURRENT_RELEASE/runtime-bootstrap.mjs" \
-  --profile "$PROFILE_NAME" --patch "$CURRENT_RELEASE/runtime-support/aws-worker.patch.yml" --dump-config
+if profile_uses_aws_worker_bundle; then
+  run_logged dump-config env DSH_HOME="$HOME_ROOT" DSH_ROOT="$CURRENT_RELEASE" DSH_COMPUTE_BACKEND=ec2 \
+    node "$CURRENT_RELEASE/runtime-bootstrap.mjs" \
+    --profile "$PROFILE_NAME" --dump-config
+else
+  run_logged dump-config env DSH_HOME="$HOME_ROOT" DSH_ROOT="$CURRENT_RELEASE" DSH_COMPUTE_BACKEND=ec2 \
+    node "$CURRENT_RELEASE/runtime-bootstrap.mjs" \
+    --profile "$PROFILE_NAME" --patch "$CURRENT_RELEASE/runtime-support/aws-worker.patch.yml" --dump-config
+fi
 run_logged settings-compat-check python3 "$MIGRATOR_PATH" --check "$SETTINGS_FILE"
 
 grep -q 'credentials-aws-secrets-manager' "$BACKUP_DIR/dump-config.log" \

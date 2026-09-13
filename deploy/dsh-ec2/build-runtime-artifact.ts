@@ -222,7 +222,22 @@ fi
 
 # Provider credentials stay in the host-owned credential provider. Remove
 # inherited key-shaped values before entering DSH and stamp the production
-# compute backend explicitly.
+# compute backend explicitly. Existing hosts may already compose the public
+# AWS worker profile, whose package-owned patch must not be applied twice.
+if grep -Fq '@deepseek-ai/dsh-aws-worker-profile' "$DSH_HOME/profiles/$DSH_PROFILE/package.json" 2>/dev/null; then
+  exec env \\
+    -u DEEPSEEK_API_KEY -u ARK_API_KEY -u ARK_PLAN_API_KEY \\
+    -u MODELFLARE_API_KEY -u GMI_SERVING_API_KEY \\
+    -u OPENROUTER_API_KEY -u OPENROUTER_RELACE_SEARCH_API_KEY \\
+    -u OPENROUTER_RELACE_APPLY_API_KEY -u RELACE_SEARCH_API_KEY \\
+    -u RELACE_APPLY_API_KEY \\
+    DSH_COMPUTE_BACKEND="$DSH_COMPUTE_BACKEND" \\
+    node "$ROOT/runtime-bootstrap.mjs" \\
+      --profile "$DSH_PROFILE" \\
+      "$@" \\
+      --port "$DSH_PORT"
+fi
+
 exec env \\
   -u DEEPSEEK_API_KEY -u ARK_API_KEY -u ARK_PLAN_API_KEY \\
   -u MODELFLARE_API_KEY -u GMI_SERVING_API_KEY \\
