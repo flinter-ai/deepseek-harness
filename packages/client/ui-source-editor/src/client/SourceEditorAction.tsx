@@ -32,7 +32,11 @@ const STARTER_FILE: SourceFile = Object.freeze({
   content: '<!doctype html>\n<html>\n  <body>\n    <h1>DSH source draft</h1>\n  </body>\n</html>\n',
 })
 
-type RemoteFailureShape = { readonly message?: string }
+type RemoteFailureShape = {
+  readonly code?: string
+  readonly reason?: string
+  readonly message?: string
+}
 type BusinessResult<T> =
   | { readonly ok: true; readonly value: T }
   | { readonly ok: false; readonly error: { readonly code: string; readonly reason?: string; readonly message?: string } }
