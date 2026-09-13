@@ -3,9 +3,10 @@
 [English](README.md) | 中文
 
 本目录负责现有 EC2 上 DSH Web systemd 服务的可重复部署路径。它通过 AWS
-Systems Manager（SSM）部署固定的 Git commit，重新构建 AWS 凭据 provider 和
-FLINTER worker profile，重新执行受支持的 profile 安装命令，并在不把模型 API
-密钥放进 systemd 或进程环境的前提下验证需要认证的 Web 端点。
+Systems Manager（SSM）部署固定的 Git commit，重新构建 DSH Web 所需的 host
+和 client library artifacts（包括 Typert 与浏览器 bundles），重新执行受支持的
+profile 安装命令，并在不把模型 API 密钥放进 systemd 或进程环境的前提下验证
+需要认证的 Web 端点。
 
 ## 自动运行的内容
 
@@ -18,9 +19,9 @@ runtime、profile、provider 或部署文件时运行，也可以手动输入明
 3. 对已停止的 EC2 或 SSM 离线目标直接拒绝；
 4. 通过 `AWS-RunShellScript` 将 `deploy.sh` 发送到目标；
 5. 验证 checkout origin、拒绝 tracked drift 或与目标 commit 冲突的 untracked
-   文件、备份 profile 文件、使用冻结 lockfile 安装依赖、构建 provider 和
-   profile，把完全匹配的旧 AWS overlay 迁移到受支持的 profile bundle，并重新
-   执行该 bundle 安装；
+   文件、备份 profile 文件、使用冻结 lockfile 安装依赖、构建 DSH Web 所需的
+   host 和 client library artifacts，把完全匹配的旧 AWS overlay 迁移到受支持的
+   profile bundle，并重新执行该 bundle 安装；
 6. 通过 EC2 instance role 解析 Ark 引用，重启 `dsh.service`，检查 `3080` 端口，
    期望未认证根路径返回 HTTP `401`，并检查凭据形状的环境变量不存在。
 

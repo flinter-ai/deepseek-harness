@@ -230,8 +230,7 @@ switched=1
 printf 'dsh-ec2-deploy: service=stopped\n'
 run_logged checkout git -C "$REPOSITORY_ROOT" checkout --detach "$DEPLOY_SHA"
 run_logged install pnpm -C "$REPOSITORY_ROOT" install --frozen-lockfile
-run_logged build-provider pnpm -C "$REPOSITORY_ROOT" --filter @deepseek-ai/dsh-credentials-aws-secrets-manager run build
-run_logged build-profile pnpm -C "$REPOSITORY_ROOT" --filter @deepseek-ai/dsh-aws-worker-profile run build
+run_logged build-libs pnpm -C "$REPOSITORY_ROOT" run build:lib
 run_logged settings-compat python3 "$REPOSITORY_ROOT/deploy/dsh-ec2/migrate-settings.py" "$SETTINGS_FILE"
 migrate_legacy_worker_overlay
 run_logged profile-install env DSH_HOME="$HOME_ROOT" DSH_ROOT="$REPOSITORY_ROOT" pnpm -C "$REPOSITORY_ROOT" dsh plugin --profile "$PROFILE_NAME" add --save-exact "$REPOSITORY_ROOT/packages/flinter/dsh-aws-worker-profile"
