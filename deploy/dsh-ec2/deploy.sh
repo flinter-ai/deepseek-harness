@@ -15,6 +15,10 @@ readonly DEPLOY_SHA="${DSH_DEPLOY_SHA:-}"
 readonly EXPECTED_REMOTE="${DSH_DEPLOY_REMOTE:-}"
 readonly DEPLOY_REGION="${DSH_DEPLOY_AWS_REGION:-}"
 readonly BACKUP_ROOT="${DSH_DEPLOY_BACKUP_ROOT:-/var/lib/dsh-phase2/deploy-backups}"
+readonly ARTIFACT_URI="${DSH_RUNTIME_ARTIFACT_URI:-}"
+readonly ARTIFACT_SHA256_URI="${DSH_RUNTIME_ARTIFACT_SHA256_URI:-}"
+readonly RELEASE_ROOT="${DSH_RUNTIME_RELEASE_ROOT:-/opt/dsh-phase2/releases}"
+readonly CURRENT_RELEASE="${DSH_RUNTIME_CURRENT_RELEASE:-$RELEASE_ROOT/current}"
 readonly PUBLIC_HOST='dsh-web.useflinter.com'
 readonly PUBLIC_TUNNEL_SERVICE='dsh-ec2-phase2-named-tunnel.service'
 readonly PUBLIC_TUNNEL_CONFIG='/etc/cloudflared/dsh-ec2-phase2.yml'
@@ -68,7 +72,7 @@ restore_profile() {
 
 migrate_legacy_worker_overlay() {
   local patch_file="$PROFILE_DIR/cordis.patch.yml"
-  local bundle_patch="$REPOSITORY_ROOT/packages/flinter/dsh-aws-worker-profile/cordis.patch.yml"
+  local bundle_patch="${BUNDLE_PATCH_FILE:-$REPOSITORY_ROOT/packages/flinter/dsh-aws-worker-profile/cordis.patch.yml}"
   local marker='# Public AWS worker profile overlay.'
   grep -Fqx "$marker" "$patch_file" || return 0
 
@@ -124,11 +128,9 @@ verify_public_ingress() {
   git_blob_matches_live_file "$PUBLIC_TUNNEL_CONFIG_SOURCE" "$PUBLIC_TUNNEL_CONFIG" 600 'ubuntu:ubuntu'
   git_blob_matches_live_file "$PUBLIC_TUNNEL_UNIT_SOURCE" \
     "/etc/systemd/system/$PUBLIC_TUNNEL_SERVICE" 644 'root:root'
-  git_blob_matches_live_file "$PUBLIC_HOST_DROPIN_SOURCE" \
-    '/etc/systemd/system/dsh.service.d/10-dsh-web-public-host.conf' 644 'root:root'
 
   service_definition=$(systemctl cat "$SERVICE_NAME")
-  grep -Fq -- "/opt/dsh-phase2/packages/flinter/dsh-alpha-profile/local/launch.sh --trusted-host $PUBLIC_HOST" \
+  grep -Fq -- "--trusted-host $PUBLIC_HOST" \
     <<<"$service_definition" \
     || die "the DSH service does not trust the stable public hostname: $PUBLIC_HOST"
   systemctl is-enabled --quiet "$PUBLIC_TUNNEL_SERVICE" \
@@ -142,9 +144,162 @@ verify_public_ingress() {
     "$PUBLIC_HOST" "$PUBLIC_TUNNEL_SERVICE"
 }
 
+install_target_public_host_dropin() {
+  local target='/etc/systemd/system/dsh.service.d/10-dsh-web-public-host.conf'
+  local temporary
+  git -C "$REPOSITORY_ROOT" cat-file -e "$DEPLOY_SHA:$PUBLIC_HOST_DROPIN_SOURCE" \
+    || die "the deployment revision is missing the protected ingress file: $PUBLIC_HOST_DROPIN_SOURCE"
+  mkdir -p "$(dirname "$target")" "$BACKUP_DIR/ingress"
+  if [[ -e "$target" ]]; then
+    [[ -f "$target" ]] || die "the protected host drop-in is not a regular file: $target"
+    cp -a "$target" "$BACKUP_DIR/ingress/10-dsh-web-public-host.conf"
+    INGRESS_DROPIN_WAS_PRESENT=1
+  else
+    INGRESS_DROPIN_WAS_PRESENT=0
+  fi
+  temporary=$(mktemp "$BACKUP_DIR/ingress/.10-dsh-web-public-host.XXXXXX")
+  git -C "$REPOSITORY_ROOT" show "$DEPLOY_SHA:$PUBLIC_HOST_DROPIN_SOURCE" >"$temporary"
+  install -o root -g root -m 644 "$temporary" "$target"
+  rm -f "$temporary"
+  systemctl daemon-reload
+  printf 'dsh-ec2-deploy: public-host-dropin=installed\n'
+}
+
+verify_target_public_host_dropin() {
+  local service_definition
+  git_blob_matches_live_file "$PUBLIC_HOST_DROPIN_SOURCE" \
+    '/etc/systemd/system/dsh.service.d/10-dsh-web-public-host.conf' 644 'root:root'
+  service_definition=$(systemctl cat "$SERVICE_NAME")
+  grep -Fq -- "$CURRENT_RELEASE/launch.sh --trusted-host $PUBLIC_HOST" \
+    <<<"$service_definition" \
+    || die "the DSH service does not point at the immutable current release: $CURRENT_RELEASE"
+}
+
+restore_target_public_host_dropin() {
+  local target='/etc/systemd/system/dsh.service.d/10-dsh-web-public-host.conf'
+  if [[ "${INGRESS_DROPIN_WAS_PRESENT:-0}" == 1 ]]; then
+    cp -a "$BACKUP_DIR/ingress/10-dsh-web-public-host.conf" "$target"
+  else
+    rm -f "$target"
+  fi
+  systemctl daemon-reload >/dev/null 2>&1 || true
+}
+
+copy_artifact_source() {
+  local source="$1"
+  local destination="$2"
+  case "$source" in
+    s3://*) aws s3 cp --only-show-errors "$source" "$destination" ;;
+    file://*) cp -f -- "${source#file://}" "$destination" ;;
+    *) die "runtime artifact source must be an s3:// or file:// URI" ;;
+  esac
+}
+
+verify_artifact_manifest() {
+  local root="$1"
+  python3 - "$root/artifact-manifest.json" "$DEPLOY_SHA" "$root" <<'PY'
+import hashlib
+import json
+import os
+import pathlib
+import sys
+
+manifest_path, expected_sha, root = sys.argv[1:]
+with open(manifest_path, encoding="utf-8") as stream:
+    manifest = json.load(stream)
+if manifest.get("schemaVersion") != 1:
+    raise SystemExit("runtime artifact manifest schema is unsupported")
+if manifest.get("sourceSha") != expected_sha:
+    raise SystemExit("runtime artifact source SHA does not match the requested deployment SHA")
+target = manifest.get("target")
+if target != {"platform": "linux", "arch": "arm64"}:
+    raise SystemExit(f"runtime artifact target is not linux/arm64: {target!r}")
+files = manifest.get("files")
+if not isinstance(files, list) or not files:
+    raise SystemExit("runtime artifact manifest has no file records")
+root_path = pathlib.Path(root).resolve()
+for record in files:
+    relative = record.get("path")
+    if not isinstance(relative, str) or not relative or pathlib.PurePosixPath(relative).is_absolute():
+        raise SystemExit("runtime artifact contains an invalid manifest path")
+    path = (root_path / pathlib.Path(relative)).resolve()
+    if os.path.commonpath((str(root_path), str(path))) != str(root_path):
+        raise SystemExit("runtime artifact manifest escapes its release directory")
+    if not path.is_file():
+        raise SystemExit(f"runtime artifact manifest file is missing: {relative}")
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    if path.stat().st_size != record.get("bytes") or digest != record.get("sha256"):
+        raise SystemExit(f"runtime artifact manifest checksum mismatch: {relative}")
+PY
+  [[ -x "$root/launch.sh" ]] || die "runtime artifact launcher is missing"
+  [[ -f "$root/runtime-bootstrap.mjs" ]] || die "runtime artifact bootstrap is missing"
+}
+
+prepare_runtime_release() {
+  local artifact_name checksum_uri checksum_file archive_file staging release
+  [[ -n "$ARTIFACT_URI" ]] || die 'DSH_RUNTIME_ARTIFACT_URI is required; EC2 does not build the DSH runtime'
+  [[ "$ARTIFACT_URI" == *.tar.gz ]] || die 'DSH_RUNTIME_ARTIFACT_URI must name a .tar.gz artifact'
+  mkdir -p "$RELEASE_ROOT"
+  ARTIFACT_TMP_DIR=$(mktemp -d "$RELEASE_ROOT/.artifact-download.XXXXXX")
+  artifact_name=$(basename "$ARTIFACT_URI")
+  checksum_uri="${ARTIFACT_SHA256_URI:-$ARTIFACT_URI.sha256}"
+  archive_file="$ARTIFACT_TMP_DIR/$artifact_name"
+  checksum_file="$ARTIFACT_TMP_DIR/$artifact_name.sha256"
+  copy_artifact_source "$ARTIFACT_URI" "$archive_file"
+  copy_artifact_source "$checksum_uri" "$checksum_file"
+  grep -Eq "^[0-9a-f]{64}[[:space:]]{2}${artifact_name//./\\.}$" "$checksum_file" \
+    || die 'runtime artifact checksum file has an unexpected format'
+  (cd "$ARTIFACT_TMP_DIR" && sha256sum -c "$artifact_name.sha256") \
+    || die 'runtime artifact checksum verification failed'
+
+  while IFS= read -r entry; do
+    case "$entry" in
+      /*|../*|*/../*|*/..)
+        die "runtime artifact contains an unsafe archive path: $entry"
+        ;;
+    esac
+  done < <(tar -tzf "$archive_file")
+
+  TIMESTAMP=$(date -u +%Y%m%dT%H%M%SZ)
+  staging="$RELEASE_ROOT/.staging-$DEPLOY_SHA-$TIMESTAMP"
+  release="$RELEASE_ROOT/$DEPLOY_SHA"
+  [[ ! -e "$staging" ]] || die "runtime staging path already exists: $staging"
+  mkdir -p "$staging"
+  tar --no-same-owner --no-same-permissions -xzf "$archive_file" -C "$staging"
+  verify_artifact_manifest "$staging"
+  if [[ -e "$release" ]]; then
+    [[ -d "$release" ]] || die "runtime release path is not a directory: $release"
+    verify_artifact_manifest "$release"
+    rm -rf "$staging"
+  else
+    mv "$staging" "$release"
+  fi
+  RELEASE_DIR="$release"
+  printf 'dsh-ec2-deploy: artifact=verified sha=%s release=%s\n' "$DEPLOY_SHA" "$RELEASE_DIR"
+}
+
+switch_runtime_release() {
+  local temporary
+  if [[ -L "$CURRENT_RELEASE" ]]; then
+    PREVIOUS_RELEASE_TARGET=$(readlink -f "$CURRENT_RELEASE")
+  elif [[ -e "$CURRENT_RELEASE" ]]; then
+    die "runtime current path is not a symlink: $CURRENT_RELEASE"
+  else
+    PREVIOUS_RELEASE_TARGET=''
+  fi
+  temporary="${CURRENT_RELEASE}.next.$$"
+  ln -s "$RELEASE_DIR" "$temporary"
+  mv -Tf "$temporary" "$CURRENT_RELEASE"
+  switched=1
+  printf 'dsh-ec2-deploy: release=current sha=%s\n' "$DEPLOY_SHA"
+}
+
 completed=0
 rollback_ready=0
 switched=0
+INGRESS_DROPIN_WAS_PRESENT=''
+PREVIOUS_RELEASE_TARGET=''
+ARTIFACT_TMP_DIR=''
 rollback() {
   local status=$?
   if (( completed == 1 || rollback_ready == 0 )); then
@@ -154,11 +309,27 @@ rollback() {
   set +e
   printf 'dsh-ec2-deploy: rollback=started\n' >&2
   if (( switched == 1 )); then
-    git -C "$REPOSITORY_ROOT" checkout --detach "$PREVIOUS_SHA" >/dev/null 2>&1
+    if [[ -n "$ARTIFACT_URI" ]]; then
+      if [[ -n "$PREVIOUS_RELEASE_TARGET" ]]; then
+        local temporary="${CURRENT_RELEASE}.rollback.$$"
+        ln -s "$PREVIOUS_RELEASE_TARGET" "$temporary"
+        mv -Tf "$temporary" "$CURRENT_RELEASE"
+      else
+        rm -f "$CURRENT_RELEASE"
+      fi
+    else
+      git -C "$REPOSITORY_ROOT" checkout --detach "$PREVIOUS_SHA" >/dev/null 2>&1
+    fi
+  fi
+  if [[ -n "$INGRESS_DROPIN_WAS_PRESENT" ]]; then
+    restore_target_public_host_dropin
   fi
   restore_profile
   if (( SERVICE_WAS_ACTIVE == 1 )); then
     systemctl restart "$SERVICE_NAME" >/dev/null 2>&1
+  fi
+  if [[ -n "$ARTIFACT_TMP_DIR" ]]; then
+    rm -rf "$ARTIFACT_TMP_DIR"
   fi
   printf 'dsh-ec2-deploy: rollback=finished sha=%s\n' "$PREVIOUS_SHA" >&2
   exit "$status"
@@ -213,8 +384,16 @@ TIMESTAMP=$(date -u +%Y%m%dT%H%M%SZ)
 BACKUP_DIR="$BACKUP_ROOT/$TIMESTAMP-$PREVIOUS_SHA"
 PROFILE_FILES=(package.json pnpm-lock.yaml pnpm-workspace.yaml cordis.patch.yml)
 declare -A PROFILE_FILE_PRESENT=()
+MIGRATOR_PATH="$BACKUP_DIR/migrate-settings.py"
+BUNDLE_PATCH_FILE="$BACKUP_DIR/aws-worker-cordis.patch.yml"
 mkdir -p "$BACKUP_DIR/profile"
 cp -a "$SETTINGS_FILE" "$BACKUP_DIR/settings.yaml"
+git -C "$REPOSITORY_ROOT" show "$DEPLOY_SHA:deploy/dsh-ec2/migrate-settings.py" >"$MIGRATOR_PATH" \
+  || die 'the deployment revision is missing the settings migrator'
+git -C "$REPOSITORY_ROOT" show "$DEPLOY_SHA:packages/flinter/dsh-aws-worker-profile/cordis.patch.yml" >"$BUNDLE_PATCH_FILE" \
+  || die 'the deployment revision is missing the AWS worker patch'
+chmod 700 "$MIGRATOR_PATH"
+chmod 600 "$BUNDLE_PATCH_FILE"
 for file in "${PROFILE_FILES[@]}"; do
   if [[ -e "$PROFILE_DIR/$file" ]]; then
     cp -a "$PROFILE_DIR/$file" "$BACKUP_DIR/profile/$file"
@@ -225,17 +404,17 @@ for file in "${PROFILE_FILES[@]}"; do
 done
 rollback_ready=1
 
+prepare_runtime_release
 systemctl stop "$SERVICE_NAME"
-switched=1
 printf 'dsh-ec2-deploy: service=stopped\n'
-run_logged checkout git -C "$REPOSITORY_ROOT" checkout --detach "$DEPLOY_SHA"
-run_logged install pnpm -C "$REPOSITORY_ROOT" install --frozen-lockfile
-run_logged build-libs pnpm -C "$REPOSITORY_ROOT" run build:lib
-run_logged settings-compat python3 "$REPOSITORY_ROOT/deploy/dsh-ec2/migrate-settings.py" "$SETTINGS_FILE"
+run_logged settings-compat python3 "$MIGRATOR_PATH" "$SETTINGS_FILE"
 migrate_legacy_worker_overlay
-run_logged profile-install env DSH_HOME="$HOME_ROOT" DSH_ROOT="$REPOSITORY_ROOT" pnpm -C "$REPOSITORY_ROOT" dsh plugin --profile "$PROFILE_NAME" add --save-exact "$REPOSITORY_ROOT/packages/flinter/dsh-aws-worker-profile"
-run_logged dump-config env DSH_HOME="$HOME_ROOT" DSH_ROOT="$REPOSITORY_ROOT" pnpm -C "$REPOSITORY_ROOT" dsh --profile "$PROFILE_NAME" --dump-config
-run_logged settings-compat-check python3 "$REPOSITORY_ROOT/deploy/dsh-ec2/migrate-settings.py" --check "$SETTINGS_FILE"
+install_target_public_host_dropin
+switch_runtime_release
+run_logged dump-config env DSH_HOME="$HOME_ROOT" DSH_ROOT="$CURRENT_RELEASE" DSH_COMPUTE_BACKEND=ec2 \
+  node "$CURRENT_RELEASE/runtime-bootstrap.mjs" \
+  --profile "$PROFILE_NAME" --patch "$CURRENT_RELEASE/runtime-support/aws-worker.patch.yml" --dump-config
+run_logged settings-compat-check python3 "$MIGRATOR_PATH" --check "$SETTINGS_FILE"
 
 grep -q 'credentials-aws-secrets-manager' "$BACKUP_DIR/dump-config.log" \
   || die 'the AWS credential provider is absent from the composed profile'
@@ -244,13 +423,12 @@ grep -q 'ARK_PLAN_API_KEY: flinter/dsh-ark-agent-plan' "$BACKUP_DIR/dump-config.
 grep -q 'allowWrites: false' "$BACKUP_DIR/dump-config.log" \
   || die 'the AWS credential provider is not read-only'
 if ! (
-  cd "$REPOSITORY_ROOT"
-  TSX_TSCONFIG_PATH="$REPOSITORY_ROOT/tsconfig.base.json" \
+  cd "$CURRENT_RELEASE"
     DSH_DEPLOY_AWS_REGION="$DEPLOY_REGION" \
-    node --import tsx/esm --input-type=module <<'NODE'
+    node --input-type=module <<'NODE'
 import { Context } from '@deepseek-ai/cordis'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
-import { AwsSecretsManagerCredentialProvider } from './packages/credentials/dsh-credentials-aws-secrets-manager/src/index.ts'
+import { AwsSecretsManagerCredentialProvider } from '@deepseek-ai/dsh-credentials-aws-secrets-manager'
 
 const ctx = new Context()
 const region = process.env.DSH_DEPLOY_AWS_REGION || undefined
@@ -275,6 +453,7 @@ grep -q '"source":"aws-secrets-manager"' "$BACKUP_DIR/provider-resolve.log" \
   || die 'the provider probe did not use Secrets Manager'
 printf 'dsh-ec2-deploy: provider-resolve=ok\n'
 
+verify_target_public_host_dropin
 systemctl restart "$SERVICE_NAME"
 for _ in {1..30}; do
   if systemctl is-active --quiet "$SERVICE_NAME" && ss -ltn | grep -qE ":${PORT_NUMBER}[[:space:]]"; then
@@ -301,6 +480,8 @@ if [[ "$SERVICE_PID" =~ ^[0-9]+$ ]] && (( SERVICE_PID > 0 )) \
 fi
 
 RESTART_COUNT=$(systemctl show "$SERVICE_NAME" -p NRestarts --value)
+rm -rf "$ARTIFACT_TMP_DIR"
+ARTIFACT_TMP_DIR=''
 completed=1
 printf 'dsh-ec2-deploy: deployment=success sha=%s http=%s restarts=%s backup=%s\n' \
   "$DEPLOY_SHA" "$HTTP_STATUS" "$RESTART_COUNT" "$BACKUP_DIR"

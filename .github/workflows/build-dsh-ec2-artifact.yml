@@ -1,0 +1,52 @@
+name: Build DSH EC2 runtime artifact
+
+# This is a manual, non-production artifact rehearsal. The Linux ARM64 runner
+# matches the current flinter-orca-dsh t4g.medium target. Promotion to an
+# account-owned artifact store and EC2 activation remain separate gates.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PRIMARY_NODE_VERSION: '24'
+  DSH_TELEMETRY_DISABLED: '1'
+
+concurrency:
+  group: build-dsh-ec2-artifact-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Linux ARM64 runtime artifact
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+
+      - name: Install (immutable)
+        run: pnpm install --frozen-lockfile
+
+      - name: Build library artifacts
+        run: pnpm run build:lib
+
+      - name: Build and verify EC2 artifact
+        run: ./node_modules/.bin/tsx deploy/dsh-ec2/build-runtime-artifact.ts --out dist/dsh-ec2
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dsh-ec2-runtime-${{ github.sha }}-linux-arm64
+          path: dist/dsh-ec2/*
+          if-no-files-found: error
+          retention-days: 14

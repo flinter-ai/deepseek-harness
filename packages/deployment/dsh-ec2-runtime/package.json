@@ -1,0 +1,27 @@
+{
+  "name": "@deepseek-ai/dsh-ec2-runtime",
+  "description": "Private dependency root for the immutable DSH Web EC2 runtime artifact.",
+  "version": "0.0.1",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "dsh-ec2-runtime": "runtime-bootstrap.mjs"
+  },
+  "files": [
+    "runtime-bootstrap.mjs"
+  ],
+  "dependencies": {
+    "@deepseek-ai/cosmokit": "workspace:^",
+    "@deepseek-ai/cordis-plugin-group": "workspace:^",
+    "@deepseek-ai/dsh": "workspace:^",
+    "@deepseek-ai/dsh-alpha-profile": "workspace:^",
+    "@deepseek-ai/dsh-api-source-controller": "workspace:^",
+    "@deepseek-ai/dsh-aws-worker-profile": "workspace:^",
+    "@deepseek-ai/dsh-client-ui-source-editor": "workspace:^",
+    "@deepseek-ai/dsh-credentials-aws-secrets-manager": "workspace:^",
+    "@deepseek-ai/dsh-host-source-publisher-github": "workspace:^",
+    "@deepseek-ai/dsh-source-draft-model": "workspace:^",
+    "@deepseek-ai/dsh-web-app": "workspace:^"
+  }
+}

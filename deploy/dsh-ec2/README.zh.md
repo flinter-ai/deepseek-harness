@@ -2,11 +2,11 @@
 
 [English](README.md) | 中文
 
-本目录负责现有 EC2 上 DSH Web systemd 服务的可重复部署路径。它通过 AWS
-Systems Manager（SSM）部署固定的 Git commit，重新构建 DSH Web 所需的 host
-和 client library artifacts（包括 Typert 与浏览器 bundles），重新执行受支持的
-profile 安装命令，并在不把模型 API 密钥放进 systemd 或进程环境的前提下验证
-需要认证的 Web 端点。
+本目录负责现有 EC2 上 DSH Web systemd 服务的可重复部署路径。CI 在 Linux ARM64
+上构建固定 SHA 的 runtime artifact；AWS Systems Manager（SSM）把 source SHA 和
+不可变 artifact URI 发送到主机，主机校验后通过原子 release pointer 激活。生产
+部署不会在 EC2 上运行 `pnpm install` 或 `pnpm run build:lib`。模型 API 密钥不会
+进入 systemd 或进程环境。
 
 ## 自动运行的内容
 
@@ -14,24 +14,26 @@ profile 安装命令，并在不把模型 API 密钥放进 systemd 或进程环�
 runtime、profile、provider 或部署文件时运行，也可以手动输入明确的 Git ref。
 工作流会：
 
-1. checkout 一个精确 commit 并记录完整 SHA；
-2. 通过 GitHub OIDC 和范围受限的部署 role 认证 AWS；
-3. 对已停止的 EC2 或 SSM 离线目标直接拒绝；
-4. 通过 `AWS-RunShellScript` 将 `deploy.sh` 发送到目标；
-5. 验证 checkout origin、拒绝 tracked drift 或与目标 commit 冲突的 untracked
-   文件、备份 profile 文件、使用冻结 lockfile 安装依赖、构建 DSH Web 所需的
-   host 和 client library artifacts，把完全匹配的旧 AWS overlay 迁移到受支持的
-   profile bundle，并重新执行该 bundle 安装；
-6. 通过 EC2 instance role 解析 Ark 引用，重启 `dsh.service`，检查 `3080` 端口，
+1. 在原生 Linux ARM64 runner 上 checkout 一个精确 commit 并记录完整 SHA；
+2. 在 CI 中使用 lockfile、构建 library artifacts，并生成无 symlink 的 runtime
+   archive 以及内嵌/同级 manifest；
+3. 把 archive、detached checksum 和同级 manifest 发布到配置好的版本化 S3 prefix；
+4. 通过 GitHub OIDC 和范围受限的部署 role 认证 AWS；
+5. 对已停止的 EC2 或 SSM 离线目标直接拒绝；
+6. 通过 `AWS-RunShellScript` 把 `deploy.sh`、source SHA 和 artifact URI 发送到目标；
+7. 验证 checkout origin 和受保护 ingress，备份持久 profile/settings 状态，下载并
+   校验 artifact，然后原子切换 `/opt/dsh-phase2/releases/current`；
+8. 通过 EC2 instance role 解析 Ark 引用，重启 `dsh.service`，检查 `3080` 端口，
    期望未认证根路径返回 HTTP `401`，并检查凭据形状的环境变量不存在。
 
 工作流串行化，因此两个部署不会同时修改同一份 profile。远端脚本在切换
-commit 后的步骤失败时回滚 Git revision 和 profile 文件。备份保留在主机的
+release pointer 后的步骤失败时回滚 release pointer 和 profile 文件。备份保留在主机的
 `/var/lib/dsh-phase2/deploy-backups` 下。
 
 一次性的旧 overlay 迁移会 fail closed：只有 user patch 的尾部与仓库内 AWS
 worker bundle 逐字节一致时才会移除。任何自定义或有歧义的 overlay 都会停止部署，
-并从 profile 备份恢复。
+并从 profile 备份恢复。各 release 按 source SHA 保留，因此 post-switch 检查失败时
+可以恢复此前的 `current`，无需重新构建。
 
 ## 稳定的 Cloudflare ingress（主机一次性配置）
 
@@ -62,10 +64,10 @@ installer 会校验 credential 权限、DSH 健康状态和 `cloudflared` ingres
 credential；这些仍属于账户负责人的操作。
 
 普通 deployment script 会在每次代码部署时执行更严格的 preflight：把 live
-tunnel config、tunnel unit 和 DSH trusted-host drop-in 与请求的 deployment SHA
-逐一比较，检查 tunnel credential 的 owner/权限和服务状态；任何不一致都会在
-停止 DSH 之前失败。这样后续 deployment 或重新配置不会悄悄恢复过时的启动路径，
-也不会丢失 stable hostname 的信任配置。
+tunnel config 和 tunnel unit 与请求的 deployment SHA 比较，检查 tunnel credential
+的 owner/权限和服务状态；任何不一致都会在停止 DSH 之前失败。激活期间它会安装
+请求的 trusted-host drop-in，校验 immutable release launcher，然后才重启 DSH。这样
+后续 deployment 或重新配置不会悄悄丢失 stable hostname 的信任配置。
 
 public hostname 仍然需要 DSH 的 authority-bound browser token 和 session cookie。
 请为 stable hostname 创建新的 token；为 `127.0.0.1` 创建的 cookie 按设计不能用于
@@ -81,11 +83,14 @@ secret 环境变量：
 | `DSH_AWS_REGION` | 当前 DSH Web 主机使用 `us-east-2`。 |
 | `DSH_EC2_INSTANCE_ID` | 目标 DSH Web EC2 instance ID。 |
 | `DSH_DEPLOY_ROLE_ARN` | 信任本仓库 GitHub OIDC subject 的 IAM role ARN。 |
+| `DSH_ARTIFACT_BUCKET` | 存放不可变 DSH runtime artifact 的账户自有 S3 bucket。 |
+| `DSH_ARTIFACT_PREFIX` | 为此部署环境保留的版本化 key prefix。 |
 
-GitHub role 只需要区域内 EC2 状态读取、SSM 目标就绪检查、针对目标 instance
-的 `ssm:SendCommand` 和 `ssm:GetCommandInvocation`。它不需要
-`secretsmanager:GetSecretValue`。EC2 instance role 仍然是 DSH secret 映射的
-权限主体，并且应只保留 profile 实际需要的读取权限。
+GitHub role 需要区域内 EC2 状态读取、SSM 目标就绪检查、针对目标 instance 的
+`ssm:SendCommand` 和 `ssm:GetCommandInvocation`，以及针对 artifact prefix 的
+`s3:PutObject`。它不需要 `secretsmanager:GetSecretValue`。EC2 instance role 需要
+针对同一 artifact prefix 的 `s3:GetObject`，仍然是 DSH secret 映射的权限主体，并且
+应只保留 profile 实际需要的读取权限。
 
 本仓库当前不会自动创建 GitHub OIDC provider 或 IAM role。这是账户级信任
 决策，必须由现有 AWS 基础设施负责人一次性配置。role 的 trust policy 必须
@@ -103,9 +108,10 @@ fail closed。
 - 没有 tracked drift 的 checkout、`dsh.service` unit，以及监听 `3080` 的 active
   服务；
 - 报告为 `Online` 的 SSM agent，以及能够读取配置的 Secrets Manager 引用的
-  instance profile；
+  instance profile 和 immutable artifact prefix；
 - `/root/.dsh-phase2` 下的持久 DSH home，包括 `tod` profile；
-- 满足仓库 lockfile 和 engine policy 的 Node 与 pnpm 版本。
+- 与 CI artifact 兼容的 Node runtime（当前 builder 使用 Node 24），以及 `aws`、
+  `tar`、`sha256sum`、`python3` 和 systemd；EC2 不需要 pnpm 或仓库开发依赖。
 
 工作流不会启动或停止 instance，不会强制 reset tracked checkout drift，不会
 轮换凭据，也不会开放 public port。与目标 commit 不冲突的 untracked operational
@@ -116,11 +122,12 @@ session 授权记录仍然保存在进程内，服务重启后会重新创建；
 ## 手动操作和回滚
 
 如需受控的主机端 rehearsal，可以以 root 身份设置
-`DSH_DEPLOY_SHA`、`DSH_DEPLOY_REMOTE` 和 `DSH_DEPLOY_AWS_REGION` 后运行同一个
-`deploy.sh`。优先使用工作流，因为它提供 commit 和 AWS 身份，不需要长期 GitHub
-访问密钥。
+`DSH_DEPLOY_SHA`、`DSH_DEPLOY_REMOTE`、`DSH_DEPLOY_AWS_REGION`、
+`DSH_RUNTIME_ARTIFACT_URI`，以及可选的 `DSH_RUNTIME_ARTIFACT_SHA256_URI` 后运行
+同一个 `deploy.sh`。优先使用工作流，因为它提供 commit、artifact 和 AWS 身份，
+不需要长期 GitHub 访问密钥。
 
-如果切换 checkout 后部署失败，脚本会恢复此前的 commit 和 profile 文件并重启
+如果切换 release 后部署失败，脚本会恢复此前的 release pointer 和 profile 文件并重启
 服务。请在主机上检查带时间戳的备份目录和 `journalctl -u dsh.service`；不要把
 `.credentials.yaml`、AWS secret 值、cookies、bearer tokens 或完整进程环境输出到
 Actions 日志。

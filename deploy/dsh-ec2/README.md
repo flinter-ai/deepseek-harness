@@ -3,11 +3,12 @@
 English | [中文](README.zh.md)
 
 This directory owns the repeatable deployment path for the existing DSH Web
-systemd service on EC2. It deploys a pinned Git commit through AWS Systems
-Manager (SSM), rebuilds the host and client library artifacts required by DSH
-Web (including Typert and browser bundles), reapplies the supported profile
-install command, and verifies the authenticated Web endpoint without putting
-model API keys in systemd or the process environment.
+systemd service on EC2. CI builds a pinned Linux ARM64 runtime artifact; AWS
+Systems Manager (SSM) sends the source SHA and immutable artifact URI to the
+host, which verifies the archive and activates it through an atomic release
+pointer. EC2 does not run `pnpm install` or `pnpm run build:lib` during a
+production deployment. Model API keys remain outside systemd and the process
+environment.
 
 ## What runs automatically
 
@@ -15,28 +16,33 @@ model API keys in systemd or the process environment.
 runtime, profile, provider, or deployment files change. It can also be started
 manually with an explicit Git ref. The workflow:
 
-1. checks out one exact commit and records its full SHA;
-2. authenticates to AWS with GitHub OIDC and a narrowly scoped deployment role;
-3. refuses a stopped EC2 instance or an SSM-offline target;
-4. sends `deploy.sh` to the target through `AWS-RunShellScript`;
-5. verifies the checkout origin, rejects tracked drift or untracked files that
-   collide with the target commit, backs up the profile files, installs the
-   frozen lockfile, builds the host and client library artifacts required by
-   DSH Web, migrates an exact legacy AWS overlay to the supported profile
-   bundle, and reapplies that bundle;
-6. resolves the Ark reference through the EC2 instance role, restarts
+1. checks out one exact commit on a native Linux ARM64 runner and records its
+   full SHA;
+2. installs the lockfile, builds the library artifacts in CI, and produces the
+   symlink-free runtime archive and embedded/sibling manifests;
+3. publishes the archive, detached checksum, and sibling manifest under the
+   configured versioned S3 prefix;
+4. authenticates to AWS with GitHub OIDC and a narrowly scoped deployment role;
+5. refuses a stopped EC2 instance or an SSM-offline target;
+6. sends `deploy.sh`, the source SHA, and the artifact URI to the target through
+   `AWS-RunShellScript`;
+7. verifies the checkout origin and protected ingress, backs up persistent
+   profile/settings state, downloads and verifies the artifact, and atomically
+   switches `/opt/dsh-phase2/releases/current`;
+8. resolves the Ark reference through the EC2 instance role, restarts
    `dsh.service`, checks port `3080`, expects HTTP `401` from the unauthenticated
    root, and checks that credential-shaped environment variables are absent.
 
 The workflow is serialized so two deployments cannot mutate the same profile
-at once. The remote script rolls back the Git revision and profile files if a
-post-switch step fails. Backups stay on the host under
+at once. The remote script rolls back the release pointer and profile files if
+a post-switch step fails. Backups stay on the host under
 `/var/lib/dsh-phase2/deploy-backups`.
 
 The one-time legacy migration is fail-closed: it removes the user-patch tail
 only when that tail is byte-for-byte identical to the checked-in AWS worker
 bundle. Any customized or ambiguous overlay stops deployment and is restored
-from the profile backup.
+from the profile backup. Releases are retained by source SHA so a failed
+post-switch check can restore the previous `current` target without rebuilding.
 
 ## Stable Cloudflare ingress (one-time host provisioning)
 
@@ -69,11 +75,12 @@ not create DNS records or tunnel credentials; those remain account-owner
 operations.
 
 The normal deployment script performs a stronger preflight on every code
-deployment: it compares the live tunnel config, tunnel unit, and DSH trusted-
-host drop-in with the requested deployment SHA, checks the tunnel credential
-mode/owner and service state, and fails before stopping DSH on any mismatch.
-This prevents a later deployment or reprovisioning step from silently
-restoring the obsolete launch path or losing the stable hostname trust.
+deployment: it compares the live tunnel config and tunnel unit with the
+requested deployment SHA, checks the tunnel credential mode/owner and service
+state, and fails before stopping DSH on any mismatch. During activation it
+installs the requested trusted-host drop-in, verifies the immutable release
+launcher, and only then restarts DSH. This prevents a later deployment or
+reprovisioning step from silently losing the stable hostname trust.
 
 The public hostname still requires DSH's authority-bound browser token and
 session cookie. Mint a fresh token for the stable hostname; a cookie minted for
@@ -90,12 +97,15 @@ set these non-secret environment variables:
 | `DSH_AWS_REGION` | `us-east-2` for the current DSH Web host. |
 | `DSH_EC2_INSTANCE_ID` | The intended DSH Web EC2 instance ID. |
 | `DSH_DEPLOY_ROLE_ARN` | The IAM role trusted by this repository's GitHub OIDC subject. |
+| `DSH_ARTIFACT_BUCKET` | Account-owned S3 bucket for immutable DSH runtime artifacts. |
+| `DSH_ARTIFACT_PREFIX` | Versioned key prefix reserved for this deployment environment. |
 
-The GitHub role needs only the regional EC2 read check, SSM target readiness,
-`ssm:SendCommand`, and `ssm:GetCommandInvocation` for the intended instance.
-It does not need `secretsmanager:GetSecretValue`. The EC2 instance role remains
-the authority for the mapped DSH secrets and should retain only the read access
-required by the profile.
+The GitHub role needs the regional EC2 read check, SSM target readiness,
+`ssm:SendCommand`, and `ssm:GetCommandInvocation` for the intended instance,
+plus `s3:PutObject` for the configured artifact prefix. It does not need
+`secretsmanager:GetSecretValue`. The EC2 instance role needs `s3:GetObject` for
+that same artifact prefix and remains the authority for the mapped DSH secrets;
+it should retain only the read access required by the profile.
 
 The repository currently does not create the GitHub OIDC provider or IAM role
 automatically. That is an account-level trust decision and must be provisioned
@@ -115,9 +125,11 @@ The target must already have:
 - a checkout without tracked drift, the `dsh.service` unit, and an active
   listener on `3080`;
 - an SSM agent reporting `Online` and an instance profile able to read the
-  configured Secrets Manager references;
+  configured Secrets Manager references and the immutable artifact prefix;
 - the persistent DSH home at `/root/.dsh-phase2`, including the `tod` profile;
-- Node and pnpm versions satisfying the repository lockfile and engine policy.
+- a supported Node runtime compatible with the CI artifact (Node 24 for the
+  current builder), plus `aws`, `tar`, `sha256sum`, `python3`, and systemd;
+  pnpm and the repository's development dependencies are not required on EC2.
 
 The workflow does not start or stop the instance, force-reset tracked checkout
 drift, rotate credentials, or expose a public port. Non-colliding untracked
@@ -129,13 +141,15 @@ continue to resolve from Secrets Manager at request time.
 ## Manual operation and rollback
 
 For a controlled host-side rehearsal, run the same `deploy.sh` as root with
-`DSH_DEPLOY_SHA`, `DSH_DEPLOY_REMOTE`, and `DSH_DEPLOY_AWS_REGION` set. The
-workflow is the preferred entry point because it supplies the commit and AWS
-identity without long-lived GitHub access keys.
+`DSH_DEPLOY_SHA`, `DSH_DEPLOY_REMOTE`, `DSH_DEPLOY_AWS_REGION`,
+`DSH_RUNTIME_ARTIFACT_URI`, and optionally
+`DSH_RUNTIME_ARTIFACT_SHA256_URI` set. The workflow is the preferred entry
+point because it supplies the commit, artifact, and AWS identity without
+long-lived GitHub access keys.
 
-If deployment fails after the checkout switch, the script restores the previous
-commit and profile files and restarts the service. Inspect the timestamped
-backup directory and `journalctl -u dsh.service` on the host; do not print
+If deployment fails after the release switch, the script restores the previous
+release pointer and profile files and restarts the service. Inspect the
+timestamped backup directory and `journalctl -u dsh.service` on the host; do not print
 `.credentials.yaml`, AWS secret values, cookies, bearer tokens, or full process
 environments into Actions logs.
 
