@@ -315,8 +315,22 @@ async function gitAllowEmpty(cwd: string, args: readonly string[], phase: string
 }
 
 function safeSegment(value: string): string {
-  const segment = value.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '')
-  return segment.length === 0 ? 'source' : segment.slice(0, 48)
+  const candidate = value.slice(0, 96)
+  let segment = ''
+  for (let index = 0; index < candidate.length && segment.length < 48; index += 1) {
+    const code = candidate.charCodeAt(index)
+    const allowed = (code >= 48 && code <= 57)
+      || (code >= 65 && code <= 90)
+      || (code >= 97 && code <= 122)
+      || code === 45 || code === 46 || code === 95
+    segment += allowed ? candidate[index] : '-'
+  }
+  let end = segment.length
+  while (end > 0 && segment.charCodeAt(end - 1) === 45) end -= 1
+  let start = 0
+  while (start < end && segment.charCodeAt(start) === 45) start += 1
+  const trimmed = segment.slice(start, end)
+  return trimmed.length === 0 ? 'source' : trimmed
 }
 
 export type { SourcePublisher, SourcePublisherInput }
