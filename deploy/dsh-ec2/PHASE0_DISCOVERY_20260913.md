@@ -14,10 +14,20 @@ secret values, or process environments.
 | Protected local harness | `/Users/oldap/deepseek-harness` @ `70c1ba3b90b01653d712b2443befe1873a853f8a` | Untouched; existing untracked WIP remains. |
 | Official upstream worktree | `/Users/oldap/deepseek-harness/.worktrees/dsh-upstream-core-20260913` @ `c291e7961a515f6d7af9304e7fd1d257929aef26` | Separate upstream source. |
 | Archived EC2 source | `/Users/oldap/deepseek-harness/.worktrees/dsh-ec2-merged-20260912` @ `0199028dc6fc0428f8d25f40424d18d9d18fe683` | Preserved source line; not used as a build/deploy source. |
-| EC2 upgrade destination | `/Users/oldap/deepseek-harness/.worktrees/dsh-ec2-upstream-reconcile-20260913` on `reconcile/dsh-ec2-upstream-20260913` @ `ae3d4147a9408f590410a985d6de81ea24ce2777` | Current mutation boundary; plan and evidence are untracked here. |
+| EC2 upgrade destination | `/Users/oldap/deepseek-harness/.worktrees/dsh-ec2-upstream-reconcile-20260913` on `reconcile/dsh-ec2-upstream-20260913` @ `6004882f5adef1aae1acbbbe8ccdfe09c5382947` | Current mutation boundary; clean and pushed to draft PR #69. |
 
 The protected local harness was not switched, merged, cherry-picked, reset,
 cleaned, committed, or deployed.
+
+The official upstream repository is the source baseline. The FLINTER fork is
+used only for the downstream review and release branches in this work:
+
+- `reconcile/dsh-upstream-base-20260913` is the frozen upstream snapshot used
+  as PR #69's base.
+- `reconcile/dsh-ec2-upstream-20260913` is the reviewed EC2 topic branch.
+- PR #69 is not a request to merge into the FLINTER default `master`/`main`.
+  A future release may deploy an exact reviewed SHA from this lineage without
+  changing the FLINTER aggregate branch.
 
 ## AWS target discovery
 
@@ -32,6 +42,15 @@ cleaned, committed, or deployed.
 - State: `stopped`, with a user-initiated shutdown reason.
 - Systems Manager: no current managed-instance record was returned, so the
   target is not presently online through SSM.
+- The attached instance profile is `flinter-bastion-ssm`. Its role has the
+  standard `AmazonSSMManagedInstanceCore` policy and reviewed inline read
+  policies for the configured DSH provider secrets and ARK plan secret. The
+  intentionally unused Modelflare provider is not a deployment prerequisite.
+- The target security group is `flinter-bastion-sg`, described as SSM outbound
+  only: it has no inbound rules and unrestricted egress. The subnet has an
+  Internet Gateway route, but this security group does not provide public Web
+  ingress. The safe validation path is SSM port forwarding or an explicitly
+  approved ingress layer, not an implicit firewall opening.
 
 The following live-host facts remain unverified until the owner starts the
 instance and SSM returns `Online`: `uname -m`, OS release, Node/pnpm versions,
@@ -60,12 +79,16 @@ start, stop, SSM command, or deployment was performed.
   in `deploy/dsh-ec2/deploy.sh`; the old host `pnpm install`/`build:lib` path is
   no longer used by the new artifact mode. This is source/worktree evidence,
   not a live-host deployment claim.
+- Native Linux ARM64 workflow run `34762898887` passed immutable install,
+  library build, artifact build/verification, and artifact upload for source
+  SHA `6004882f5adef1aae1acbbbe8ccdfe09c5382947`. The downloaded archive's
+  detached checksum and manifest source SHA were independently verified.
 
 ## Phase 0 verdict
 
-The target architecture is known: **Linux ARM64 on `t4g.medium`**. The P0
-implementation can be designed around an ARM64 CI build, but the live-host
-and artifact-distribution gates are not yet closed.
+The target architecture is known: **Linux ARM64 on `t4g.medium`**. The CI
+artifact gate is now closed for source SHA `6004882f5a…`; the live-host,
+artifact-distribution, and authenticated ingress gates are not yet closed.
 
 ### Next authorized in-scope step
 
@@ -73,8 +96,9 @@ and artifact-distribution gates are not yet closed.
    read/write authorities; do not create resources implicitly.
 2. When the owner starts `i-09cc08b3fdad49cf5` and SSM is `Online`, collect the
    redacted live-host facts above.
-3. Run the new builder on native Linux ARM64, publish one versioned artifact,
-   and rehearse the checksum/extraction/rollback path before production.
+3. Publish the already-proven bytes for `6004882f5a…` under one immutable
+   versioned key, then rehearse checksum/extraction/rollback through SSM before
+   production.
 
 No production release is eligible from this discovery record alone.
 
@@ -106,8 +130,9 @@ at `packages/deployment/dsh-ec2-runtime`.
   this prototype intentionally does not claim the P1 lazy-backend reduction.
 
 The artifact-based deployment script and ARM64 CI workflow now exist in the
-destination worktree, but they have not been pushed, published to S3, or run
-through SSM. No AWS resource was created and no EC2 service was restarted.
+destination worktree and are pushed, but the artifact has not been published
+to an account-owned store or run through SSM. No AWS resource was created and
+no EC2 service was restarted.
 The full `pnpm run build:lib` also passes after the private composition root
 adds a no-op tsdown input configuration; the composition root is not treated
 as a normal library bundle.
