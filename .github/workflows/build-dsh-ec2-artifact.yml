@@ -1,10 +1,23 @@
 name: Build DSH EC2 runtime artifact
 
-# This is a manual, non-production artifact rehearsal. The Linux ARM64 runner
-# matches the current flinter-orca-dsh t4g.medium target. Promotion to an
-# account-owned artifact store and EC2 activation remain separate gates.
+# This is a pull-request/manual, non-production artifact rehearsal. The Linux
+# ARM64 runner matches the current flinter-orca-dsh t4g.medium target.
+# Promotion to an account-owned artifact store and EC2 activation remain
+# separate gates.
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/build-dsh-ec2-artifact.yml'
+      - 'deploy/dsh-ec2/**'
+      - 'packages/**'
+      - 'apps/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig.base.json'
+      - 'tsconfig.host.json'
+      - 'tsdown.config.ts'
 
 permissions:
   contents: read
@@ -26,6 +39,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - uses: pnpm/action-setup@v4
         with:
@@ -46,7 +60,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: dsh-ec2-runtime-${{ github.sha }}-linux-arm64
+          name: dsh-ec2-runtime-${{ github.event.pull_request.head.sha || github.sha }}-linux-arm64
           path: dist/dsh-ec2/*
           if-no-files-found: error
           retention-days: 14
