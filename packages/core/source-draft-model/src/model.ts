@@ -3,6 +3,7 @@
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {
   SourceDraft,
+  SourceDraftFailure,
   SourceDraftId,
   SourceDraftModelFailure,
   SourceDraftPublishValue,
@@ -152,7 +153,7 @@ export class SourceDraftModel implements SourceDraftModelSource {
           'source-draft-not-ready',
           'save the current editor snapshot before publishing',
         )
-        if (generation === this.generation) this.fail(result.error, 'error')
+        if (generation === this.generation && !result.value.ok) this.fail(result.value.error, 'error')
         return result
       }
 
@@ -189,7 +190,7 @@ export class SourceDraftModel implements SourceDraftModelSource {
           'source-draft-not-ready',
           'there is no saved draft to delete',
         )
-        if (generation === this.generation) this.fail(result.error, 'error')
+        if (generation === this.generation && !result.value.ok) this.fail(result.value.error, 'error')
         return result
       }
       const result = await this.remote.delete({
@@ -279,9 +280,18 @@ function freezeDraft(draft: SourceDraft | null): SourceDraft | null {
   return Object.freeze({ ...draft, files: freezeFiles(draft.files) })
 }
 
-function localFailure<T>(code: string, message: string): SourceDraftCallResult<T> & { readonly ok: false } {
+function localFailure<T>(
+  code: 'source-draft-not-ready',
+  reason: string,
+): SourceDraftCallResult<T> & {
+  readonly ok: true
+  readonly value: { readonly ok: false; readonly error: SourceDraftFailure }
+} {
   return {
-    ok: false,
-    error: Object.freeze({ code, message, details: {} }),
+    ok: true,
+    value: {
+      ok: false,
+      error: Object.freeze({ code, reason }),
+    },
   }
 }

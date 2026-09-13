@@ -100,6 +100,12 @@ export interface SourceDraftRejected {
   readonly reason: string
 }
 
+/** The editor must save a current snapshot before a local action can proceed. */
+export interface SourceDraftNotReady {
+  readonly code: 'source-draft-not-ready'
+  readonly reason: string
+}
+
 export interface SourcePublisherUnavailable {
   readonly code: 'publisher-unavailable'
 }
@@ -114,6 +120,7 @@ export type SourceDraftFailure =
   | SourceDraftNotFound
   | SourceDraftVersionConflict
   | SourceDraftRejected
+  | SourceDraftNotReady
   | SourcePublisherUnavailable
   | SourcePublishFailed
 
