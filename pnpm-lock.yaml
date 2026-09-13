@@ -1142,12 +1142,9 @@ importers:
 
   packages/api/source-controller:
     dependencies:
-      '@deepseek-ai/dsh-source-draft-model':
+      '@deepseek-ai/dsh-typert-protocol':
         specifier: workspace:^
-        version: link:../../core/source-draft-model
-      '@deepseek-ai/dsh-workspace':
-        specifier: workspace:^
-        version: link:../../workspace/workspace
+        version: link:../../typert/protocol
       '@deepseek-ai/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
@@ -1176,6 +1173,9 @@ importers:
       '@deepseek-ai/dsh-session':
         specifier: workspace:^
         version: link:../../core/session
+      '@deepseek-ai/dsh-source-draft-model':
+        specifier: workspace:^
+        version: link:../../core/source-draft-model
       '@deepseek-ai/dsh-storage':
         specifier: workspace:^
         version: link:../../storage/storage
@@ -1185,9 +1185,9 @@ importers:
       '@deepseek-ai/dsh-storage-json':
         specifier: workspace:^
         version: link:../../storage/storage-json
-      '@deepseek-ai/dsh-typert-protocol':
+      '@deepseek-ai/dsh-workspace':
         specifier: workspace:^
-        version: link:../../typert/protocol
+        version: link:../../workspace/workspace
 
   packages/api/workspace-controller:
     dependencies:
@@ -4145,11 +4145,10 @@ importers:
         version: 18.3.31
 
   packages/client/ui-source-editor:
-    dependencies:
+    devDependencies:
       '@codesandbox/sandpack-react':
         specifier: 2.20.0
         version: 2.20.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-    devDependencies:
       '@deepseek-ai/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
