@@ -6,6 +6,7 @@ import type {
   SourceDraftFailure,
   SourceDraftId,
   SourceDraftModelFailure,
+  SourceDraftNotReady,
   SourceDraftPublishValue,
   SourceDraftRemote,
   SourceDraftResult,
@@ -47,7 +48,9 @@ export interface SourceDraftModelSource {
   subscribe(listener: () => void): () => void
 }
 
-type SourceDraftCallResult<T> = import('@deepseek-ai/dsh-typert-protocol').RemoteResult<SourceDraftResult<T>>
+type SourceDraftCallResult<T> =
+  | import('@deepseek-ai/dsh-typert-protocol').RemoteResult<SourceDraftResult<T>>
+  | { readonly ok: false; readonly error: SourceDraftNotReady }
 
 /**
  * Coordinates an editor snapshot with the durable Host Remote.
@@ -153,7 +156,7 @@ export class SourceDraftModel implements SourceDraftModelSource {
           'source-draft-not-ready',
           'save the current editor snapshot before publishing',
         )
-        if (generation === this.generation && !result.value.ok) this.fail(result.value.error, 'error')
+        if (generation === this.generation) this.fail(result.error, 'error')
         return result
       }
 
@@ -190,7 +193,7 @@ export class SourceDraftModel implements SourceDraftModelSource {
           'source-draft-not-ready',
           'there is no saved draft to delete',
         )
-        if (generation === this.generation && !result.value.ok) this.fail(result.value.error, 'error')
+        if (generation === this.generation) this.fail(result.error, 'error')
         return result
       }
       const result = await this.remote.delete({
@@ -280,18 +283,10 @@ function freezeDraft(draft: SourceDraft | null): SourceDraft | null {
   return Object.freeze({ ...draft, files: freezeFiles(draft.files) })
 }
 
-function localFailure<T>(
-  code: 'source-draft-not-ready',
-  reason: string,
-): SourceDraftCallResult<T> & {
-  readonly ok: true
-  readonly value: { readonly ok: false; readonly error: SourceDraftFailure }
-} {
+function localFailure<T>(code: 'source-draft-not-ready', reason: string):
+  SourceDraftCallResult<T> & { readonly ok: false; readonly error: SourceDraftFailure } {
   return {
-    ok: true,
-    value: {
-      ok: false,
-      error: Object.freeze({ code, reason }),
-    },
+    ok: false,
+    error: Object.freeze({ code, reason }),
   }
 }

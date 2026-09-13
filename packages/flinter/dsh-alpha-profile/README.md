@@ -88,14 +88,6 @@ prove distributed capacity across multiple hosts. EC2 deployments set
 `DSH_COMPUTE_BACKEND=ec2` explicitly in the protected systemd drop-in, so the
 CodeSandbox default applies only to hosts that intentionally select it.
 
-## Known Limitations and Deferred Work
-
-- **Live provider capacity is not proven by configuration** — mock endpoints validate shape and selection; paid provider calls and AWS deployment remain separate evidence gates.
-- **The current route catalog is intentionally narrow** — adding models or reasoning levels requires explicit endpoint verification and profile review.
-- **A live CodeSandbox VM is not a model-credential bridge** — provider calls from a VM require a separately reviewed short-lived credential/broker path; raw provider keys remain host-owned.
-- **CodeSandbox workspace is not AWS persistence** — shutdown/resume preserves CodeSandbox files only. Session JSONL, manifests, and artifacts need a separately implemented AWS storage adapter or reviewed shared mount before a CodeSandbox worker is storage-ready.
-- **Native DSH events remain the L0 trace seam** — downstream trace-link may consume them later, but this package does not extend the Session codec.
-
 ## Attempt safety
 
 Use this package for non-Orca launch and attempt safety around the native DSH Agent and Session. The control-plane or executor integration must provide the authenticated callback path, cloud task identity, stop operation, and terminal-state observation.
@@ -108,6 +100,30 @@ The launch flow is `resolveWorkerAttemptRoots()` → `createWorkerAttemptRoots()
 ## Understand the implementation
 
 The exact attempt and lifecycle contracts are exported from [src/attempt.ts](src/attempt.ts) and [src/lifecycle.ts](src/lifecycle.ts). DSH identity and create/resume binding remain in [src/worker.ts](src/worker.ts).
+
+## Model Experience
+
+### Route, compute, and credential boundaries
+
+#### What the model sees
+
+The model-facing surface sees the selected provider, bounded compute status, and credential references such as `ARK_PLAN_API_KEY`; it never receives AWS secret values or the process-local lease.
+
+#### Token effect
+
+Route identity and bounded worker status add only the metadata explicitly rendered by a host; provider credentials, manifests, and attempt roots are not copied into the model context.
+
+#### KV Cache effect
+
+Changing `DSH_COMPUTE_BACKEND` or rotating a fresh-session route does not rewrite an existing model prefix; only a new session or an explicit host-rendered status line changes the next request context.
+
+## Known Limitations and Deferred Work
+
+- **Live provider capacity is not proven by configuration** — mock endpoints validate shape and selection; paid provider calls and AWS deployment remain separate evidence gates.
+- **The current route catalog is intentionally narrow** — adding models or reasoning levels requires explicit endpoint verification and profile review.
+- **A live CodeSandbox VM is not a model-credential bridge** — provider calls from a VM require a separately reviewed short-lived credential/broker path; raw provider keys remain host-owned.
+- **CodeSandbox workspace is not AWS persistence** — shutdown/resume preserves CodeSandbox files only. Session JSONL, manifests, and artifacts need a separately implemented AWS storage adapter or reviewed shared mount before a CodeSandbox worker is storage-ready.
+- **Native DSH events remain the L0 trace seam** — downstream trace-link may consume them later, but this package does not extend the Session codec.
 
 <a id="dev-note"></a>
 ### Dev Note

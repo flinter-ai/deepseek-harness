@@ -98,6 +98,22 @@ EC2 部署在受保护的 systemd drop-in 中显式设置
 
 完整的 attempt 与 lifecycle contract 从 [src/attempt.ts](src/attempt.ts) 和 [src/lifecycle.ts](src/lifecycle.ts) 导出；DSH identity 以及 create/resume binding 仍由 [src/worker.ts](src/worker.ts) 负责。
 
+## Model Experience
+
+### 路由、计算与凭据边界
+
+#### What the model sees
+
+面向 model 的 surface 只会看到选定的 provider、有界 compute 状态以及 `ARK_PLAN_API_KEY` 这类 credential reference；不会收到 AWS secret value 或进程内 lease。
+
+#### Token effect
+
+route identity 与有界 worker status 只会加入 host 明确渲染的 metadata；provider credential、manifest 和 attempt root 不会复制到 model context。
+
+#### KV Cache effect
+
+改变 `DSH_COMPUTE_BACKEND` 或轮换新的 session route 不会重写已有 model prefix；只有新 session 或 host 明确渲染的 status line 才会改变下一次 request context。
+
 <a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延期工作
 

@@ -131,3 +131,19 @@ Actions 日志。
 确实到达目标并报告脱敏的
 `dsh-ec2-deploy: deployment=success` 行，否则不证明 phone/desktop tunnel、
 GitHub remote 编辑或新的 live deployment 已经完成。
+
+## Model Experience
+
+### 部署边界
+
+#### What the model sees
+
+部署 surface 只暴露 `DSH_DEPLOY_SHA`、authenticated Web status 和 `DSH_COMPUTE_BACKEND=ec2` 等有界健康与 revision fact；不会把 AWS secret value 或 GitHub bearer token 渲染到 model context。
+
+#### Token effect
+
+除非 host 明确在 session 中加入脱敏 status line，否则 deployment metadata 不贡献 model token；deployment script 会将 credential 和 process environment 留在 model request 之外。
+
+#### KV Cache effect
+
+改变 deployed commit 或重启 EC2 service 不会重写已有 model prefix；新 session 会通过正常的 host-owned startup 和 profile composition 看到新的 runtime。

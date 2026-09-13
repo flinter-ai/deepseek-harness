@@ -145,3 +145,19 @@ A green local build or workflow step proves only the corresponding source,
 SSM, and host checks. It does not prove a phone/desktop tunnel, GitHub remote
 editing, or a new live deployment unless the workflow itself reaches the
 target and reports the redacted `dsh-ec2-deploy: deployment=success` line.
+
+## Model Experience
+
+### Deployment boundary
+
+#### What the model sees
+
+The deployment surface exposes only bounded health and revision facts such as `DSH_DEPLOY_SHA`, authenticated Web status, and `DSH_COMPUTE_BACKEND=ec2`; it never renders AWS secret values or GitHub bearer tokens into model context.
+
+#### Token effect
+
+Deployment metadata contributes no model tokens unless a host explicitly includes a redacted status line in a session; the deployment script keeps credentials and process environments outside the model request.
+
+#### KV Cache effect
+
+Changing the deployed commit or restarting the EC2 service does not rewrite an existing model prefix; a new session observes the new runtime only through the normal host-owned startup and profile composition.

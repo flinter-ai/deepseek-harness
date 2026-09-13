@@ -144,6 +144,7 @@ export class GitHubSourcePublisher implements SourcePublisher {
 
   async publish(input: SourcePublisherInput): Promise<SourceDraftPublishValue> {
     if (input.signal.aborted) throw input.signal.reason ?? new SourcePublisherError('publication aborted')
+    for (const file of input.draft.files) validateSourcePath(file.path)
     const token = await this.config.token()
     if (input.signal.aborted) throw input.signal.reason ?? new SourcePublisherError('publication aborted')
     if (token === undefined || token.trim() === '') {
@@ -239,18 +240,22 @@ async function writeFiles(worktreePath: string, files: readonly SourceFile[]): P
 }
 
 function safeTarget(root: string, filePath: string): string {
-  if (filePath.length === 0 || filePath.includes('\\') || filePath.includes('\0') || isAbsolute(filePath)) {
-    throw new SourcePublisherError(`unsafe source path: ${filePath}`)
-  }
-  if (normalize(filePath) !== filePath || filePath.split('/').some(segment => segment === '' || segment === '.' || segment === '..')) {
-    throw new SourcePublisherError(`unsafe source path: ${filePath}`)
-  }
+  validateSourcePath(filePath)
   const target = resolve(root, filePath)
   const boundary = `${resolve(root)}${sep}`
   if (target !== resolve(root) && !target.startsWith(boundary)) {
     throw new SourcePublisherError(`source path escapes the publication worktree: ${filePath}`)
   }
   return target
+}
+
+function validateSourcePath(filePath: string): void {
+  if (filePath.length === 0 || filePath.includes('\\') || filePath.includes('\0') || isAbsolute(filePath)) {
+    throw new SourcePublisherError(`unsafe source path: ${filePath}`)
+  }
+  if (normalize(filePath) !== filePath || filePath.split('/').some(segment => segment === '' || segment === '.' || segment === '..')) {
+    throw new SourcePublisherError(`unsafe source path: ${filePath}`)
+  }
 }
 
 async function assertNoSymlinkParents(root: string, target: string): Promise<void> {
