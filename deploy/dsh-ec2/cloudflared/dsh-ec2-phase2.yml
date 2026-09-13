@@ -1,0 +1,7 @@
+tunnel: 5942a39d-b66c-4429-8740-5c1363073f98
+credentials-file: /etc/cloudflared/dsh-ec2-phase2.json
+metrics: 127.0.0.1:20244
+ingress:
+  - hostname: dsh-web.useflinter.com
+    service: http://127.0.0.1:3080
+  - service: http_status:404
