@@ -241,6 +241,8 @@ grep -q 'credentials-aws-secrets-manager' "$BACKUP_DIR/dump-config.log" \
   || die 'the AWS credential provider is absent from the composed profile'
 grep -q 'ARK_PLAN_API_KEY: flinter/dsh-ark-agent-plan' "$BACKUP_DIR/dump-config.log" \
   || die 'the Ark secret mapping is absent from the composed profile'
+grep -q 'OPENCODE_GO_API_KEY: flinter/dsh-opencode-go' "$BACKUP_DIR/dump-config.log" \
+  || die 'the default OpenCode secret mapping is absent from the composed profile'
 grep -q 'allowWrites: false' "$BACKUP_DIR/dump-config.log" \
   || die 'the AWS credential provider is not read-only'
 if ! (
@@ -256,13 +258,23 @@ const ctx = new Context()
 const region = process.env.DSH_DEPLOY_AWS_REGION || undefined
 const provider = new AwsSecretsManagerCredentialProvider(ctx, {
   ...(region === undefined ? {} : { region }),
-  secretNames: { ARK_PLAN_API_KEY: 'flinter/dsh-ark-agent-plan' },
+  secretNames: {
+    ARK_PLAN_API_KEY: 'flinter/dsh-ark-agent-plan',
+    OPENCODE_GO_API_KEY: 'flinter/dsh-opencode-go',
+  },
   secretFormat: 'json',
   allowWrites: false,
 })
-const resolved = await provider.resolve(credentialRef('ARK_PLAN_API_KEY'))
-if (resolved?.value === undefined) throw new Error('Ark credential reference is not configured')
-console.log(JSON.stringify({ configured: true, source: resolved.source, writable: false }))
+const resolvedArk = await provider.resolve(credentialRef('ARK_PLAN_API_KEY'))
+if (resolvedArk?.value === undefined) throw new Error('Ark credential reference is not configured')
+const resolvedOpenCode = await provider.resolve(credentialRef('OPENCODE_GO_API_KEY'))
+if (resolvedOpenCode?.value === undefined) throw new Error('OpenCode credential reference is not configured')
+console.log(JSON.stringify({
+  configured: true,
+  references: ['ARK_PLAN_API_KEY', 'OPENCODE_GO_API_KEY'],
+  source: 'aws-secrets-manager',
+  writable: false,
+}))
 NODE
 ) >"$BACKUP_DIR/provider-resolve.log" 2>&1; then
   printf 'dsh-ec2-deploy: provider-resolve=failed; log=%s\n' "$BACKUP_DIR/provider-resolve.log" >&2
@@ -291,12 +303,12 @@ HTTP_STATUS=$(curl --silent --show-error --output /dev/null --write-out '%{http_
 [[ "$HTTP_STATUS" == 401 ]] || die "authenticated Web endpoint health check returned HTTP $HTTP_STATUS"
 
 SYSTEMD_ENV=$(systemctl show "$SERVICE_NAME" -p Environment --value)
-if grep -qE '(ARK_PLAN_API_KEY|DEEPSEEK_API_KEY|MODELFLARE_API_KEY|GMI_SERVING_API_KEY)=' <<<"$SYSTEMD_ENV"; then
+if grep -qE '(ARK_PLAN_API_KEY|DEEPSEEK_API_KEY|MODELFLARE_API_KEY|GMI_SERVING_API_KEY|OPENCODE_GO_API_KEY)=' <<<"$SYSTEMD_ENV"; then
   die 'a credential value is present in the systemd environment'
 fi
 SERVICE_PID=$(systemctl show "$SERVICE_NAME" -p MainPID --value)
 if [[ "$SERVICE_PID" =~ ^[0-9]+$ ]] && (( SERVICE_PID > 0 )) \
-  && tr '\0' '\n' <"/proc/$SERVICE_PID/environ" | grep -qE '^(ARK_PLAN_API_KEY|DEEPSEEK_API_KEY|MODELFLARE_API_KEY|GMI_SERVING_API_KEY)='; then
+  && tr '\0' '\n' <"/proc/$SERVICE_PID/environ" | grep -qE '^(ARK_PLAN_API_KEY|DEEPSEEK_API_KEY|MODELFLARE_API_KEY|GMI_SERVING_API_KEY|OPENCODE_GO_API_KEY)='; then
   die 'a credential value is present in the DSH process environment'
 fi
 

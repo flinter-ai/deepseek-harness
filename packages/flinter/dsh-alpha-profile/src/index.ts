@@ -21,6 +21,7 @@ export const FLINTER_CREDENTIAL_REFS = Object.freeze({
   modelflare: 'MODELFLARE_API_KEY',
   gmiServing: 'GMI_SERVING_API_KEY',
   deepseekOfficial: 'DEEPSEEK_API_KEY',
+  opencodeGo: 'OPENCODE_GO_API_KEY',
 } as const)
 
 /** AWS Secrets Manager names corresponding to the supported route references. */
@@ -29,6 +30,16 @@ export const FLINTER_AWS_SECRET_NAMES = Object.freeze({
   modelflare: 'flinter/dsh-modelflare',
   gmiServing: 'flinter/dsh-gmi-serving',
   deepseekOfficial: 'flinter/dsh-deepseek-official',
+  opencodeGo: 'flinter/dsh-opencode-go',
+} as const)
+
+/** Explicit AWS reference-to-secret mapping consumed by the credential provider. */
+export const FLINTER_AWS_SECRET_NAMES_BY_REF = Object.freeze({
+  [FLINTER_CREDENTIAL_REFS.arkAgentPlan]: FLINTER_AWS_SECRET_NAMES.arkAgentPlan,
+  [FLINTER_CREDENTIAL_REFS.modelflare]: FLINTER_AWS_SECRET_NAMES.modelflare,
+  [FLINTER_CREDENTIAL_REFS.gmiServing]: FLINTER_AWS_SECRET_NAMES.gmiServing,
+  [FLINTER_CREDENTIAL_REFS.deepseekOfficial]: FLINTER_AWS_SECRET_NAMES.deepseekOfficial,
+  [FLINTER_CREDENTIAL_REFS.opencodeGo]: FLINTER_AWS_SECRET_NAMES.opencodeGo,
 } as const)
 
 /** Values verified against the alpha's llm-pi-ai config schema. */
@@ -359,7 +370,7 @@ export function buildFlinterProfileComposition(
         id: 'credentials-aws-secrets-manager',
         name: '@deepseek-ai/dsh-credentials-aws-secrets-manager',
         config: Object.freeze({
-          secretNames: FLINTER_AWS_SECRET_NAMES,
+          secretNames: FLINTER_AWS_SECRET_NAMES_BY_REF,
           secretFormat: 'json',
           allowWrites: false,
         }),

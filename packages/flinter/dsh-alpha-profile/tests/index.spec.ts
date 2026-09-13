@@ -6,6 +6,7 @@ import {
   consumeFlinterNativeSessionEvents,
   DIRECT_DEEPSEEK_ROUTE,
   FLINTER_AWS_SECRET_NAMES,
+  FLINTER_AWS_SECRET_NAMES_BY_REF,
   FLINTER_CREDENTIAL_REFS,
   FLINTER_NATIVE_EVENT_TYPES,
   FLINTER_MODEL_CAPACITIES,
@@ -83,6 +84,8 @@ describe('FLINTER alpha provider/profile layer', () => {
   it('keeps AWS secret names separate from model credential references', () => {
     expect(FLINTER_AWS_SECRET_NAMES.gmiServing).toBe('flinter/dsh-gmi-serving')
     expect(FLINTER_AWS_SECRET_NAMES.gmiServing).not.toBe(FLINTER_CREDENTIAL_REFS.gmiServing)
+    expect(FLINTER_AWS_SECRET_NAMES_BY_REF.GMI_SERVING_API_KEY).toBe('flinter/dsh-gmi-serving')
+    expect(FLINTER_AWS_SECRET_NAMES_BY_REF.OPENCODE_GO_API_KEY).toBe('flinter/dsh-opencode-go')
     expect(DIRECT_DEEPSEEK_ROUTE).toEqual({
       provider: 'deepseek-official',
       model: 'deepseek-v4-flash',
@@ -107,7 +110,7 @@ describe('FLINTER alpha provider/profile layer', () => {
           config: {
             secretFormat: 'json',
             allowWrites: false,
-            secretNames: FLINTER_AWS_SECRET_NAMES,
+            secretNames: FLINTER_AWS_SECRET_NAMES_BY_REF,
           },
         }],
       },

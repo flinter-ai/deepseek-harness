@@ -39,6 +39,7 @@ Mount it in an AWS worker profile after disabling the base profile's local crede
           MODELFLARE_API_KEY: flinter/dsh-modelflare
           GMI_SERVING_API_KEY: flinter/dsh-gmi-serving
           DEEPSEEK_API_KEY: flinter/dsh-deepseek-official
+          OPENCODE_GO_API_KEY: flinter/dsh-opencode-go
         secretFormat: json
         allowWrites: false
 ```

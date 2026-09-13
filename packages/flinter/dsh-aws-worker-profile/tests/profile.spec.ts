@@ -31,6 +31,7 @@ describe('public AWS worker profile bundle', () => {
               MODELFLARE_API_KEY: 'flinter/dsh-modelflare',
               GMI_SERVING_API_KEY: 'flinter/dsh-gmi-serving',
               DEEPSEEK_API_KEY: 'flinter/dsh-deepseek-official',
+              OPENCODE_GO_API_KEY: 'flinter/dsh-opencode-go',
             },
           },
         }],
