@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-aws-worker-profile",
   "description": "Public read-only AWS credential profile layer over the DSH alpha bundles",
-  "version": "0.1.2-alpha.1",
+  "version": "0.1.5-rc.2",
   "publishConfig": {
     "access": "public"
   },

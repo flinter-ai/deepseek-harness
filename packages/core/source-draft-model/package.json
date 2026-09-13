@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-source-draft-model",
   "description": "Framework-neutral source draft state machine for browser editors",
-  "version": "0.1.2-alpha.1",
+  "version": "0.1.5-rc.2",
   "publishConfig": {
     "access": "public"
   },

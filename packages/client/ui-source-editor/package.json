@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-client-ui-source-editor",
   "description": "Sandpack source editor with durable DSH drafts and explicit Host publication",
-  "version": "0.1.2-alpha.1",
+  "version": "0.1.5-rc.2",
   "publishConfig": {
     "access": "public"
   },
