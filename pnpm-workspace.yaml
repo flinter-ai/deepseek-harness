@@ -50,6 +50,9 @@ allowBuilds:
   # The Python runtime deploy includes the reviewed workspace postinstall that
   # restores the executable bit on node-pty's macOS spawn helper.
   '@deepseek-ai/dsh-subprocess-local@file:packages/subprocess/subprocess-local': true
+  # es5-ext ships a required lifecycle script; allowing it keeps frozen-lockfile
+  # installs consistent on the ARM64 EC2 deployment host and local CI.
+  es5-ext: true
 
 minimumReleaseAgeExclude:
   # Fresh pi-ai releases carry the model catalog updates that are the whole
