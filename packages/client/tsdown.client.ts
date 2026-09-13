@@ -11,7 +11,7 @@
 import { readFile } from 'node:fs/promises'
 import { existsSync, globSync, readFileSync } from 'node:fs'
 import { isBuiltin } from 'node:module'
-import { basename, dirname, isAbsolute, relative, resolve as resolvePath, sep } from 'node:path'
+import { basename, dirname, isAbsolute, join, relative, resolve as resolvePath, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { UserConfig } from 'tsdown'
 import { transform } from 'lightningcss'
@@ -58,7 +58,7 @@ function styleInjectionModule(
  * Everything else under @deepseek-ai/* is either a module-table entry
  * (external) or a leak the purity gate rejects.
  */
-export const INLINE_SAFE = /^(?:@deepseek-ai\/dsh-(?:file-reference|session|llm|tools|brand|util-crypto|util-workspace-path)(?:\/|$)|@deepseek-ai\/dsh-token-meter\/client$)/
+export const INLINE_SAFE = /^(?:@deepseek-ai\/dsh-(?:file-reference|session|llm|tools|brand|util-crypto|util-workspace-path|source-draft-model)(?:\/|$)|@deepseek-ai\/dsh-token-meter\/client$)/
 
 /**
  * Vendored framework libraries: rescoped into @deepseek-ai, so the gate below
@@ -77,7 +77,21 @@ const GENERATED_REMOTE = /^@deepseek-ai\/dsh-[a-z0-9]+(?:-[a-z0-9]+)*\/remote$/
  */
 const SKIP_WORKSPACE_BUILD: UserConfig = { entry: '' }
 
-const REPOSITORY_ROOT = fileURLToPath(new URL('../..', import.meta.url))
+/**
+ * Resolve the repository root even when tsdown evaluates this config from its
+ * `.unrun` temporary module directory under a package's node_modules.
+ */
+function repositoryRoot(start: string): string {
+  let current = resolvePath(start)
+  while (true) {
+    if (existsSync(join(current, 'pnpm-workspace.yaml'))) return current
+    const parent = dirname(current)
+    if (parent === current) throw new Error('tsdown: unable to locate pnpm-workspace.yaml')
+    current = parent
+  }
+}
+
+const REPOSITORY_ROOT = repositoryRoot(dirname(fileURLToPath(import.meta.url)))
 
 /** Rebase a physical lib-relative source onto a browser URL that mirrors the repository directories. */
 function browserSourcePath(source: string, sourcemapPath: string): string {

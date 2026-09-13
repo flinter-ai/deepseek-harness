@@ -1,0 +1,148 @@
+.root {
+  position: relative;
+}
+
+.trigger {
+  min-height: 28px;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.trigger:hover,
+.trigger:focus-visible {
+  background: var(--dsw-alias-fill-l2);
+  color: var(--dsw-alias-label-secondary);
+}
+
+.backdrop {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgb(0 0 0 / 45%);
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(1180px, 100%);
+  height: min(780px, 100%);
+  overflow: hidden;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 14px;
+  background: var(--dsw-specific-panel, var(--dsw-alias-bg-primary));
+  box-shadow: var(--dsw-shadow-lv3);
+}
+
+.header,
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+}
+
+.header {
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+}
+
+.footer {
+  border-top: 1px solid var(--dsw-alias-border-l2);
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+  color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.meta,
+.status,
+.error {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+}
+
+.meta {
+  overflow: hidden;
+  font-family: var(--dsw-font-mono);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sandpack {
+  height: 100%;
+}
+
+.loading,
+.empty {
+  display: grid;
+  height: 100%;
+  place-items: center;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 13px;
+}
+
+.button {
+  min-height: 30px;
+  padding: 4px 10px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 7px;
+  background: var(--dsw-alias-fill-l1);
+  color: var(--dsw-alias-label-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.button:hover:not(:disabled),
+.button:focus-visible:not(:disabled) {
+  border-color: var(--dsw-alias-border-l1);
+  background: var(--dsw-alias-fill-l2);
+}
+
+.button:disabled {
+  cursor: default;
+  opacity: .5;
+}
+
+.primary {
+  border-color: var(--dsw-alias-brand);
+  background: var(--dsw-alias-brand);
+  color: white;
+}
+
+.danger {
+  margin-right: auto;
+  color: var(--dsw-alias-red, #c33);
+}
+
+.error {
+  max-width: min(520px, 40%);
+  overflow: hidden;
+  color: var(--dsw-alias-red, #c33);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.link {
+  color: var(--dsw-alias-brand);
+  font-size: 12px;
+}
