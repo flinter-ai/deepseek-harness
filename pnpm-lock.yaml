@@ -4747,6 +4747,15 @@ importers:
         specifier: workspace:^
         version: link:../../llm/token-meter
 
+  packages/compute/compute:
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-credentials':
+        specifier: workspace:^
+        version: link:../../credentials/credentials
+
   packages/context/agent-instructions:
     dependencies:
       '@deepseek-ai/dsh-util-values':
@@ -10500,6 +10509,12 @@ importers:
         version: link:../../../vendor/cordis
 
   packages/util/workspace-path:
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+
+  packages/web/draft:
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: workspace:^
