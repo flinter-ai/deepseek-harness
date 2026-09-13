@@ -1,18 +1,20 @@
 # DSH EC2 runtime artifact rollout plan
 
 **Status (2026-09-13):** The local P0 implementation and its macOS arm64
-rehearsal pass. Destination commit `efd48a1db2c3e147dc10148c680c61c009da7bd8`
-is pushed on draft PR #69 against the isolated upstream snapshot base; DSH and
-vendor release gates pass, while the unrelated Cloudflare/issue-policy checks
-still lack repository configuration and the long-session browser benchmark
-failed on its existing frame/replay fixture. A final local artifact for this
-SHA has a verified detached checksum and contains the workspace git-worktree
-runtime export. Native Linux arm64 CI artifact publication, the account-owned
-artifact store, and live EC2 activation remain pending; no production artifact
-has been published and nothing has been merged or deployed.
+rehearsal pass. Destination commit
+`63cf1f0227284ad760dea290f127dac817710eba` is pushed on draft PR #69 against
+the isolated upstream snapshot base. The native Linux arm64 artifact run
+`34762427414` passed; its downloaded archive has a verified detached checksum,
+the manifest source SHA matches the commit, and the required workspace
+git-worktree runtime export is present. DSH and vendor release gates pass,
+while the unrelated Cloudflare/issue-policy checks still lack repository
+configuration and the long-session browser benchmark failed on its existing
+frame/replay fixture. The account-owned artifact store and live EC2 activation
+remain pending; no production artifact has been published and nothing has been
+merged or deployed.
 
 **Source baseline:** `reconcile/dsh-ec2-upstream-20260913` at
-`efd48a1db2c3e147dc10148c680c61c009da7bd8`, based on the isolated
+`63cf1f0227284ad760dea290f127dac817710eba`, based on the isolated
 `upstream/master` snapshot `c291e7961a515f6d7af9304e7fd1d257929aef26`.
 
 ## Objective
@@ -118,10 +120,11 @@ The first implementation boundary is now explicit:
 
 The current local macOS arm64 rehearsal produced an 81 MB compressed archive
 with 20,852 manifest-tracked files. Its detached checksum and sibling manifest
-match the embedded manifest. `pnpm run build:lib`, the artifact builder,
-clean extraction, CLI/Web/launcher help, and static/package gates pass. This is
-not Linux ARM64 or EC2 proof; the authoritative artifact still must be built
-on `ubuntu-24.04-arm`.
+match the embedded manifest. `pnpm run build:lib`, the artifact builder, clean
+extraction, CLI/Web/launcher help, and static/package gates pass. The
+authoritative Linux arm64 artifact was then built and smoke-verified on
+`ubuntu-24.04-arm` by workflow run `34762427414`; this proves CI artifact
+production and integrity, not EC2 activation.
 
 - compiled CLI and DSH Web runtime/client assets;
 - alpha profile, AWS credential provider, source draft/controller/editor, and
