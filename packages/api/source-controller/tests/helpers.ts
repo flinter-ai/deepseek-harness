@@ -55,6 +55,7 @@ export async function setupHarness(options: {
       id: sessionId,
       createdAt,
       cwd: root,
+      isSeeded: false,
     }
     sessions.set(sessionId, meta)
     return { id: sessionId, meta }

@@ -40,6 +40,7 @@ describe('GitHubSourcePublisher', () => {
       id: sessionId,
       createdAt: 1_700_000_000_000,
       cwd: repositoryRoot,
+      isSeeded: false,
     }
     const draft = {
       draftId: 'source-publisher-draft' as SourceDraft['draftId'],
@@ -125,6 +126,7 @@ describe('GitHubSourcePublisher', () => {
         id: sessionId,
         createdAt: 1_700_000_000_000,
         cwd: repositoryRoot,
+        isSeeded: false,
       },
       signal: new AbortController().signal,
     })).rejects.toThrow('unsafe source path')

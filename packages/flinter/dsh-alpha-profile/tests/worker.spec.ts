@@ -104,7 +104,7 @@ describe('alpha worker/session adapter', () => {
 
     const setup = calls.create?.setup
     expect(setup).toEqual(expect.any(Function))
-    await setup?.(new Context())
+    await setup?.(new Context(), undefined as never)
   })
 
   it.each([

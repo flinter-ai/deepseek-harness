@@ -117,9 +117,10 @@ describe('FLINTER alpha provider/profile layer', () => {
 
   it('consumes native events without dropping opaque plugin records', () => {
     const session = {
-      version: 0,
+      version: 3 as const,
       id: SessionId('native-consumer'),
       createdAt: 1,
+      isSeeded: false,
       delegationDepth: 0,
     }
     const events = [
