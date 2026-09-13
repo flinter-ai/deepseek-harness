@@ -81,6 +81,22 @@ describe('pi-ai request context conversion', () => {
     expect(toPiContext({ ...base, tools: [] })).toEqual({ messages: [] })
   })
 
+  it('maps provider-facing strict tool schemas to pi-ai constrained sampling', () => {
+    const base = { provider: 'openai', model: 'gpt-4.1', messages: [] }
+    expect(toPiContext({
+      ...base,
+      tools: [{ name: 'strict_lookup', description: 'lookup', parameters: { type: 'object' }, strict: true }],
+    })).toEqual({
+      messages: [],
+      tools: [{
+        name: 'strict_lookup',
+        description: 'lookup',
+        parameters: { type: 'object' },
+        constrainedSampling: { type: 'json_schema', strict: 'require' },
+      }],
+    })
+  })
+
   it('converts complete text-only history and rejects nested images without storage', () => {
     const callId = ToolCallId('call-1')
     expect(toPiContext(request([

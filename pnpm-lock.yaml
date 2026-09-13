@@ -5828,6 +5828,22 @@ importers:
         specifier: workspace:^
         version: link:../../typert/protocol
 
+  packages/extensions/relace:
+    dependencies:
+      '@deepseek-ai/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-llm':
+        specifier: workspace:^
+        version: link:../../llm/llm
+      '@deepseek-ai/dsh-llm-pi-ai':
+        specifier: workspace:^
+        version: link:../../llm/llm-pi-ai
+
   packages/extensions/tool-cordis:
     devDependencies:
       '@deepseek-ai/cordis':
