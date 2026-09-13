@@ -7,12 +7,6 @@ import { Context, Service } from '@deepseek-ai/cordis'
 import s from '@deepseek-ai/schemastery'
 import type { SessionHeader, SessionId } from '@deepseek-ai/dsh-session/types'
 import { ApiSessionNotFound } from '@deepseek-ai/dsh-api-session-controller'
-import type { KvTable } from '@deepseek-ai/dsh-storage-domain'
-import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
-import { resolveGitCommit, resolveGitRepository } from '@deepseek-ai/dsh-workspace/src/git-worktree'
-import { sourceDraftDomainSpec } from './spec.ts'
-import type { SourceDraftRecord } from './spec.ts'
-import type { SourcePublisher } from './publisher.ts'
 import type {
   SourceDraftBootstrapRequest,
   SourceDraftBootstrapResult,
@@ -35,7 +29,13 @@ import type {
   SourceDraftSaveResult,
   SourceDraftSessionNotFound,
   SourceFile,
-} from './types.ts'
+} from '@deepseek-ai/dsh-source-draft-model/types'
+import type { KvTable } from '@deepseek-ai/dsh-storage-domain'
+import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
+import { resolveGitCommit, resolveGitRepository } from '@deepseek-ai/dsh-workspace/src/git-worktree'
+import { sourceDraftDomainSpec } from './spec.ts'
+import type { SourceDraftRecord } from './spec.ts'
+import type { SourcePublisher } from './publisher.ts'
 
 export type * from './types.ts'
 export type { SourcePublisher, SourcePublisherInput } from './publisher.ts'
