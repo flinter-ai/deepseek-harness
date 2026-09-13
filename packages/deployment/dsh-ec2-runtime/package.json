@@ -22,6 +22,7 @@
     "@deepseek-ai/dsh-credentials-aws-secrets-manager": "workspace:^",
     "@deepseek-ai/dsh-host-source-publisher-github": "workspace:^",
     "@deepseek-ai/dsh-source-draft-model": "workspace:^",
-    "@deepseek-ai/dsh-web-app": "workspace:^"
+    "@deepseek-ai/dsh-web-app": "workspace:^",
+    "@deepseek-ai/schemastery": "workspace:^"
   }
 }

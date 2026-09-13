@@ -33,6 +33,7 @@ const REQUIRED_PACKAGES = [
   '@deepseek-ai/dsh-host-source-publisher-github',
   '@deepseek-ai/dsh-source-draft-model',
   '@deepseek-ai/dsh-web-app',
+  '@deepseek-ai/schemastery',
 ] as const
 const SHA_PATTERN = /^[0-9a-f]{40}$/u
 const ARCHES = new Set(['arm64', 'x64'])
