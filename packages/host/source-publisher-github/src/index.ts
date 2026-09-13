@@ -18,7 +18,7 @@ import {
   removeGitWorktree,
   resolveGitCommit,
   resolveGitRepository,
-} from '@deepseek-ai/dsh-workspace/src/git-worktree'
+} from '@deepseek-ai/dsh-workspace/git-worktree'
 
 const execFileAsync = promisify(execFile)
 const GIT_OUTPUT_LIMIT = 1024 * 1024

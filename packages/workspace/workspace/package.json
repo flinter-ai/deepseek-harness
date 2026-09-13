@@ -26,6 +26,10 @@
       "types": "./lib/types/types.d.ts",
       "default": "./lib/types/types.js"
     },
+    "./git-worktree": {
+      "types": "./lib/types/git-worktree.d.ts",
+      "default": "./lib/types/git-worktree.js"
+    },
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },

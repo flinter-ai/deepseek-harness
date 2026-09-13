@@ -6,7 +6,7 @@ import { promisify } from 'node:util'
 import { afterEach, describe, expect, it } from 'vitest'
 import { SessionId, SESSION_FORMAT_VERSION, type SessionHeader } from '@deepseek-ai/dsh-session/types'
 import type { SourceDraft } from '@deepseek-ai/dsh-api-source-controller/types'
-import { resolveGitCommit } from '@deepseek-ai/dsh-workspace/src/git-worktree'
+import { resolveGitCommit } from '@deepseek-ai/dsh-workspace/git-worktree'
 import { GitHubSourcePublisher, type PullRequestRequest } from '../src/index.ts'
 
 const execFileAsync = promisify(execFile)

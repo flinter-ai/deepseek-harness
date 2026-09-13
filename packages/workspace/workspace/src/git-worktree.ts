@@ -4,7 +4,7 @@
  * Every Git invocation is an argv-based `execFile` call. The adapter never
  * interpolates repository paths, branch names, or revisions into a shell
  * command string.
- * @module @deepseek-ai/dsh-workspace/src/git-worktree
+ * @module @deepseek-ai/dsh-workspace/git-worktree
  */
 
 import { execFile } from 'node:child_process'

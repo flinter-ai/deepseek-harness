@@ -59,7 +59,7 @@ const PEER_REQUIRED_HOST_EXPORTS = {
   '@deepseek-ai/dsh-session': ['SESSION_FORMAT_VERSION'],
   '@deepseek-ai/dsh-session-persistence': ['SessionPersistenceNotFoundError'],
   '@deepseek-ai/dsh-storage-domain': ['defineDomain', 'domainTable'],
-  '@deepseek-ai/dsh-workspace/src/git-worktree': ['resolveGitCommit', 'resolveGitRepository'],
+  '@deepseek-ai/dsh-workspace/git-worktree': ['resolveGitCommit', 'resolveGitRepository'],
 } as const satisfies HostDependencyExports
 
 /** Exact import specifier to reviewed runtime exports. */

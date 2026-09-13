@@ -32,7 +32,7 @@ import type {
 } from '@deepseek-ai/dsh-source-draft-model/types'
 import type { KvTable } from '@deepseek-ai/dsh-storage-domain'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
-import { resolveGitCommit, resolveGitRepository } from '@deepseek-ai/dsh-workspace/src/git-worktree'
+import { resolveGitCommit, resolveGitRepository } from '@deepseek-ai/dsh-workspace/git-worktree'
 import { sourceDraftDomainSpec } from './spec.ts'
 import type { SourceDraftRecord } from './spec.ts'
 import type { SourcePublisher } from './publisher.ts'
