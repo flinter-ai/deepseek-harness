@@ -35,6 +35,11 @@ const REQUIRED_PACKAGES = [
   '@deepseek-ai/dsh-web-app',
   '@deepseek-ai/schemastery',
 ] as const
+const PROFILE_BUNDLES = [
+  '@deepseek-ai/dsh-base',
+  '@deepseek-ai/dsh-web-app',
+  '@deepseek-ai/dsh-aws-worker-profile',
+] as const
 const SHA_PATTERN = /^[0-9a-f]{40}$/u
 const ARCHES = new Set(['arm64', 'x64'])
 const PLATFORMS = new Set(['linux', 'darwin'])
@@ -182,6 +187,164 @@ function pruneRuntimeNoise(nodeModules: string): void {
     }
   }
   visit(nodeModules)
+}
+
+interface PackageManifest {
+  readonly dependencies?: Record<string, unknown>
+  readonly peerDependencies?: Record<string, unknown>
+  readonly peerDependenciesMeta?: Record<string, { readonly optional?: boolean }>
+  readonly dsh?: { readonly bundle?: { readonly patch?: string } }
+}
+
+function packageManifestPath(nodeModules: string, packageName: string): string {
+  return join(nodeModules, ...packageName.split('/'), 'package.json')
+}
+
+/** Assert that every non-optional package in the shipped profile graph is present. */
+function validateProfileClosure(root: string): void {
+  const nodeModules = join(root, 'node_modules')
+  const queue: Array<{ readonly name: string; readonly required: boolean }> = PROFILE_BUNDLES.map(name => ({
+    name,
+    required: true,
+  }))
+  const visited = new Set<string>()
+  const missing = new Set<string>()
+
+  while (queue.length > 0) {
+    const next = queue.shift()
+    if (next === undefined || visited.has(next.name)) continue
+    visited.add(next.name)
+    const manifestPath = packageManifestPath(nodeModules, next.name)
+    if (!existsSync(manifestPath)) {
+      if (next.required) missing.add(next.name)
+      continue
+    }
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as PackageManifest
+    for (const dependency of Object.keys(manifest.dependencies ?? {})) {
+      queue.push({ name: dependency, required: true })
+    }
+    for (const peer of Object.keys(manifest.peerDependencies ?? {})) {
+      queue.push({
+        name: peer,
+        required: manifest.peerDependenciesMeta?.[peer]?.optional !== true,
+      })
+    }
+  }
+
+  if (missing.size > 0) {
+    fail(`profile dependency closure is missing: ${[...missing].sort().join(', ')}`)
+  }
+}
+
+function workspacePackageDirectories(): Map<string, string> {
+  const packages = new Map<string, string>()
+  function visit(directory: string): void {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      if (entry.name === 'node_modules' || entry.name === '.git') continue
+      const path = join(directory, entry.name)
+      if (entry.isDirectory()) {
+        visit(path)
+      } else if (entry.name === 'package.json') {
+        const manifest = JSON.parse(readFileSync(path, 'utf8')) as { readonly name?: unknown }
+        if (typeof manifest.name === 'string') packages.set(manifest.name, dirname(path))
+      }
+    }
+  }
+  for (const directory of ['packages', 'apps', 'vendor']) {
+    const path = join(REPOSITORY_ROOT, directory)
+    if (existsSync(path)) visit(path)
+  }
+  return packages
+}
+
+/** Fill legacy-deploy omissions from already-built workspace package files. */
+function ensureWorkspaceProfileClosure(stage: string): void {
+  const packageDirectories = workspacePackageDirectories()
+  const nodeModules = join(stage, 'node_modules')
+  const queue = [...new Set([...REQUIRED_PACKAGES, ...PROFILE_BUNDLES])]
+  const visited = new Set<string>()
+
+  while (queue.length > 0) {
+    const packageName = queue.shift()
+    if (packageName === undefined || visited.has(packageName)) continue
+    visited.add(packageName)
+    const manifestPath = packageManifestPath(nodeModules, packageName)
+    if (!existsSync(manifestPath)) {
+      const source = packageDirectories.get(packageName)
+      if (source === undefined) continue
+      const destination = dirname(manifestPath)
+      mkdirSync(destination, { recursive: true })
+      copyFileSync(join(source, 'package.json'), manifestPath)
+      for (const directoryName of ['lib', 'config', 'bin', 'dist']) {
+        const sourceDirectory = join(source, directoryName)
+        if (existsSync(sourceDirectory)) {
+          copyWithoutNestedNodeModules(sourceDirectory, join(destination, directoryName))
+        }
+      }
+      const sourceManifest = JSON.parse(readFileSync(join(source, 'package.json'), 'utf8')) as PackageManifest
+      const patch = sourceManifest.dsh?.bundle?.patch
+      if (typeof patch === 'string') {
+        const sourcePatch = resolve(source, patch)
+        if (existsSync(sourcePatch)) {
+          const destinationPatch = join(destination, patch)
+          mkdirSync(dirname(destinationPatch), { recursive: true })
+          copyFileSync(sourcePatch, destinationPatch)
+        }
+      }
+    }
+    if (!existsSync(manifestPath)) fail(`workspace package cannot be staged: ${packageName}`)
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as PackageManifest
+    for (const dependency of Object.keys(manifest.dependencies ?? {})) queue.push(dependency)
+    for (const peer of Object.keys(manifest.peerDependencies ?? {})) {
+      if (manifest.peerDependenciesMeta?.[peer]?.optional !== true) queue.push(peer)
+    }
+  }
+}
+
+/** Boot the shipped EC2 profile far enough to prove the authenticated Web boundary. */
+function profileBootSmoke(root: string, home: string): void {
+  const profileDir = join(home, 'profiles', 'tod')
+  mkdirSync(profileDir, { recursive: true })
+  writeFileSync(join(profileDir, 'package.json'), `${JSON.stringify({
+    name: 'dsh-profile-tod-artifact-smoke',
+    private: true,
+    dependencies: {},
+    dsh: { profile: { bundles: PROFILE_BUNDLES, patchReload: 'startup' } },
+  }, undefined, 2)}\n`)
+  writeFileSync(join(profileDir, 'cordis.patch.yml'), '[]\n')
+
+  const port = 31937
+  const logPath = join(home, 'profile-boot.log')
+  const quote = (value: string): string => `'${value.replace(/'/gu, "'\\''")}'`
+  const script = [
+    'set -eu',
+    `DSH_HOME=${quote(home)} DSH_PROFILE=tod DSH_PORT=${port} DSH_COMPUTE_BACKEND=ec2 NODE_OPTIONS='' ${quote(join(root, 'launch.sh'))} --no-open >${quote(logPath)} 2>&1 &`,
+    'pid=$!',
+    'cleanup() { kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; }',
+    'trap cleanup EXIT HUP INT TERM',
+    'attempt=0',
+    'while [ "$attempt" -lt 30 ]; do',
+    `  http_status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:${port}/" || true)`,
+    '  if [ "$http_status" = 401 ]; then exit 0; fi',
+    '  if ! kill -0 "$pid" 2>/dev/null; then break; fi',
+    '  attempt=$((attempt + 1))',
+    '  sleep 1',
+    'done',
+    `cat ${quote(logPath)} >&2 2>/dev/null || true`,
+    'exit 1',
+  ].join('\n')
+  const result = spawnSync('/bin/sh', ['-c', script], {
+    cwd: root,
+    env: { ...process.env, NODE_OPTIONS: '' },
+    encoding: 'utf8',
+    timeout: 60_000,
+    maxBuffer: 8 * 1024 * 1024,
+  })
+  if (result.error !== undefined || result.status !== 0) {
+    const log = existsSync(logPath) ? readFileSync(logPath, 'utf8').trim() : ''
+    const detail = [result.error?.message, result.stderr.trim(), log].filter(Boolean).join('\n').slice(-12_000)
+    fail(`real tod profile boot smoke failed: ${detail || `exit ${String(result.status)}`}`)
+  }
 }
 
 function writeRuntimeSupport(stage: string): void {
@@ -332,6 +495,7 @@ function smoke(root: string): void {
       fail(`clean EC2 launcher help smoke failed: ${detail}`)
     }
     if (!launcher.stdout.includes('Usage: dsh --profile web')) fail('clean EC2 launcher smoke produced no Web usage output')
+    profileBootSmoke(root, home)
   } finally {
     rmSync(home, { recursive: true, force: true })
   }
@@ -384,6 +548,9 @@ function main(): void {
 
   try {
     deployRuntime(stage)
+    materializeNodeModules(join(stage, 'node_modules'))
+    pruneRuntimeNoise(join(stage, 'node_modules'))
+    ensureWorkspaceProfileClosure(stage)
 
     for (const packageName of REQUIRED_PACKAGES) {
       const packageRoot = join(stage, 'node_modules', ...packageName.split('/'))
@@ -391,8 +558,7 @@ function main(): void {
     }
     if (!existsSync(join(stage, 'runtime-bootstrap.mjs'))) fail('runtime bootstrap is missing from deploy output')
 
-    materializeNodeModules(join(stage, 'node_modules'))
-    pruneRuntimeNoise(join(stage, 'node_modules'))
+    validateProfileClosure(stage)
     writeRuntimeSupport(stage)
     rmSync(join(stage, 'README.zh.md'), { force: true })
     if (findSymlink(stage) !== undefined) fail('runtime tree contains an unexpected symlink')

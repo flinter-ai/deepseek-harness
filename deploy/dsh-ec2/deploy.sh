@@ -478,7 +478,12 @@ ss -ltn | grep -qE ":${PORT_NUMBER}[[:space:]]" || die 'service did not listen a
 sleep 5
 systemctl is-active --quiet "$SERVICE_NAME" || die 'service became inactive after the post-start stability window'
 
-HTTP_STATUS=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:${PORT_NUMBER}/" || true)
+HTTP_STATUS=''
+for _ in {1..30}; do
+  HTTP_STATUS=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:${PORT_NUMBER}/" || true)
+  [[ "$HTTP_STATUS" == 401 ]] && break
+  sleep 2
+done
 [[ "$HTTP_STATUS" == 401 ]] || die "authenticated Web endpoint health check returned HTTP $HTTP_STATUS"
 
 SYSTEMD_ENV=$(systemctl show "$SERVICE_NAME" -p Environment --value)
