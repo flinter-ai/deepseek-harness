@@ -14,7 +14,7 @@ secret values, or process environments.
 | Protected local harness | `/Users/oldap/deepseek-harness` @ `70c1ba3b90b01653d712b2443befe1873a853f8a` | Untouched; existing untracked WIP remains. |
 | Official upstream worktree | `/Users/oldap/deepseek-harness/.worktrees/dsh-upstream-core-20260913` @ `c291e7961a515f6d7af9304e7fd1d257929aef26` | Separate upstream source. |
 | Archived EC2 source | `/Users/oldap/deepseek-harness/.worktrees/dsh-ec2-merged-20260912` @ `0199028dc6fc0428f8d25f40424d18d9d18fe683` | Preserved source line; not used as a build/deploy source. |
-| EC2 upgrade destination | `/Users/oldap/deepseek-harness/.worktrees/dsh-ec2-upstream-reconcile-20260913` on `reconcile/dsh-ec2-upstream-20260913` @ `6004882f5adef1aae1acbbbe8ccdfe09c5382947` | Current mutation boundary; clean and pushed to draft PR #69. |
+| EC2 upgrade destination | `/Users/oldap/deepseek-harness/.worktrees/dsh-ec2-upstream-reconcile-20260913` on `reconcile/dsh-ec2-upstream-20260913` @ `abbddead9b0a53c31e2e41b673bda21e45d710a4` | Current mutation boundary; clean, pushed to draft PR #69, and used to build/deploy the exact artifact. |
 
 The protected local harness was not switched, merged, cherry-picked, reset,
 cleaned, committed, or deployed.
@@ -39,9 +39,8 @@ used only for the downstream review and release branches in this work:
   `i-09cc08b3fdad49cf5`.
 - Instance type: `t4g.medium`; architecture: `arm64`; platform: Linux/UNIX.
   This confirms the requested size/architecture at the EC2 metadata level.
-- State: `stopped`, with a user-initiated shutdown reason.
-- Systems Manager: no current managed-instance record was returned, so the
-  target is not presently online through SSM.
+- State during deployment: `running`.
+- Systems Manager during deployment: `Online`.
 - The attached instance profile is `flinter-bastion-ssm`. Its role has the
   standard `AmazonSSMManagedInstanceCore` policy and reviewed inline read
   policies for the configured DSH provider secrets and ARK plan secret. The
@@ -52,11 +51,13 @@ used only for the downstream review and release branches in this work:
   ingress. The safe validation path is SSM port forwarding or an explicitly
   approved ingress layer, not an implicit firewall opening.
 
-The following live-host facts remain unverified until the owner starts the
-instance and SSM returns `Online`: `uname -m`, OS release, Node/pnpm versions,
-RAM/swap/disk, the active service unit, the `/opt/dsh-phase2` layout, current
-release state, and the actual profile/credential-provider composition. No
-start, stop, SSM command, or deployment was performed.
+Live-host facts collected through SSM: `aarch64`, Ubuntu 22.04, Node
+`v22.23.2`, pnpm `11.7.0`, approximately 3.7 GiB RAM, no swap, and
+approximately 27 GiB free disk. The existing `/opt/dsh-phase2` checkout was
+clean at the preserved legacy SHA before deployment; its source checkout
+remains separate from `/opt/dsh-phase2/releases/<source-sha>`. The `tod`
+profile, service unit, explicit `DSH_COMPUTE_BACKEND=ec2`, and named Cloudflare
+tunnel were verified. The deployed release is now the exact SHA recorded above.
 
 ## CI and artifact-store discovery
 
@@ -64,43 +65,54 @@ start, stop, SSM command, or deployment was performed.
 - The checked-in EC2 workflow is
   `.github/workflows/deploy-dsh-ec2.yml`; the destination worktree now
   replaces the former host-build/self-hosted-x64 path with a native Linux
-  ARM64 build job plus an SSM activation job. The workflow remains unexercised
-  until its protected environment variables, OIDC role, artifact bucket, and
-  online EC2/SSM target exist.
+  ARM64 build job plus an SSM activation job. Its build job was exercised
+  successfully as run `34791268500`. The protected environment now contains
+  the OIDC role, artifact bucket, and prefix; the separate deployment job is
+  intentionally not triggered from this draft PR because its event is
+  protected `master`/manual dispatch. The equivalent exact-SHA deployment was
+  performed through SSM.
 - The repository already demonstrates an ARM64 GitHub-hosted runner label
-  (`ubuntu-24.04-arm`) in other workflows. Its suitability for this DSH
-  runtime artifact still needs a focused build/smoke test.
-- No DSH/release artifact bucket was identified by the read-only name scan.
-  The existing `flinter-control-plane-vector-store` bucket is not assumed to
-  be a runtime artifact store. No bucket, IAM policy, OIDC role, or retention
-  policy was created or changed.
+  (`ubuntu-24.04-arm`) in other workflows; run `34791268500` confirmed its
+  suitability for this DSH runtime artifact.
+- The private account-owned artifact bucket is
+  `flinter-dsh-ec2-artifacts-527947547848-us-east-2`, region `us-east-2`.
+  Versioning, public-access blocking, owner-enforced object ownership, and
+  server-side AES256 encryption are enabled. The EC2 role has read access only
+  below `dsh-ec2/`; the GitHub OIDC deploy role is scoped to the repository,
+  protected environment, artifact prefix, target instance, and SSM command
+  type.
 - The destination worktree now contains a runtime manifest, immutable release
   pointer, checksum-verified extraction path, and artifact-based EC2 activation
   in `deploy/dsh-ec2/deploy.sh`; the old host `pnpm install`/`build:lib` path is
   no longer used by the new artifact mode. This is source/worktree evidence,
   not a live-host deployment claim.
-- Native Linux ARM64 workflow run `34762898887` passed immutable install,
+- Native Linux ARM64 workflow run `34791268500` passed immutable install,
   library build, artifact build/verification, and artifact upload for source
-  SHA `6004882f5adef1aae1acbbbe8ccdfe09c5382947`. The downloaded archive's
-  detached checksum and manifest source SHA were independently verified.
+  SHA `abbddead9b0a53c31e2e41b673bda21e45d710a4`. The downloaded archive's
+  detached checksum and manifest source SHA were independently verified. The
+  exact archive was uploaded to S3 and activated on EC2 by SSM command
+  `77817d8d-a6ba-419f-b6ab-1fee879df5fb`.
 
 ## Phase 0 verdict
 
-The target architecture is known: **Linux ARM64 on `t4g.medium`**. The CI
-artifact gate is now closed for source SHA `6004882f5a…`; the live-host,
-artifact-distribution, and authenticated ingress gates are not yet closed.
+The target architecture is known: **Linux ARM64 on `t4g.medium`**. Discovery,
+artifact distribution, exact-SHA activation, and redacted local ingress gates
+are closed for `abbddead9b…`. Authenticated Web E2E and rollback rehearsal are
+still open; the source remains on draft PR #69 and has not been merged into the
+FLINTER default branch.
 
 ### Next authorized in-scope step
 
-1. Decide or verify the account-owned immutable artifact store and its CI/EC2
-   read/write authorities; do not create resources implicitly.
-2. When the owner starts `i-09cc08b3fdad49cf5` and SSM is `Online`, collect the
-   redacted live-host facts above.
-3. Publish the already-proven bytes for `6004882f5a…` under one immutable
-   versioned key, then rehearse checksum/extraction/rollback through SSM before
-   production.
+1. Run authenticated Web/profile E2E against the exact deployed SHA without
+   printing or placing credentials in the artifact.
+2. Rehearse a controlled post-switch failure and verify the saved previous
+   release pointer returns the legacy service to health.
+3. Decide whether this reviewed upstream reconciliation should be promoted in
+   its own release process; do not merge it into the FLINTER default branch as
+   an upstream-core update.
 
-No production release is eligible from this discovery record alone.
+The exact-SHA EC2 activation is evidenced above, but this discovery record does
+not by itself declare production readiness.
 
 ## P0 local artifact prototype result
 
@@ -129,10 +141,11 @@ at `packages/deployment/dsh-ec2-runtime`.
 - The current alpha profile still makes CodeSandbox part of the closure, so
   this prototype intentionally does not claim the P1 lazy-backend reduction.
 
-The artifact-based deployment script and ARM64 CI workflow now exist in the
-destination worktree and are pushed, but the artifact has not been published
-to an account-owned store or run through SSM. No AWS resource was created and
-no EC2 service was restarted.
+The artifact-based deployment script and ARM64 CI workflow are pushed in the
+destination worktree. The exact Linux artifact was published to the private
+store and run through SSM; no source checkout on EC2 was rebuilt. The EC2
+service was restarted from the immutable release and passed its redacted
+health checks. CodeSandbox remains outside this P0 deployment.
 The full `pnpm run build:lib` also passes after the private composition root
 adds a no-op tsdown input configuration; the composition root is not treated
 as a normal library bundle.

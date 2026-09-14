@@ -1,21 +1,31 @@
 # DSH EC2 runtime artifact rollout plan
 
-**Status (2026-09-13):** The local P0 implementation and its macOS arm64
-rehearsal pass. Destination commit
-`63cf1f0227284ad760dea290f127dac817710eba` is pushed on draft PR #69 against
-the isolated upstream snapshot base. The native Linux arm64 artifact run
-`34762427414` passed; its downloaded archive has a verified detached checksum,
-the manifest source SHA matches the commit, and the required workspace
-git-worktree runtime export is present. DSH and vendor release gates pass,
-while the unrelated Cloudflare/issue-policy checks still lack repository
-configuration and the long-session browser benchmark failed on its existing
-frame/replay fixture. The account-owned artifact store and live EC2 activation
-remain pending; no production artifact has been published and nothing has been
-merged or deployed.
+**Status (2026-09-13 America/New_York; last deployment 2026-09-14 UTC):** The
+P0 implementation is pushed on draft PR #69 against the isolated upstream
+snapshot base at commit
+`abbddead9b0a53c31e2e41b673bda21e45d710a4`. Native Linux arm64 CI run
+`34791268500` passed immutable install, library build, artifact build, and
+artifact verification. The exact archive was independently checksum-checked,
+published to the private S3 artifact store, and deployed to the EC2 target by
+SSM command `77817d8d-a6ba-419f-b6ab-1fee879df5fb`. EC2 now runs the exact
+release with service `active`, localhost `401`, explicit `ec2` compute, and
+Secrets Manager provider resolution without credential values in the service
+or process environment. The source is still unmerged and PR #69 remains a
+draft reconciliation/rollout branch; authenticated Web E2E and an induced
+rollback rehearsal remain open P0 gates.
 
 **Source baseline:** `reconcile/dsh-ec2-upstream-20260913` at
-`63cf1f0227284ad760dea290f127dac817710eba`, based on the isolated
+`abbddead9b0a53c31e2e41b673bda21e45d710a4`, based on the isolated
 `upstream/master` snapshot `c291e7961a515f6d7af9304e7fd1d257929aef26`.
+
+**Release record:** The CI archive is
+`dsh-ec2-runtime-abbddead9b0a53c31e2e41b673bda21e45d710a4-linux-arm64.tar.gz`
+with SHA-256
+`24241f5cb51b45a70f42c15ef6c5f28786e612be4d32a61dd26ab3eb39b84ee8`. It is
+stored below the private bucket
+`flinter-dsh-ec2-artifacts-527947547848-us-east-2/dsh-ec2/`; GitHub environment
+variables now point the deployment workflow at that bucket, the `dsh-ec2`
+prefix, and the scoped OIDC deploy role.
 
 ## Objective
 
@@ -108,23 +118,20 @@ The first implementation boundary is now explicit:
   non-runtime TypeScript artifacts, writes the embedded and sibling file
   manifest/checksums, and verifies a clean extraction plus CLI/Web/launcher
   smoke.
-- The local prototype produced a 467 MB uncompressed tree and a compressed
-  macOS arm64 archive in the roughly 70–80 MB range after the explicit source
-  package roots were added. The artifact also carries the profile settings
-  adapter, AWS overlay, and release launcher; this is protocol/closure evidence
-  only, and CI must produce the authoritative Linux arm64 artifact.
+- The local prototype produced a 467 MB uncompressed tree. The artifact also
+  carries the profile settings adapter, AWS overlay, and release launcher;
+  this is protocol/closure evidence only.
 - `.github/workflows/deploy-dsh-ec2.yml` now builds on `ubuntu-24.04-arm`,
   publishes the archive/checksum/manifest under configured S3 variables, and
-  passes only the resulting immutable URI to SSM. It fails closed until those
-  bucket/prefix variables and the matching CI/EC2 IAM permissions exist.
+  passes only the resulting immutable URI to SSM. The protected environment is
+  now configured with the bucket/prefix and matching OIDC/EC2 IAM permissions.
 
-The current local macOS arm64 rehearsal produced an 81 MB compressed archive
-with 20,852 manifest-tracked files. Its detached checksum and sibling manifest
-match the embedded manifest. `pnpm run build:lib`, the artifact builder, clean
-extraction, CLI/Web/launcher help, and static/package gates pass. The
-authoritative Linux arm64 artifact was then built and smoke-verified on
-`ubuntu-24.04-arm` by workflow run `34762427414`; this proves CI artifact
-production and integrity, not EC2 activation.
+The authoritative Linux arm64 artifact from run `34791268500` is 47,632,230
+bytes compressed and contains 19,795 manifest-tracked files. Its detached
+checksum and manifest source SHA were independently verified locally and again
+by the EC2 deployment script before extraction. The CI job's isolated builder
+smoke passed; EC2 then reached the redacted service/profile checks from the
+same bytes.
 
 - compiled CLI and DSH Web runtime/client assets;
 - alpha profile, AWS credential provider, source draft/controller/editor, and
@@ -179,13 +186,23 @@ The Git checkout remains only as a read-only deployment metadata and protected
 ingress source until the artifact path has passed staging and production
 acceptance. It is not the runtime release and is never rebuilt on the host.
 
+The artifact path has now been exercised on the EC2 target. SSM command
+`77817d8d-a6ba-419f-b6ab-1fee879df5fb` verified the detached archive checksum,
+the per-file manifest, the `linux/arm64` target, settings compatibility,
+protected ingress, the read-only AWS credential provider, and a stable service
+restart. `/opt/dsh-phase2/releases/current` points to the exact source SHA
+release. The deployment snapshot is retained at
+`/var/lib/dsh-phase2/deploy-backups/20260914T000935Z-0199028dc6fc0428f8d25f40424d18d9d18fe683`.
+The public hostname returned `403` without an authenticated session, so this
+is ingress reachability/protection evidence rather than authenticated Web E2E.
+
 **Gate:** the new path must prove that EC2 did not invoke package installation
 or source compilation, and that rollback returns the previously verified
 artifact to service.
 
 ### Phase 3 — staged release proof
 
-1. Build a candidate from an exact merged GitHub SHA.
+1. Build a candidate from an exact reviewed GitHub SHA.
 2. Activate that exact artifact in the approved staging/rehearsal target.
 3. Confirm artifact manifest, checksum, release pointer, service health,
    authenticated Web behavior, profile composition, source publisher
@@ -195,9 +212,11 @@ artifact to service.
 5. Record the source SHA, artifact checksum, target, activation time,
    health evidence, and rollback pointer. This record contains no secrets.
 
-Production success is a successful host activation and authenticated E2E
-evidence on the exact artifact SHA. A CI pass or an unauthenticated `401`
-health probe is necessary but not sufficient.
+The exact EC2 activation is complete for this reviewed SHA, but production
+success is still not claimed: the source PR is not merged, authenticated E2E
+evidence has not been run, and rollback has not yet been induced and
+rehearsed. A CI pass or an unauthenticated `401` health probe is necessary but
+not sufficient.
 
 ## Deferred work
 
