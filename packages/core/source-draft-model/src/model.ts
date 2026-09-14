@@ -96,6 +96,10 @@ export class SourceDraftModel implements SourceDraftModelSource {
     return () => { this.listeners.delete(listener) }
   }
 
+  /**
+   * Replace the local editor snapshot and mark it dirty.
+   * @param files - Relative source files currently held by the editor.
+   */
   setFiles(files: readonly SourceFile[]): void {
     this.files = freezeFiles(files)
     this.generation += 1
@@ -104,6 +108,10 @@ export class SourceDraftModel implements SourceDraftModelSource {
     this.invalidate()
   }
 
+  /**
+   * Serialize a save against the current server revision.
+   * @returns the saved draft or a remote/local rejection.
+   */
   save(): Promise<SourceDraftCallResult<SourceDraft>> {
     return this.enqueue(async () => {
       const generation = this.generation
@@ -135,6 +143,11 @@ export class SourceDraftModel implements SourceDraftModelSource {
     })
   }
 
+  /**
+   * Load one saved draft into the editor model.
+   * @param draftId - Saved draft identity to load.
+   * @returns the loaded draft or a remote rejection.
+   */
   load(draftId: SourceDraftId): Promise<SourceDraftCallResult<SourceDraft>> {
     return this.enqueue(async () => {
       const generation = this.generation
@@ -148,6 +161,11 @@ export class SourceDraftModel implements SourceDraftModelSource {
     })
   }
 
+  /**
+   * Publish only the exact saved revision currently held by the model.
+   * @param signal - Optional cancellation signal for publication.
+   * @returns the publication result or a remote/local rejection.
+   */
   publish(signal?: AbortSignal): Promise<SourceDraftCallResult<SourceDraftPublishValue>> {
     return this.enqueue(async () => {
       const generation = this.generation
@@ -185,6 +203,10 @@ export class SourceDraftModel implements SourceDraftModelSource {
     })
   }
 
+  /**
+   * Delete the saved draft while preserving unsaved local files as dirty.
+   * @returns the deletion result or a remote/local rejection.
+   */
   delete(): Promise<SourceDraftCallResult<{ readonly deleted: true }>> {
     return this.enqueue(async () => {
       const generation = this.generation

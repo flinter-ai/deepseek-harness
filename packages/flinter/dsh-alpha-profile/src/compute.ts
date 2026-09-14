@@ -10,6 +10,7 @@ import { isAbsolute } from 'node:path'
 
 /** Compute substrates supported by the FLINTER worker contract. */
 export const DSH_COMPUTE_BACKENDS = ['codesandbox', 'ec2', 'local'] as const
+/** Union of compute substrate names accepted by the worker contract. */
 export type DshComputeBackend = (typeof DSH_COMPUTE_BACKENDS)[number]
 
 /** New workers default to the bounded CodeSandbox substrate. */
@@ -56,7 +57,11 @@ function nonNegativeInteger(value: unknown, field: string): number {
   return value as number
 }
 
-/** Parse a backend name without silently accepting an unknown platform. */
+/**
+ * Parse a backend name without silently accepting an unknown platform.
+ * @param value - Candidate backend name; omitted values use the bounded default.
+ * @returns the validated compute backend.
+ */
 export function parseDshComputeBackend(value: unknown = DEFAULT_DSH_COMPUTE_BACKEND): DshComputeBackend {
   if (typeof value !== 'string' || !DSH_COMPUTE_BACKENDS.includes(value as DshComputeBackend)) {
     throw new Error(`compute backend must be one of ${DSH_COMPUTE_BACKENDS.join(', ')}`)
@@ -87,7 +92,11 @@ export interface DshComputeAdmissionPolicy {
   readonly hibernationTimeoutSeconds: number
 }
 
-/** Read the compute policy, defaulting to one CodeSandbox worker at a time. */
+/**
+ * Read the compute policy, defaulting to one CodeSandbox worker at a time.
+ * @param env - Non-secret environment values to resolve.
+ * @returns the validated bounded admission policy.
+ */
 export function readDshComputeAdmissionPolicy(
   env: NodeJS.ProcessEnv = process.env,
 ): DshComputeAdmissionPolicy {
@@ -144,6 +153,7 @@ export type DshComputeAdmissionErrorCode =
 
 /** A non-secret admission/fencing failure. */
 export class DshComputeAdmissionError extends Error {
+  /** Stable machine-readable admission failure code. */
   readonly code: DshComputeAdmissionErrorCode
 
   constructor(code: DshComputeAdmissionErrorCode, message: string) {
@@ -191,6 +201,7 @@ function validateIdentityForBackend(identity: DshComputeAttemptIdentity, default
  * lease only after its physical and logical fences are proven.
  */
 export class DshComputeAdmission {
+  /** Immutable admission limits used by this process-local guard. */
   readonly policy: DshComputeAdmissionPolicy
   private readonly activeBySession = new Map<string, ActiveLease>()
   private readonly activeByKey = new Map<string, ActiveLease>()
@@ -199,10 +210,16 @@ export class DshComputeAdmission {
     this.policy = Object.freeze({ ...policy })
   }
 
+  /** Number of sessions with a live compute lease. */
   get activeCount(): number {
     return this.activeBySession.size
   }
 
+  /**
+   * List active leases, optionally limited to one backend.
+   * @param backend - Optional backend filter.
+   * @returns the active leases matching the filter.
+   */
   active(backend?: DshComputeBackend): readonly DshComputeLease[] {
     const selected = backend === undefined ? undefined : parseDshComputeBackend(backend)
     return Object.freeze([...this.activeBySession.values()]
@@ -210,6 +227,11 @@ export class DshComputeAdmission {
       .map(entry => entry.lease))
   }
 
+  /**
+   * Acquire one fenced lease after total, per-session, and backend checks.
+   * @param identity - Session, attempt, owner, generation, and optional backend.
+   * @returns the process-local lease.
+   */
   acquire(identity: DshComputeAttemptIdentity): DshComputeLease {
     const normalized = validateIdentityForBackend(identity, this.policy.backend)
     const key = `${normalized.sessionId}\u0000${normalized.attemptId}`
@@ -306,6 +328,11 @@ export class DshComputeBackendSelector {
     this.adapters = entries
   }
 
+  /**
+   * Return the registered adapter for one validated backend.
+   * @param backend - Backend adapter to select.
+   * @returns the registered adapter.
+   */
   get(backend: DshComputeBackend): DshComputeBackendAdapter {
     const selected = parseDshComputeBackend(backend)
     const adapter = this.adapters.get(selected)
@@ -313,6 +340,12 @@ export class DshComputeBackendSelector {
     return adapter
   }
 
+  /**
+   * Start one execution through the selected backend adapter.
+   * @param spec - Literal execution identity, argv, cwd, and environment.
+   * @param backend - Backend adapter to use.
+   * @returns a process handle for the selected backend execution.
+   */
   start(spec: DshComputeExecutionSpec, backend: DshComputeBackend): Promise<DshComputeProcess> {
     return this.get(backend).start(spec)
   }
@@ -335,6 +368,7 @@ export interface CodeSandboxRuntime {
   disposeSandbox(sandbox: CodeSandboxSandbox): Promise<void>
 }
 
+/** Minimal sandbox handle needed by the compute adapter. */
 export interface CodeSandboxSandbox {
   readonly id: string
   connect(options: Readonly<{
@@ -342,6 +376,7 @@ export interface CodeSandboxSandbox {
   }>): Promise<CodeSandboxClient>
 }
 
+/** Minimal connected CodeSandbox command surface used by DSH. */
 export interface CodeSandboxClient {
   readonly commands: Readonly<{
     runBackground(
@@ -355,11 +390,13 @@ export interface CodeSandboxClient {
   }>
 }
 
+/** Running CodeSandbox command handle with wait and stop operations. */
 export interface CodeSandboxCommand {
   waitUntilComplete(): Promise<unknown>
   kill(): Promise<void>
 }
 
+/** Host-supplied CodeSandbox runtime and bounded VM settings. */
 export interface CodeSandboxComputeBackendOptions {
   readonly runtime: CodeSandboxRuntime
   readonly templateId?: string
@@ -424,6 +461,11 @@ export class CodeSandboxComputeBackend implements DshComputeBackendAdapter {
     }
   }
 
+  /**
+   * Start one bounded argv execution and dispose the sandbox on completion.
+   * @param input - Validated execution identity, argv, cwd, and environment.
+   * @returns a process handle that waits for or stops the remote command.
+   */
   async start(input: DshComputeExecutionSpec): Promise<DshComputeProcess> {
     const spec = sandboxSpec(input)
     const sandbox = await this.options.runtime.createSandbox({

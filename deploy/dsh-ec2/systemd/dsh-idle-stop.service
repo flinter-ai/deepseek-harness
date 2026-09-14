@@ -1,0 +1,12 @@
+[Unit]
+Description=Stop DSH Web after a verified idle interval
+After=dsh.service
+Wants=dsh.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/local/libexec/dsh-phase2/idle-stop.sh
+NoNewPrivileges=true
+PrivateTmp=true

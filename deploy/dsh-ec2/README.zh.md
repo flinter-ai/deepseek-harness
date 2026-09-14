@@ -35,6 +35,24 @@ worker bundle 逐字节一致时才会移除。任何自定义或有歧义的 ov
 并从 profile 备份恢复。各 release 按 source SHA 保留，因此 post-switch 检查失败时
 可以恢复此前的 `current`，无需重新构建。
 
+## 自动关机的安全边界
+
+EC2 部署会开启可选的 `dsh-host-idle-guard`，并安装独立的
+`dsh-idle-stop.timer`。guard 在 `/var/lib/dsh-phase2/idle-state.json` 原子写入
+脱敏快照；控制器必须确认 HTTP、WebSocket、job 和 PTY 全部为零，状态文件新鲜，
+没有部署锁，并且距最近一次已接受应用活动已满 30 分钟。状态缺失、格式错误、过期
+或时钟不一致时均 fail closed。运维人员可创建
+`/var/lib/dsh-phase2/idle-stop.hold` 来禁止关机。
+
+控制器先停止 `dsh.service`，再请求 `systemctl poweroff`；它不运行在 DSH 进程内，
+也不使用 CPU 百分比作为空闲证明。现有的较慢 CloudWatch CPU alarm 暂作为后备，
+其账户级策略另行审查。安全的 dry-run 检查：
+
+```bash
+sudo DSH_IDLE_STOP_DRY_RUN=1 \
+  /usr/local/libexec/dsh-phase2/idle-stop.sh
+```
+
 ## 稳定的 Cloudflare ingress（主机一次性配置）
 
 DSH 服务仍然只绑定 loopback。经过审查的 public path 是一个独立的

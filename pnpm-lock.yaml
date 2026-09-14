@@ -1167,9 +1167,6 @@ importers:
       '@deepseek-ai/dsh-client-connection':
         specifier: workspace:^
         version: link:../../client/connection
-      '@deepseek-ai/dsh-invariants':
-        specifier: workspace:^
-        version: link:../../runtime-diagnostics/invariants
       '@deepseek-ai/dsh-session':
         specifier: workspace:^
         version: link:../../core/session
@@ -2001,6 +1998,9 @@ importers:
       '@deepseek-ai/dsh-host-frontend-static':
         specifier: workspace:^
         version: link:../../host/frontend-static
+      '@deepseek-ai/dsh-host-idle-guard':
+        specifier: workspace:^
+        version: link:../../host/idle-guard
       '@deepseek-ai/dsh-host-open-in-app':
         specifier: workspace:^
         version: link:../../host/open-in-app
@@ -4176,9 +4176,6 @@ importers:
       '@deepseek-ai/dsh-client-ui-slots':
         specifier: workspace:^
         version: link:../ui-slots
-      '@deepseek-ai/dsh-invariants':
-        specifier: workspace:^
-        version: link:../../runtime-diagnostics/invariants
       '@deepseek-ai/dsh-session':
         specifier: workspace:^
         version: link:../../core/session
@@ -5290,9 +5287,6 @@ importers:
       '@deepseek-ai/dsh-brand':
         specifier: workspace:^
         version: link:../../util/brand
-      '@deepseek-ai/dsh-invariants':
-        specifier: workspace:^
-        version: link:../../runtime-diagnostics/invariants
       '@deepseek-ai/dsh-session':
         specifier: workspace:^
         version: link:../session
@@ -5433,24 +5427,9 @@ importers:
       '@deepseek-ai/dsh-credentials':
         specifier: workspace:^
         version: link:../credentials
-      '@deepseek-ai/dsh-invariants':
-        specifier: workspace:^
-        version: link:../../runtime-diagnostics/invariants
 
   packages/deployment/dsh-ec2-runtime:
     dependencies:
-      '@deepseek-ai/dsh-anonymous-user-id':
-        specifier: workspace:^
-        version: link:../../identity/anonymous-user-id
-      '@deepseek-ai/dsh-attachment':
-        specifier: workspace:^
-        version: link:../../attachment/attachment
-      '@deepseek-ai/dsh-authorization':
-        specifier: workspace:^
-        version: link:../../credentials/authorization
-      '@deepseek-ai/dsh-bash-local':
-        specifier: workspace:^
-        version: link:../../shell/bash-local
       '@deepseek-ai/cordis-plugin-group':
         specifier: workspace:^
         version: link:../../../vendor/group
@@ -5463,12 +5442,24 @@ importers:
       '@deepseek-ai/dsh-alpha-profile':
         specifier: workspace:^
         version: link:../../flinter/dsh-alpha-profile
+      '@deepseek-ai/dsh-anonymous-user-id':
+        specifier: workspace:^
+        version: link:../../identity/anonymous-user-id
       '@deepseek-ai/dsh-api-source-controller':
         specifier: workspace:^
         version: link:../../api/source-controller
+      '@deepseek-ai/dsh-attachment':
+        specifier: workspace:^
+        version: link:../../attachment/attachment
+      '@deepseek-ai/dsh-authorization':
+        specifier: workspace:^
+        version: link:../../credentials/authorization
       '@deepseek-ai/dsh-aws-worker-profile':
         specifier: workspace:^
         version: link:../../flinter/dsh-aws-worker-profile
+      '@deepseek-ai/dsh-bash-local':
+        specifier: workspace:^
+        version: link:../../shell/bash-local
       '@deepseek-ai/dsh-client-ui-source-editor':
         specifier: workspace:^
         version: link:../../client/ui-source-editor
@@ -6265,9 +6256,6 @@ importers:
       '@deepseek-ai/dsh-credentials':
         specifier: workspace:^
         version: link:../../credentials/credentials
-      '@deepseek-ai/dsh-invariants':
-        specifier: workspace:^
-        version: link:../../runtime-diagnostics/invariants
       '@deepseek-ai/dsh-launch-environment':
         specifier: workspace:^
         version: link:../../util/launch-environment
@@ -6287,9 +6275,6 @@ importers:
       '@deepseek-ai/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
-      '@deepseek-ai/dsh-invariants':
-        specifier: workspace:^
-        version: link:../../runtime-diagnostics/invariants
 
   packages/fs/fs:
     devDependencies:
@@ -6983,6 +6968,25 @@ importers:
         specifier: workspace:^
         version: link:../webserver
 
+  packages/host/idle-guard:
+    dependencies:
+      '@deepseek-ai/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-host-webserver':
+        specifier: workspace:^
+        version: link:../webserver
+      '@deepseek-ai/dsh-jobs':
+        specifier: workspace:^
+        version: link:../../jobs/jobs
+      '@deepseek-ai/dsh-terminal':
+        specifier: workspace:^
+        version: link:../../terminal/terminal
+
   packages/host/open-in-app:
     dependencies:
       '@deepseek-ai/dsh-launch-environment':
@@ -7045,9 +7049,6 @@ importers:
       '@deepseek-ai/dsh-api-source-controller':
         specifier: workspace:^
         version: link:../../api/source-controller
-      '@deepseek-ai/dsh-invariants':
-        specifier: workspace:^
-        version: link:../../runtime-diagnostics/invariants
 
   packages/host/webserver:
     dependencies:

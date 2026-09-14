@@ -42,7 +42,6 @@ bundle 的 patch 只包含公开的 secret 名称映射。Secret 内容、AWS �
 |---|---|
 | [`cordis.patch.yml`](cordis.patch.yml) | 标准 DSH bundle 之上的精简 profile overlay。 |
 | [`src/index.ts`](src/index.ts) | 空模块入口；运行内容是 patch。 |
-| [`src/invariant.ts`](src/invariant.ts) | 不读取机密的静态 invariant companion。 |
 | [`tests/profile.spec.ts`](tests/profile.spec.ts) | 验证公开元数据、映射与没有占位 secret 材料。 |
 
 <a id="further-exploration"></a>
@@ -79,6 +78,7 @@ Credential-source selection changes request authorization only; it is not model 
 
 <a id="known-limitations-and-deferred-work"></a>
 
+- 本包不发布 runtime invariant companion，因为 profile 只组合 provider adapter， 不拥有包内可变状态。
 - **Phase 1 只有 mock 证据** — 本 bundle 测试不证明 AWS SDK 调用或 IAM 权限。
 - **默认只读** — secret 写入需要单独审查的部署配置。
 - **尚未移植下游** — trace-link、agentic-control、segment、PES、executor/Runta、Tower、Beam 和控制平面集成仍是后续 gate。

@@ -125,6 +125,13 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Adapters register provider implementations; the loop and compaction call the provider-neutral stream service.',
   },
   {
+    key: 'relace',
+    pkg: 'relace',
+    title: 'Optional Relace provider helper',
+    mode: 'seam',
+    note: 'Keeps Relace Search and Apply-3 request formatting and Search tool schemas behind an optional provider-helper surface; host credentials and tool execution remain outside the plugin.',
+  },
+  {
     key: 'deepseekLlmApiExtensions',
     pkg: 'deepseek-llm-api-extensions',
     title: 'Official DeepSeek request extensions',
@@ -635,6 +642,15 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'core',
     consumers: ['client-connection', 'client-modules', 'client-hmr'],
     note: 'Plain node:http carrier: named-route registry, index transform taps, and the static dist fallback; web-transport plugins register their own routes.',
+  },
+  {
+    key: 'sourceController',
+    pkg: 'api-source-controller',
+    title: 'Durable browser source-draft controller',
+    mode: 'core',
+    companions: ['host-source-publisher-github'],
+    consumers: ['client-ui-source-editor'],
+    note: 'Owns session-scoped draft persistence, revision fencing, path and size limits, and the explicit publish boundary; browser editors provide files while the host publisher performs Git/PR writes.',
   },
   {
     key: 'clientModules',

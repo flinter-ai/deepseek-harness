@@ -85,6 +85,9 @@ jobs:
       - name: Build and verify Linux ARM64 artifact
         run: ./node_modules/.bin/tsx deploy/dsh-ec2/build-runtime-artifact.ts --out dist/dsh-ec2
 
+      - name: Test idle-stop controller
+        run: python3 deploy/dsh-ec2/test_idle_stop.py
+
       - name: Configure AWS credentials through GitHub OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:

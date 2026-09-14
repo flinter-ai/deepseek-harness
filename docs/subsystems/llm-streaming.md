@@ -647,6 +647,8 @@ interface ToolSchema {
   description: string
   /** JSON Schema object for the arguments. */
   parameters: Record<string, unknown>
+  /** Optional provider-facing strict function-schema request. */
+  strict?: boolean
 }
 ```
 

@@ -27,6 +27,14 @@ readonly PUBLIC_TUNNEL_BINARY="${DSH_CLOUDFLARED_BIN:-/home/ubuntu/bin/cloudflar
 readonly PUBLIC_TUNNEL_CONFIG_SOURCE='deploy/dsh-ec2/cloudflared/dsh-ec2-phase2.yml'
 readonly PUBLIC_TUNNEL_UNIT_SOURCE='deploy/dsh-ec2/cloudflared/dsh-ec2-phase2-named-tunnel.service'
 readonly PUBLIC_HOST_DROPIN_SOURCE='deploy/dsh-ec2/systemd/10-dsh-web-public-host.conf'
+readonly IDLE_STOP_SCRIPT_SOURCE='deploy/dsh-ec2/idle-stop.sh'
+readonly IDLE_STOP_SERVICE_SOURCE='deploy/dsh-ec2/systemd/dsh-idle-stop.service'
+readonly IDLE_STOP_TIMER_SOURCE='deploy/dsh-ec2/systemd/dsh-idle-stop.timer'
+readonly IDLE_STOP_SCRIPT_TARGET='/usr/local/libexec/dsh-phase2/idle-stop.sh'
+readonly IDLE_STOP_SERVICE_TARGET='/etc/systemd/system/dsh-idle-stop.service'
+readonly IDLE_STOP_TIMER_TARGET='/etc/systemd/system/dsh-idle-stop.timer'
+readonly IDLE_STOP_TIMER='dsh-idle-stop.timer'
+readonly DEPLOY_LOCK_FILE='/run/lock/dsh-phase2-deploy.lock'
 
 die() {
   printf 'dsh-ec2-deploy: error: %s\n' "$*" >&2
@@ -189,6 +197,75 @@ restore_target_public_host_dropin() {
   systemctl daemon-reload >/dev/null 2>&1 || true
 }
 
+install_target_idle_guard() {
+  local source target mode temporary target_name index
+  local -a sources=(
+    "$IDLE_STOP_SCRIPT_SOURCE"
+    "$IDLE_STOP_SERVICE_SOURCE"
+    "$IDLE_STOP_TIMER_SOURCE"
+  )
+  local -a targets=(
+    "$IDLE_STOP_SCRIPT_TARGET"
+    "$IDLE_STOP_SERVICE_TARGET"
+    "$IDLE_STOP_TIMER_TARGET"
+  )
+  local -a modes=(700 644 644)
+  # Mark this before the first filesystem mutation. If installation fails
+  # halfway through, the EXIT rollback must restore the files already copied.
+  IDLE_GUARD_INSTALLED=1
+  mkdir -p "$BACKUP_DIR/idle-guard" /var/lib/dsh-phase2 /usr/local/libexec/dsh-phase2
+  chmod 750 /var/lib/dsh-phase2
+  for index in "${!sources[@]}"; do
+    source="${sources[$index]}"
+    target="${targets[$index]}"
+    mode="${modes[$index]}"
+    target_name=$(basename "$target")
+    git -C "$REPOSITORY_ROOT" cat-file -e "$DEPLOY_SHA:$source" \
+      || die "the deployment revision is missing the idle guard file: $source"
+    if [[ -e "$target" || -L "$target" ]]; then
+      [[ -f "$target" && ! -L "$target" ]] || die "the idle guard target is not a regular file: $target"
+      cp -a "$target" "$BACKUP_DIR/idle-guard/$target_name"
+      : >"$BACKUP_DIR/idle-guard/$target_name.present"
+    else
+      : >"$BACKUP_DIR/idle-guard/$target_name.absent"
+    fi
+    temporary=$(mktemp "$BACKUP_DIR/idle-guard/.$target_name.XXXXXX")
+    git -C "$REPOSITORY_ROOT" show "$DEPLOY_SHA:$source" >"$temporary"
+    install -o root -g root -m "$mode" "$temporary" "$target"
+    rm -f "$temporary"
+  done
+  systemctl daemon-reload
+  systemctl enable --now "$IDLE_STOP_TIMER"
+  printf 'dsh-ec2-deploy: idle-guard=installed timer=%s\n' "$IDLE_STOP_TIMER"
+}
+
+restore_target_idle_guard() {
+  local target target_name
+  local -a targets=(
+    "$IDLE_STOP_SCRIPT_TARGET"
+    "$IDLE_STOP_SERVICE_TARGET"
+    "$IDLE_STOP_TIMER_TARGET"
+  )
+  systemctl stop "$IDLE_STOP_TIMER" >/dev/null 2>&1 || true
+  for target in "${targets[@]}"; do
+    target_name=$(basename "$target")
+    if [[ -e "$BACKUP_DIR/idle-guard/$target_name.present" ]]; then
+      cp -a "$BACKUP_DIR/idle-guard/$target_name" "$target"
+    elif [[ -e "$BACKUP_DIR/idle-guard/$target_name.absent" ]]; then
+      rm -f "$target"
+    fi
+  done
+  systemctl daemon-reload >/dev/null 2>&1 || true
+  if [[ "${IDLE_TIMER_WAS_ENABLED:-0}" == 1 ]]; then
+    systemctl enable "$IDLE_STOP_TIMER" >/dev/null 2>&1 || true
+  else
+    systemctl disable "$IDLE_STOP_TIMER" >/dev/null 2>&1 || true
+  fi
+  if [[ "${IDLE_TIMER_WAS_ACTIVE:-0}" == 1 ]]; then
+    systemctl start "$IDLE_STOP_TIMER" >/dev/null 2>&1 || true
+  fi
+}
+
 copy_artifact_source() {
   local source="$1"
   local destination="$2"
@@ -303,6 +380,9 @@ switch_runtime_release() {
 completed=0
 rollback_ready=0
 switched=0
+IDLE_GUARD_INSTALLED=0
+IDLE_TIMER_WAS_ENABLED=0
+IDLE_TIMER_WAS_ACTIVE=0
 INGRESS_DROPIN_WAS_PRESENT=''
 PREVIOUS_RELEASE_TARGET=''
 ARTIFACT_TMP_DIR=''
@@ -330,6 +410,9 @@ rollback() {
   if [[ -n "$INGRESS_DROPIN_WAS_PRESENT" ]]; then
     restore_target_public_host_dropin
   fi
+  if (( IDLE_GUARD_INSTALLED == 1 )); then
+    restore_target_idle_guard
+  fi
   restore_profile
   if (( SERVICE_WAS_ACTIVE == 1 )); then
     systemctl restart "$SERVICE_NAME" >/dev/null 2>&1
@@ -347,6 +430,10 @@ trap rollback EXIT
 [[ "$PORT_NUMBER" =~ ^[0-9]+$ ]] || die 'port is invalid'
 [[ "$DEPLOY_SHA" =~ ^[0-9a-f]{40}$ ]] || die 'DSH_DEPLOY_SHA must be a 40-character commit SHA'
 [[ -n "$EXPECTED_REMOTE" ]] || die 'DSH_DEPLOY_REMOTE is required'
+
+mkdir -p "$(dirname "$DEPLOY_LOCK_FILE")"
+exec 8>"$DEPLOY_LOCK_FILE"
+flock -n 8 || die 'another DSH deployment or idle-stop check is active'
 
 git -C "$REPOSITORY_ROOT" rev-parse --git-dir >/dev/null 2>&1 || die "not a Git checkout: $REPOSITORY_ROOT"
 PROFILE_DIR="$HOME_ROOT/profiles/$PROFILE_NAME"
@@ -410,6 +497,9 @@ for file in "${PROFILE_FILES[@]}"; do
 done
 rollback_ready=1
 
+if systemctl is-enabled --quiet "$IDLE_STOP_TIMER"; then IDLE_TIMER_WAS_ENABLED=1; fi
+if systemctl is-active --quiet "$IDLE_STOP_TIMER"; then IDLE_TIMER_WAS_ACTIVE=1; fi
+
 prepare_runtime_release
 systemctl stop "$SERVICE_NAME"
 printf 'dsh-ec2-deploy: service=stopped\n'
@@ -417,12 +507,15 @@ run_logged settings-compat python3 "$MIGRATOR_PATH" "$SETTINGS_FILE"
 migrate_legacy_worker_overlay
 install_target_public_host_dropin
 switch_runtime_release
+install_target_idle_guard
 if profile_uses_aws_worker_bundle; then
   run_logged dump-config env DSH_HOME="$HOME_ROOT" DSH_ROOT="$CURRENT_RELEASE" DSH_COMPUTE_BACKEND=ec2 \
+    DSH_IDLE_GUARD_ENABLED=1 DSH_IDLE_STATE_FILE=/var/lib/dsh-phase2/idle-state.json \
     node "$CURRENT_RELEASE/runtime-bootstrap.mjs" \
     --profile "$PROFILE_NAME" --dump-config
 else
   run_logged dump-config env DSH_HOME="$HOME_ROOT" DSH_ROOT="$CURRENT_RELEASE" DSH_COMPUTE_BACKEND=ec2 \
+    DSH_IDLE_GUARD_ENABLED=1 DSH_IDLE_STATE_FILE=/var/lib/dsh-phase2/idle-state.json \
     node "$CURRENT_RELEASE/runtime-bootstrap.mjs" \
     --profile "$PROFILE_NAME" --patch "$CURRENT_RELEASE/runtime-support/aws-worker.patch.yml" --dump-config
 fi

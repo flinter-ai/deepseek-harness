@@ -3,6 +3,7 @@
 import { spawnSync } from 'node:child_process'
 import { rmSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import {
   CLIENT_BUILD_RECORD_PATH,
@@ -50,4 +51,10 @@ function main(): void {
   )
 }
 
-if (import.meta.main) main()
+// Node added `import.meta.main` after the oldest runtime still encountered by
+// local contributors. Keep the script safe to import while also preventing a
+// supported build command from silently succeeding without running anything
+// when that property is unavailable.
+const invokedAsScript = process.argv[1] !== undefined
+  && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))
+if (import.meta.main || invokedAsScript) main()

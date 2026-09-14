@@ -135,6 +135,12 @@ async spawn(owner: Agent, request: TerminalSpawnRequest, signal?: AbortSignal): 
 hasOwnerActivity(owner: Agent): boolean
 
 /**
+ * Count published sessions and in-flight spawns across every owner.
+ * @returns the number of live terminal resources.
+ */
+activeCount(): number
+
+/**
  * Start one exclusive interactive send.
  * @param owner - exact session owner.
  * @param id - target PTY identity.

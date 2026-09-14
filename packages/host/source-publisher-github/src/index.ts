@@ -63,14 +63,23 @@ export interface GitHubSourcePublisherConfig {
 
 /** Optional Web composition row. Missing repository identity leaves publishing unavailable. */
 export interface Config {
+  /** Enable the host-owned GitHub publisher when repository identity is present. */
   readonly enabled?: boolean
+  /** Repository root allowed for source publication. */
   readonly repositoryRoot?: string
+  /** Directory for temporary publication worktrees. */
   readonly worktreeRoot?: string
+  /** GitHub owner for the publication repository. */
   readonly owner?: string
+  /** GitHub repository name for the publication repository. */
   readonly repo?: string
+  /** Base branch used when opening the pull request. */
   readonly baseBranch?: string
+  /** Git remote used to push the temporary publication branch. */
   readonly remote?: string
+  /** Prefix used for temporary publication branches. */
   readonly branchPrefix?: string
+  /** Environment variable containing the host-resolved GitHub token. */
   readonly tokenEnv?: string
 }
 
@@ -86,6 +95,11 @@ export class SourcePublisherError extends Error {
 export class GitHubPullRequestClient implements PullRequestClient {
   constructor(private readonly request: typeof fetch = fetch) {}
 
+  /**
+   * Create one GitHub pull request using the caller's host-owned token.
+   * @param input - Repository, branch, title, body, token, and cancellation signal.
+   * @returns the created pull-request URL.
+   */
   async create(input: PullRequestRequest): Promise<string> {
     const response = await this.request(
       `https://api.github.com/repos/${encodeURIComponent(input.owner)}/${encodeURIComponent(input.repo)}/pulls`,

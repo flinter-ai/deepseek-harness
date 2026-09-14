@@ -32,6 +32,10 @@ class StubJobRegistry extends JobRegistry {
     return [this.snapshotOf(JobId('bash-1'))]
   }
 
+  activeCount(): number {
+    return 1
+  }
+
   get(id: JobId): JobSnapshot {
     return this.snapshotOf(id)
   }

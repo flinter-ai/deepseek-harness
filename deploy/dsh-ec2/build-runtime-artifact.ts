@@ -315,17 +315,29 @@ function profileBootSmoke(root: string, home: string): void {
 
   const port = 31937
   const logPath = join(home, 'profile-boot.log')
+  const idleStatePath = join(home, 'idle-state.json')
   const quote = (value: string): string => `'${value.replace(/'/gu, "'\\''")}'`
   const script = [
     'set -eu',
-    `DSH_HOME=${quote(home)} DSH_PROFILE=tod DSH_PORT=${port} DSH_COMPUTE_BACKEND=ec2 NODE_OPTIONS='' ${quote(join(root, 'launch.sh'))} --no-open >${quote(logPath)} 2>&1 &`,
+    `DSH_HOME=${quote(home)} DSH_PROFILE=tod DSH_PORT=${port} DSH_COMPUTE_BACKEND=ec2 DSH_IDLE_GUARD_ENABLED=1 DSH_IDLE_STATE_FILE=${quote(idleStatePath)} NODE_OPTIONS='' ${quote(join(root, 'launch.sh'))} --no-open >${quote(logPath)} 2>&1 &`,
     'pid=$!',
     'cleanup() { kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; }',
     'trap cleanup EXIT HUP INT TERM',
     'attempt=0',
     'while [ "$attempt" -lt 30 ]; do',
     `  http_status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:${port}/" || true)`,
-    '  if [ "$http_status" = 401 ]; then exit 0; fi',
+    '  if [ "$http_status" = 401 ]; then',
+    '    state_attempt=0',
+    `    while [ "$state_attempt" -lt 10 ] && [ ! -s ${quote(idleStatePath)} ]; do sleep 1; state_attempt=$((state_attempt + 1)); done`,
+    `    test -s ${quote(idleStatePath)}`,
+    `    grep -q '\"schemaVersion\":2' ${quote(idleStatePath)}`,
+    `    grep -q '\"capabilitiesReady\":true' ${quote(idleStatePath)}`,
+    `    grep -q '\"activeHttpRequests\":0' ${quote(idleStatePath)}`,
+    `    grep -q '\"activeWebSockets\":0' ${quote(idleStatePath)}`,
+    `    grep -q '\"activeJobs\":0' ${quote(idleStatePath)}`,
+    `    grep -q '\"activePtys\":0' ${quote(idleStatePath)}`,
+    '    exit 0',
+    '  fi',
     '  if ! kill -0 "$pid" 2>/dev/null; then break; fi',
     '  attempt=$((attempt + 1))',
     '  sleep 1',

@@ -19,11 +19,17 @@ import type { PiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
 export const name = 'relace'
 export const inject: readonly string[] = []
 
+/** OpenRouter model id for Relace's agentic codebase search. */
 export const RELACE_SEARCH_MODEL = 'relace/relace-search' as const
+/** OpenRouter model id for Relace's Instant Apply-3 operation. */
 export const RELACE_APPLY_MODEL = 'relace/relace-apply-3' as const
+/** OpenRouter-compatible API base used by both Relace routes. */
 export const RELACE_OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1' as const
+/** DSH provider key for the Relace Search route. */
 export const RELACE_SEARCH_PROVIDER = 'relace-search' as const
+/** DSH provider key for the Relace Apply-3 route. */
 export const RELACE_APPLY_PROVIDER = 'relace-apply-3' as const
+/** Maximum serialized prompt size accepted by the Apply-3 formatter. */
 export const RELACE_APPLY_MAX_INPUT_CHARS = 512_000
 
 /** The exact tool names accepted by the Relace Search model. */
@@ -125,6 +131,7 @@ const reportBack: RelaceSearchToolSchema = {
   },
 }
 
+/** The strict host-tool schemas required by Relace Search. */
 export const RELACE_SEARCH_TOOLS: readonly RelaceSearchToolSchema[] = Object.freeze([
   viewFile,
   viewDirectory,
@@ -133,7 +140,10 @@ export const RELACE_SEARCH_TOOLS: readonly RelaceSearchToolSchema[] = Object.fre
   reportBack,
 ])
 
-/** Return detached schemas so request callers cannot mutate the plugin constants. */
+/**
+ * Return detached schemas so request callers cannot mutate the plugin constants.
+ * @returns mutable copies of the provider-facing tool schemas.
+ */
 export function relaceSearchToolSchemas(): ToolSchema[] {
   return RELACE_SEARCH_TOOLS.map(tool => ({
     ...tool,
@@ -141,6 +151,7 @@ export function relaceSearchToolSchemas(): ToolSchema[] {
   }))
 }
 
+/** Host-owned implementations bound to the five Relace Search tool names. */
 export interface RelaceSearchToolHandlers {
   viewFile(args: { readonly path: string; readonly view_range: readonly [number, number] }, signal?: AbortSignal): Promise<unknown>
   viewDirectory(args: { readonly path: string; readonly include_hidden: boolean }, signal?: AbortSignal): Promise<unknown>
@@ -154,11 +165,13 @@ export interface RelaceSearchToolHandlers {
   bash(args: { readonly command: string }, signal?: AbortSignal): Promise<unknown>
 }
 
+/** Validated report-back payload returned by Relace Search. */
 export interface RelaceSearchReport {
   readonly explanation: string
   readonly files: Readonly<Record<string, readonly (readonly [number, number])[]>>
 }
 
+/** Policy-bound bridge between Relace Search tool calls and host callbacks. */
 export interface RelaceSearchToolBridge {
   readonly schemas: readonly ToolSchema[]
   execute(name: RelaceSearchToolName, args: unknown, signal?: AbortSignal): Promise<unknown>
@@ -209,7 +222,11 @@ function parseReport(value: unknown): RelaceSearchReport {
   })
 }
 
-/** Bind the exact Relace tool names to host-owned, policy-checked operations. */
+/**
+ * Bind the exact Relace tool names to host-owned, policy-checked operations.
+ * @param handlers - Host callbacks for the read-only search tool operations.
+ * @returns a bridge that validates arguments and retains the final report.
+ */
 export function createRelaceSearchToolBridge(handlers: RelaceSearchToolHandlers): RelaceSearchToolBridge {
   let finalReport: RelaceSearchReport | undefined
   return {
@@ -239,17 +256,25 @@ export function createRelaceSearchToolBridge(handlers: RelaceSearchToolHandlers)
   }
 }
 
+/** Credential references used to resolve the two OpenRouter-backed routes. */
 export interface RelaceProviderCredentialRefs {
+  /** Environment or credential reference used by Relace Search. */
   readonly search: string
+  /** Environment or credential reference used by Relace Apply. */
   readonly apply: string
 }
 
+/** Default host credential references for both Relace routes. */
 export const RELACE_DEFAULT_CREDENTIAL_REFS = Object.freeze({
   search: 'OPENROUTER_API_KEY',
   apply: 'OPENROUTER_API_KEY',
 } satisfies RelaceProviderCredentialRefs)
 
-/** Provider rows consumed by the existing generic `llm-pi-ai` plugin. */
+/**
+ * Build provider rows consumed by the existing generic `llm-pi-ai` plugin.
+ * @param credentialRefs - Environment or credential names for each route.
+ * @returns provider profiles for Relace Search and Apply-3.
+ */
 export function buildRelaceProviderProfiles(
   credentialRefs: Partial<RelaceProviderCredentialRefs> = {},
 ): Readonly<Record<string, PiAiProviderProfile>> {
@@ -278,12 +303,18 @@ export function buildRelaceProviderProfiles(
   } satisfies Readonly<Record<string, PiAiProviderProfile>>)
 }
 
+/** System instruction that constrains the Relace Search agent to host tools. */
 export const RELACE_SEARCH_SYSTEM_PROMPT = [
   'You are an AI agent whose job is to explore a code base with the provided tools and thoroughly understand the problem.',
   'Use the tools to inspect the codebase, then call report_back when the relevant files and reasoning are clear.',
   'The host enforces workspace roots, output limits, and a read-only command policy.',
 ].join('\n')
 
+/**
+ * Build the tagged user request expected by Relace Search.
+ * @param input - Codebase location and user query to encode.
+ * @returns the tagged Relace Search user prompt.
+ */
 export function buildRelaceSearchUserPrompt(input: { readonly codebase: string; readonly userPrompt: string }): string {
   const codebase = requiredString(input.codebase, 'codebase')
   const userPrompt = requiredString(input.userPrompt, 'userPrompt')
@@ -300,6 +331,11 @@ export function buildRelaceSearchUserPrompt(input: { readonly codebase: string; 
   ].join('\n')
 }
 
+/**
+ * Build a DSH model request for Relace Search and its strict tools.
+ * @param input - Codebase location and user query to send.
+ * @returns model-generation options for the Relace Search route.
+ */
 export function buildRelaceSearchGenerateOptions(input: { readonly codebase: string; readonly userPrompt: string }): GenerateOptions {
   return {
     provider: RELACE_SEARCH_PROVIDER,
@@ -321,7 +357,11 @@ function taggedValue(value: unknown, field: string, tag: string, singleLine = fa
   return normalized
 }
 
-/** Format the documented Apply-3 input without writing the result anywhere. */
+/**
+ * Format the documented Apply-3 input without writing the result anywhere.
+ * @param input - Optional instruction, original code, and requested update.
+ * @returns the bounded tagged Apply-3 prompt.
+ */
 export function formatRelaceApplyPrompt(input: {
   readonly instruction?: string
   readonly initialCode: string
@@ -337,6 +377,11 @@ export function formatRelaceApplyPrompt(input: {
   return result
 }
 
+/**
+ * Build a DSH model request for Relace Instant Apply-3.
+ * @param input - Optional instruction, original code, and requested update.
+ * @returns model-generation options for the Relace Apply-3 route.
+ */
 export function buildRelaceApplyGenerateOptions(input: {
   readonly instruction?: string
   readonly initialCode: string
@@ -353,11 +398,17 @@ export function buildRelaceApplyGenerateOptions(input: {
   }
 }
 
+/** Normalized merged-code result accepted from an Apply-3 response. */
 export interface RelaceApplyResult {
   readonly mergedCode: string
   readonly usage?: Readonly<Record<string, unknown>>
 }
 
+/**
+ * Extract merged code from either the native or OpenAI-compatible response shape.
+ * @param payload - Untrusted provider response to validate.
+ * @returns normalized merged code and optional usage metadata.
+ */
 export function parseRelaceApplyResponse(payload: unknown): RelaceApplyResult {
   const record = objectRecord(payload, 'relace apply response must be an object')
   if (typeof record.mergedCode === 'string') return {
@@ -380,7 +431,9 @@ export function parseRelaceApplyResponse(payload: unknown): RelaceApplyResult {
   }
 }
 
+/** Configuration for the optional Relace provider-helper plugin. */
 export interface Config {
+  /** Credential references for the Search and Apply provider routes. */
   credentialRefs?: Partial<RelaceProviderCredentialRefs>
 }
 
@@ -391,18 +444,36 @@ export const Config = z.object({
   }).default(RELACE_DEFAULT_CREDENTIAL_REFS),
 }) as unknown as z<Config>
 
+/** Public runtime surface exposed by the optional Relace plugin. */
 export interface RelaceRuntime {
   readonly providerProfiles: Readonly<Record<string, PiAiProviderProfile>>
   readonly searchTools: readonly RelaceSearchToolSchema[]
+  /** Build a model request for Relace Search.
+   * @param input - Codebase and user prompt to search.
+   * @returns The provider-facing generation request.
+   */
   buildSearchGenerateOptions(input: { readonly codebase: string; readonly userPrompt: string }): GenerateOptions
+  /** Build a model request for Relace Apply.
+   * @param input - Initial code, edit snippet, and optional instruction.
+   * @returns The provider-facing generation request.
+   */
   buildApplyGenerateOptions(input: {
     readonly instruction?: string
     readonly initialCode: string
     readonly editSnippet: string
   }): GenerateOptions
+  /** Create the host-owned bridge for invoking Relace Search tools.
+   * @param handlers - Host callbacks for Search tool execution.
+   * @returns A tool bridge with the public Search schemas.
+   */
   createSearchToolBridge(handlers: RelaceSearchToolHandlers): RelaceSearchToolBridge
 }
 
+/**
+ * Create a pure Relace runtime surface from host-owned credential references.
+ * @param config - Credential references for the optional provider routes.
+ * @returns the provider profiles, tool schemas, prompt builders, and bridge factory.
+ */
 export function createRelaceRuntime(config: Config = {}): RelaceRuntime {
   const providerProfiles = buildRelaceProviderProfiles(config.credentialRefs)
   return Object.freeze({

@@ -42,7 +42,6 @@ The runtime content is [`cordis.patch.yml`](cordis.patch.yml). It replaces one `
 |---|---|
 | [`cordis.patch.yml`](cordis.patch.yml) | Thin profile overlay over the standard DSH bundles. |
 | [`src/index.ts`](src/index.ts) | Empty module entry; the patch is the runtime content. |
-| [`src/invariant.ts`](src/invariant.ts) | Static invariant companion with no secret access. |
 | [`tests/profile.spec.ts`](tests/profile.spec.ts) | Verifies public metadata, mappings, and no placeholder secret material. |
 
 <a id="further-exploration"></a>
@@ -79,6 +78,7 @@ Credential-source selection changes request authorization only; it is not model 
 
 <a id="known-limitations-and-deferred-work"></a>
 
+- No runtime invariant companion is published because this profile only composes provider adapters and owns no package-local mutable state.
 - **Mock evidence only in Phase 1** — AWS SDK calls and IAM permissions are not proven by this public bundle test.
 - **Read-only by default** — secret writes require a separately reviewed deployment configuration.
 - **No downstream port** — trace-link, agentic-control, segment, PES, executor/Runta, Tower, Beam, and control-plane integration remain later gates.

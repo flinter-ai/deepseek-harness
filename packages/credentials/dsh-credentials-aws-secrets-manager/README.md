@@ -72,7 +72,6 @@ Browser-session record operations are process-local and never write to Secrets M
 | File | Role |
 |---|---|
 | [`src/index.ts`](src/index.ts) | AWS reference resolution, public mapping configuration, read-only guard, and lifecycle. |
-| [`src/invariant.ts`](src/invariant.ts) | Static invariant companion; it registers no secret-related runtime behavior. |
 | [`tests/aws-secrets-manager.spec.ts`](tests/aws-secrets-manager.spec.ts) | Mocked SDK contract tests; no AWS account or live secret is used. |
 
 <a id="further-exploration"></a>
@@ -110,6 +109,7 @@ Credential values and provider authorization metadata are not appended to the mo
 
 <a id="known-limitations-and-deferred-work"></a>
 
+- No runtime invariant companion is published because this adapter delegates secret validation to AWS and owns no additional mutable runtime relationship.
 - **Mock evidence only in Phase 1** — the component suite proves the adapter contract without claiming AWS deployment or IAM proof.
 - **No external-rotation event** — Secrets Manager does not provide the local file watcher's update event through this package; the next request resolves the current value.
 - **No durable record store** — browser-session grants are process-local; durable API-key records are not supplied by this adapter.

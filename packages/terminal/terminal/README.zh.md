@@ -55,6 +55,8 @@ kind: "package-reference"
 
 成功打开会返回会话 id、类型、后端提供的 pid（如有）、状态与有界启动消息。发送以等待原因结算：`stdin_read`（shell 正在等待输入）、`inferred_idle`（输出静默）、`timeout` 或 `session_exit`（顶层 shell 已退出）。失败携带稳定的机器可路由错误码：后端类型缺失（`NO_BACKEND`）、会话未知（`NO_SESSION`）、属于其他 agent 的会话（`FOREIGN_SESSION`）、并发第二次发送（`SEND_ACTIVE`），或所有者不再存活（`OWNER_NOT_LIVE`）。后端设置失败会在发布任何内容之前拒绝打开；清理失败会拒绝关闭，而不是声称成功。
 
+宿主生命周期策略可以调用 `ctx.terminals.activeCount()` 获取进程范围内已发布 会话和进行中 spawn 的数量。它不返回会话 id、所有者、输出或标签，也不会削弱 所有者隔离边界。
+
 -----
 
 <a id="understand-the-implementation"></a>

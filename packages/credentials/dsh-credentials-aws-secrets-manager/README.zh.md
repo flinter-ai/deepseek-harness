@@ -72,7 +72,6 @@ provider 只负责 AWS 后端的引用查询。DSH 仍负责 agent loop、Sessio
 | 文件 | 作用 |
 |---|---|
 | [`src/index.ts`](src/index.ts) | AWS 引用解析、公开映射配置、只读保护与生命周期。 |
-| [`src/invariant.ts`](src/invariant.ts) | 静态 invariant companion，不注册读取机密的运行逻辑。 |
 | [`tests/aws-secrets-manager.spec.ts`](tests/aws-secrets-manager.spec.ts) | SDK mock 合约测试，不使用 AWS 账户或真实 secret。 |
 
 <a id="further-exploration"></a>
@@ -110,6 +109,7 @@ Credential values and provider authorization metadata are not appended to the mo
 
 <a id="known-limitations-and-deferred-work"></a>
 
+- 本包不发布 runtime invariant companion，因为适配器把 secret 校验委托给 AWS， 不拥有额外的可变运行时关系。
 - **Phase 1 只有 mock 证据** — 测试证明适配器合约，不声称已完成 AWS 部署或 IAM 证明。
 - **没有外部轮换事件** — Secrets Manager 不提供本地文件 watcher 的更新事件；下一次请求会解析当前值。
 - **没有持久记录存储**——浏览器会话授权保存在进程内存中；本适配器不提供持久 API-key 记录。

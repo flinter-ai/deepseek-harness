@@ -60,6 +60,59 @@ interface Config {
 
 Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.zh.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
+<a id="ctxsourcecontroller--sourcecontroller"></a>
+
+### `ctx.sourceController` — `SourceController`
+
+Durable source-draft service shared by direct DSH Web and browser editors. It owns draft persistence and optimistic fencing; Git/PR side effects are delegated to an optional host publisher and otherwise fail closed.
+
+```ts cordis-catalog
+/**
+ * Resolve the exact Git base used to create a new browser editor buffer.
+ * @param request - Session whose project Git base should be resolved.
+ * @returns the exact current Git base or a safe rejection.
+ */
+@Remote('bootstrap') async bootstrap(request: SourceDraftBootstrapRequest): Promise<SourceDraftBootstrapResult>
+
+/**
+ * List drafts belonging to one persisted Session lifecycle.
+ * @param request - Session whose drafts should be listed.
+ * @returns drafts belonging to the requested Session or a safe rejection.
+ */
+@Remote('list') async list(request: SourceDraftListRequest): Promise<SourceDraftListResult>
+
+/**
+ * Load one draft only when its Session lifecycle still matches.
+ * @param request - Session and draft identity to load.
+ * @returns the requested draft or a safe rejection.
+ */
+@Remote('get') async get(request: SourceDraftGetRequest): Promise<SourceDraftGetResult>
+
+/**
+ * Save a complete, normalized source snapshot with optimistic fencing.
+ * @param request - Source files and optional revision fence to save.
+ * @returns the saved draft or a validation/session/version rejection.
+ */
+@Remote('save') save(request: SourceDraftSaveRequest): Promise<SourceDraftSaveResult>
+
+/**
+ * Delete one draft after an optional revision check.
+ * @param request - Session, draft, and optional revision fence to delete.
+ * @returns the deletion result or a safe rejection.
+ */
+@Remote('delete') delete(request: SourceDraftDeleteRequest): Promise<SourceDraftDeleteResult>
+
+/**
+ * Publish one exact saved revision through the optional host publisher.
+ * @param request - Session, draft, and exact saved revision to publish.
+ * @param signal - Cancellation signal for the host publication.
+ * @returns the publication result or a safe rejection.
+ */
+@Remote('publish') publish(request: SourceDraftPublishRequest, signal: AbortSignal): Promise<SourceDraftPublishResult>
+```
+
+Source: [`packages/api/source-controller/src/index.ts`](../../packages/api/source-controller/src/index.ts)
+
 <a id="ctxwebserver--webserver"></a>
 
 ### `ctx.webServer` — `WebServer`
@@ -67,6 +120,18 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 The browser HTTP carrier service. Activation listens immediately. Route registration order does not affect requests because configured named routes must be distinct, and the fallback handler answers anything not yet claimed during startup with 404 until its owner registers. A listen failure rejects initialization, and the boot process reports the failed fiber.
 
 ```ts cordis-catalog
+/**
+ * Record accepted application activity without exposing request contents.
+ * @param at - Optional timestamp for the accepted activity event.
+ */
+recordActivity(at: number = Date.now()): void
+
+/**
+ * Return redacted transport facts for host lifecycle policies.
+ * @returns current request, WebSocket, and latest-activity facts.
+ */
+activitySnapshot(): WebActivitySnapshot
+
 /**
  * Register a named route. Duplicate (kind, path) throws — route patterns are
  * a composition-level contract, so a collision is a misconfiguration.

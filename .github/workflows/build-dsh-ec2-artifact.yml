@@ -58,6 +58,9 @@ jobs:
       - name: Build and verify EC2 artifact
         run: ./node_modules/.bin/tsx deploy/dsh-ec2/build-runtime-artifact.ts --out dist/dsh-ec2
 
+      - name: Test idle-stop controller
+        run: python3 deploy/dsh-ec2/test_idle_stop.py
+
       - uses: actions/upload-artifact@v4
         with:
           name: dsh-ec2-runtime-${{ github.event.pull_request.head.sha || github.sha }}-linux-arm64
