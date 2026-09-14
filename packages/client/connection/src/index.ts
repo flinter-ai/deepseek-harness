@@ -132,6 +132,7 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
           res.end(rejection === 401 ? 'unauthorized' : 'forbidden')
           return
         }
+        webCtx.webServer.recordActivity()
         await bridge(req, res, fetchHandler, maxRequestBodyBytes)
       },
     }

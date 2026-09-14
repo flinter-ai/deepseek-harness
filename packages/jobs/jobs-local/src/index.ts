@@ -196,6 +196,11 @@ export class LocalJobRegistry extends JobRegistry {
       .map(job => this.snapshot(job))
   }
 
+  /** Count live jobs across every owner; host lifecycle policies use this. */
+  activeCount(): number {
+    return [...this.store.values()].filter(task => !isTerminal(task.status)).length
+  }
+
   get(id: JobId, caller?: Agent): JobSnapshot {
     const job = this.expect(id)
     this.assertAccess(job, caller)

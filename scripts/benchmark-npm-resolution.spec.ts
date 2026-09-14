@@ -78,10 +78,16 @@ describe('npm resolution benchmark', () => {
       name: '@deepseek-ai/dsh-child',
       version: '0.1.0',
     })
+    writeJson(root, 'packages/deployment/runtime/package.json', {
+      name: '@deepseek-ai/dsh-private-runtime',
+      version: '0.0.1',
+      private: true,
+    })
 
     const index = buildRegistryIndex(root)
 
     expect(index.get('external')?.get('2.0.0')).toMatchObject({ dependencies: { child: '^1.0.0' } })
+    expect(index.has('@deepseek-ai/dsh-private-runtime')).toBe(false)
     expect(index.get('@deepseek-ai/dsh')?.get('0.1.0')).toEqual({
       name: '@deepseek-ai/dsh',
       version: '0.1.0',

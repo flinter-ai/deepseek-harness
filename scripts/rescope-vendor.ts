@@ -565,7 +565,10 @@ function main(): void {
   const all = patterns(reverse)
   const files = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' })
     .split('\0')
-    .filter(file => file !== '' && !excluded(file))
+    // `git ls-files` includes tracked paths removed in the current tree. A
+    // rescope check must preserve those deletions rather than trying to read
+    // a file that is intentionally absent.
+    .filter(file => file !== '' && !excluded(file) && existsSync(resolve(root, file)))
 
   const counts = new Map<string, { files: number; lines: number }>()
   const failures: string[] = []

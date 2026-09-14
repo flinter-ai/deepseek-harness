@@ -234,6 +234,16 @@ export class TerminalSessionService extends Service {
   }
 
   /**
+   * Count published sessions and in-flight spawns across every owner.
+   * @returns the number of live terminal resources.
+   */
+  activeCount(): number {
+    let pending = 0
+    for (const owned of this.pendingSpawns.values()) pending += owned.size
+    return this.sessions.size + pending
+  }
+
+  /**
    * Start one exclusive interactive send.
    * @param owner - exact session owner.
    * @param id - target PTY identity.

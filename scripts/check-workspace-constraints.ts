@@ -57,6 +57,8 @@ const experimentalPackageDirectory = /^packages\/experimental\/[^/]+$/
 const experimentalPackageNamePrefix = '@deepseek-ai/dsh-experimental-'
 /** Ordinary directories whose packages this repository publishes: one release member each. */
 const standardReleaseMemberDirectory = /^(?:packages\/(?!experimental\/)[^/]+\/[^/]+|apps\/(?!desktop(?:-host)?$)[^/]+|vendor\/[^/]+)$/
+/** Private dependency roots consumed by an artifact builder, not published to npm. */
+const privateArtifactPackageDirectories = new Set(['packages/deployment/dsh-ec2-runtime'])
 /** Installable application assembled by electron-builder rather than published to npm. */
 const desktopApplicationDirectory = 'apps/desktop'
 const localArtifactDirs = new Set(['node_modules'])
@@ -159,6 +161,9 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   '@deepseek-ai/dsh-client-ui-dockkit': ['lib/**/*.css'],
   '@deepseek-ai/dsh-client-web': ['lib/**/*.css'],
   '@deepseek-ai/dsh-client-ui-theme': ['lib/styles'],
+  // The Sandpack browser bundle is split by tsdown; publish every generated
+  // CJS chunk that lib/client.js loads by relative path.
+  '@deepseek-ai/dsh-client-ui-source-editor': ['lib/**/*.cjs'],
   // The CPython side ships as source .py files, published as-is rather than built.
   '@deepseek-ai/dsh-experimental-code-runtime-python': ['py/**/*.py'],
   // The shipped preset compositions travel inside the roster package.
@@ -288,8 +293,13 @@ export function checkExperimentalManifest({ dir, manifest }: WorkspaceManifest):
   return errors
 }
 
+export function isPrivateArtifactDirectory(dir: string): boolean {
+  return privateArtifactPackageDirectories.has(dir)
+}
+
 function isReleaseMemberDirectory(dir: string): boolean {
-  return standardReleaseMemberDirectory.test(dir) || isPublicExperimentalPackageDirectory(dir)
+  return !isPrivateArtifactDirectory(dir)
+    && (standardReleaseMemberDirectory.test(dir) || isPublicExperimentalPackageDirectory(dir))
 }
 
 /**
@@ -322,8 +332,11 @@ export function checkDshFamilyVersion(manifest: PackageManifest, expected: strin
 export function checkWorkspaceManifest({ dir, manifest }: WorkspaceManifest): string[] {
   const errors = checkExperimentalManifest({ dir, manifest })
   const label = manifest.name ?? dir
-  const familyVersionError = checkDshFamilyVersion(manifest, repositoryVersion)
+  const familyVersionError = isPrivateArtifactDirectory(dir)
+    ? undefined
+    : checkDshFamilyVersion(manifest, repositoryVersion)
   if (familyVersionError !== undefined) errors.push(familyVersionError)
+  if (isPrivateArtifactDirectory(dir)) return errors
   const isNativePackageDir = dir.startsWith('native/system/packages/')
   const isPublicNativePackage = isNativePackageDir
     && manifest.name !== undefined

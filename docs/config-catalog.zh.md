@@ -231,6 +231,26 @@ export interface Config {
 
 来源：[`packages/api/settings-controller/src/index.ts:36`](../packages/api/settings-controller/src/index.ts)
 
+<a id="deepseek-aidsh-api-source-controller"></a>
+
+## `@deepseek-ai/dsh-api-source-controller`
+
+需要：`storageDomain` · `sessionController`
+
+```ts config-catalog
+/** Deployment limits for browser-provided source material. */
+export interface Config {
+  /** Maximum number of files accepted in one saved source snapshot. */
+  readonly maxFiles?: number
+  /** Maximum UTF-8 byte size accepted for one source file. */
+  readonly maxFileBytes?: number
+  /** Maximum UTF-8 byte size accepted for the complete source snapshot. */
+  readonly maxTotalBytes?: number
+}
+```
+
+来源：[`packages/api/source-controller/src/index.ts:50`](../packages/api/source-controller/src/index.ts)
+
 <a id="deepseek-aidsh-api-workspace-files"></a>
 
 ## `@deepseek-ai/dsh-api-workspace-files`
@@ -521,6 +541,30 @@ export interface Config {
 ```
 
 来源：[`packages/extensions/cordis-host-runner/src/index.ts:88`](../packages/extensions/cordis-host-runner/src/index.ts)
+
+<a id="deepseek-aidsh-credentials-aws-secrets-manager"></a>
+
+## `@deepseek-ai/dsh-credentials-aws-secrets-manager`
+
+```ts config-catalog
+/** Plugin configuration. All fields are public routing metadata, never secret values. */
+export interface Config {
+  /** AWS region; omitted means the standard AWS SDK region chain. */
+  region?: string
+  /** Optional default prefix for references not present in `secretNames`. */
+  secretPrefix?: string
+  /** Explicit reference-to-secret-name mapping for deployment-owned names. */
+  secretNames?: Readonly<Record<string, string>>
+  /** Secret payload shape. JSON is the recommended shape for named references. */
+  secretFormat?: 'plain' | 'json'
+  /** JSON property carrying the value; defaults to the reference name. */
+  jsonField?: string
+  /** Writes are opt-in and should remain false for the Phase 1 worker profile. */
+  allowWrites?: boolean
+}
+```
+
+来源：[`packages/credentials/dsh-credentials-aws-secrets-manager/src/index.ts:35`](../packages/credentials/dsh-credentials-aws-secrets-manager/src/index.ts)
 
 <a id="deepseek-aidsh-credentials-local"></a>
 
@@ -923,6 +967,31 @@ export interface Config {
 
 来源：[`packages/host/frontend-static/src/index.ts:30`](../packages/host/frontend-static/src/index.ts)
 
+<a id="deepseek-aidsh-host-idle-guard"></a>
+
+## `@deepseek-ai/dsh-host-idle-guard`
+
+需要：`webServer`
+
+```ts config-catalog
+/** Idle guard configuration. The plugin is disabled unless explicitly enabled. */
+export interface Config {
+  /** Write the state file and keep it fresh. Defaults to false. */
+  enabled?: boolean
+  /** Absolute state-file path owned by the host deployment. */
+  stateFile?: string
+  /** State refresh period in milliseconds. Defaults to 30 seconds. */
+  intervalMs?: number
+  /** Declare whether a missing PTY registry is expected in this composition. */
+  ptyMode?: IdleGuardPtyMode
+}
+
+/** Whether the composed host must provide a PTY registry. */
+export type IdleGuardPtyMode = 'required' | 'absent'
+```
+
+来源：[`packages/host/idle-guard/src/index.ts:46`](../packages/host/idle-guard/src/index.ts)
+
 <a id="deepseek-aidsh-host-open-in-app"></a>
 
 ## `@deepseek-ai/dsh-host-open-in-app`
@@ -953,6 +1022,36 @@ export interface Config {
 ```
 
 来源：[`packages/host/open-in-app/src/index.ts:50`](../packages/host/open-in-app/src/index.ts)
+
+<a id="deepseek-aidsh-host-source-publisher-github"></a>
+
+## `@deepseek-ai/dsh-host-source-publisher-github`
+
+```ts config-catalog
+/** Optional Web composition row. Missing repository identity leaves publishing unavailable. */
+export interface Config {
+  /** Enable the host-owned GitHub publisher when repository identity is present. */
+  readonly enabled?: boolean
+  /** Repository root allowed for source publication. */
+  readonly repositoryRoot?: string
+  /** Directory for temporary publication worktrees. */
+  readonly worktreeRoot?: string
+  /** GitHub owner for the publication repository. */
+  readonly owner?: string
+  /** GitHub repository name for the publication repository. */
+  readonly repo?: string
+  /** Base branch used when opening the pull request. */
+  readonly baseBranch?: string
+  /** Git remote used to push the temporary publication branch. */
+  readonly remote?: string
+  /** Prefix used for temporary publication branches. */
+  readonly branchPrefix?: string
+  /** Environment variable containing the host-resolved GitHub token. */
+  readonly tokenEnv?: string
+}
+```
+
+来源：[`packages/host/source-publisher-github/src/index.ts:65`](../packages/host/source-publisher-github/src/index.ts)
 
 <a id="deepseek-aidsh-host-webserver"></a>
 
@@ -1750,6 +1849,28 @@ export type Config = LocalConfig
 依赖：[`LocalConfig`](#deepseek-aidsh-pwsh-local)
 
 来源：[`packages/shell/pwsh-sandbox/src/index.ts:40`](../packages/shell/pwsh-sandbox/src/index.ts)
+
+<a id="deepseek-aidsh-relace"></a>
+
+## `@deepseek-ai/dsh-relace`
+
+```ts config-catalog
+/** Configuration for the optional Relace provider-helper plugin. */
+export interface Config {
+  /** Credential references for the Search and Apply provider routes. */
+  credentialRefs?: Partial<RelaceProviderCredentialRefs>
+}
+
+/** Credential references used to resolve the two OpenRouter-backed routes. */
+export interface RelaceProviderCredentialRefs {
+  /** Environment or credential reference used by Relace Search. */
+  readonly search: string
+  /** Environment or credential reference used by Relace Apply. */
+  readonly apply: string
+}
+```
+
+来源：[`packages/extensions/relace/src/index.ts:435`](../packages/extensions/relace/src/index.ts)
 
 <a id="deepseek-aidsh-repeat-tool-reminder"></a>
 
@@ -3487,6 +3608,7 @@ export interface Config {
 - `@deepseek-ai/dsh-client-ui-sidebar-files`（[`packages/client/ui-sidebar-files/src/index.ts`](../packages/client/ui-sidebar-files/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-sidebar-right`（[`packages/client/ui-sidebar-right/src/index.ts`](../packages/client/ui-sidebar-right/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-skill`（[`packages/client/ui-skill/src/index.ts`](../packages/client/ui-skill/src/index.ts)）
+- `@deepseek-ai/dsh-client-ui-source-editor`（[`packages/client/ui-source-editor/src/index.ts`](../packages/client/ui-source-editor/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-subagent`（[`packages/client/ui-subagent/src/index.ts`](../packages/client/ui-subagent/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-theme`（[`packages/client/ui-theme/src/index.ts`](../packages/client/ui-theme/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-tool`（[`packages/client/ui-tool/src/index.ts`](../packages/client/ui-tool/src/index.ts)）
@@ -3553,9 +3675,11 @@ export interface Config {
 由其他包作为库导入；`cordis.yml` 无法加载它们。
 
 - `@deepseek-ai/dsh-agent-loop-testkit`（[`packages/test-support/agent-loop-testkit/src/index.ts`](../packages/test-support/agent-loop-testkit/src/index.ts)）
+- `@deepseek-ai/dsh-alpha-profile`（[`packages/flinter/dsh-alpha-profile/src/index.ts`](../packages/flinter/dsh-alpha-profile/src/index.ts)）
 - `@deepseek-ai/dsh-anonymous-user-id`（[`packages/identity/anonymous-user-id/src/index.ts`](../packages/identity/anonymous-user-id/src/index.ts)）
 - `@deepseek-ai/dsh-app-boot`（[`packages/boot/app-boot/src/index.ts`](../packages/boot/app-boot/src/index.ts)）
 - `@deepseek-ai/dsh-atomic-write`（[`packages/util/atomic-write/src/index.ts`](../packages/util/atomic-write/src/index.ts)）
+- `@deepseek-ai/dsh-aws-worker-profile`（[`packages/flinter/dsh-aws-worker-profile/src/index.ts`](../packages/flinter/dsh-aws-worker-profile/src/index.ts)）
 - `@deepseek-ai/dsh-base`（[`packages/bundle/base/src/index.ts`](../packages/bundle/base/src/index.ts)）
 - `@deepseek-ai/dsh-brand`（[`packages/util/brand/src/index.ts`](../packages/util/brand/src/index.ts)）
 - `@deepseek-ai/dsh-chunked-list`（[`packages/util/chunked-list/src/index.ts`](../packages/util/chunked-list/src/index.ts)）
@@ -3594,6 +3718,7 @@ export interface Config {
 - `@deepseek-ai/dsh-session-snapshot`（[`packages/test-support/session-snapshot/src/index.ts`](../packages/test-support/session-snapshot/src/index.ts)）
 - `@deepseek-ai/dsh-session-telemetry`（[`packages/session/session-telemetry/src/index.ts`](../packages/session/session-telemetry/src/index.ts)）
 - `@deepseek-ai/dsh-session-title-llm`（[`packages/session/session-title-llm/src/index.ts`](../packages/session/session-title-llm/src/index.ts)）
+- `@deepseek-ai/dsh-source-draft-model`（[`packages/core/source-draft-model/src/index.ts`](../packages/core/source-draft-model/src/index.ts)）
 - `@deepseek-ai/dsh-subagent-in-process-driver`（[`packages/subagent/subagent-in-process-driver/src/index.ts`](../packages/subagent/subagent-in-process-driver/src/index.ts)）
 - `@deepseek-ai/dsh-timeout`（[`packages/util/timeout/src/index.ts`](../packages/util/timeout/src/index.ts)）
 - `@deepseek-ai/dsh-typert-generator`（[`packages/typert/generator/src/index.ts`](../packages/typert/generator/src/index.ts)）

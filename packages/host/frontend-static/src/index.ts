@@ -136,7 +136,11 @@ export function apply(ctx: Context, config: Config): void {
       res,
       distRoot,
       distIndex,
-      () => ctx.connection.authorizeIndex(req, res),
+      () => {
+        const authorized = ctx.connection.authorizeIndex(req, res)
+        if (authorized) ctx.webServer.recordActivity()
+        return authorized
+      },
       renderIndex,
     )
   }), 'frontend-static: fallback seat')

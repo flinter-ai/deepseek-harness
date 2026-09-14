@@ -274,6 +274,36 @@ publish(topic: string, payload: InspectorJsonValue, monotonicMs?: number): void
 
 Source: [`packages/experimental/inspector/src/index.ts`](../../packages/experimental/inspector/src/index.ts)
 
+<a id="ctxrelace--relaceruntime"></a>
+
+### `ctx.relace` — `RelaceRuntime`
+
+Public runtime surface exposed by the optional Relace plugin.
+
+```ts cordis-catalog
+/** Build a model request for Relace Search.
+ * @param input - Codebase and user prompt to search.
+ * @returns The provider-facing generation request.
+ */
+buildSearchGenerateOptions(input: { readonly codebase: string; readonly userPrompt: string }): GenerateOptions
+
+/** Build a model request for Relace Apply.
+ * @param input - Initial code, edit snippet, and optional instruction.
+ * @returns The provider-facing generation request.
+ */
+buildApplyGenerateOptions(input: { readonly instruction?: string readonly initialCode: string readonly editSnippet: string }): GenerateOptions
+
+/** Create the host-owned bridge for invoking Relace Search tools.
+ * @param handlers - Host callbacks for Search tool execution.
+ * @returns A tool bridge with the public Search schemas.
+ */
+createSearchToolBridge(handlers: RelaceSearchToolHandlers): RelaceSearchToolBridge
+```
+
+Types: [GenerateOptions](llm-streaming.md)
+
+Source: [`packages/extensions/relace/src/index.ts`](../../packages/extensions/relace/src/index.ts)
+
 <a id="cordis-events"></a>
 
 ### `cordis/*` events

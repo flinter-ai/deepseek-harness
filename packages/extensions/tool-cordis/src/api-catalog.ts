@@ -1156,6 +1156,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'fresh snapshots.',
       },
       {
+        signature: 'abstract activeCount(): number',
+        description: 'Return all process-wide live jobs, independent of caller ownership.',
+        parameters: [],
+        returns: 'the number of non-terminal jobs.',
+      },
+      {
         signature: 'abstract get(id: JobId, caller?: Agent): JobSnapshot',
         description: 'Return a non-consuming snapshot without changing its read cursor or notice state. Throws for an unknown or foreign job.',
         parameters: [{ name: 'id', description: 'job to look up.' }, { name: 'caller', description: 'reading agent checked against the owner.' }],
@@ -1395,6 +1401,31 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Select whether plan mode should be active. Between turns the method appends the change immediately because no in-turn pre-step will run until another prompt starts a turn. The open-turn fold is the idle signal: agent status stays `running` through post-turn checkpointing, when no further in-turn pre-step runs. During an open turn the selection remains pending until the next accepted in-turn pre-step. Repeated selection of the current or already-pending state is a no-op.',
         parameters: [{ name: 'agent', description: 'The agent to switch.' }, { name: 'active', description: 'Whether plan mode should be active.' }],
         returns: 'what happened: `committed` (logged now), `queued` (awaiting the next accepted in-turn pre-step), `cancelled` (an opposite pending selection was cleared; the logged state already matches), or `noop` (already in that state).',
+      },
+    ],
+  },
+  {
+    key: 'relace',
+    summary: 'Public runtime surface exposed by the optional Relace plugin.',
+    description: 'Public runtime surface exposed by the optional Relace plugin.',
+    methods: [
+      {
+        signature: 'buildSearchGenerateOptions(input: { readonly codebase: string; readonly userPrompt: string }): GenerateOptions',
+        description: 'Build a model request for Relace Search.',
+        parameters: [{ name: 'input', description: 'Codebase and user prompt to search.' }],
+        returns: 'The provider-facing generation request.',
+      },
+      {
+        signature: 'buildApplyGenerateOptions(input: { readonly instruction?: string readonly initialCode: string readonly editSnippet: string }): GenerateOptions',
+        description: 'Build a model request for Relace Apply.',
+        parameters: [{ name: 'input', description: 'Initial code, edit snippet, and optional instruction.' }],
+        returns: 'The provider-facing generation request.',
+      },
+      {
+        signature: 'createSearchToolBridge(handlers: RelaceSearchToolHandlers): RelaceSearchToolBridge',
+        description: 'Create the host-owned bridge for invoking Relace Search tools.',
+        parameters: [{ name: 'handlers', description: 'Host callbacks for Search tool execution.' }],
+        returns: 'A tool bridge with the public Search schemas.',
       },
     ],
   },
@@ -2202,6 +2233,49 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'sourceController',
+    summary: 'Durable source-draft service shared by direct DSH Web and browser editors.',
+    description: 'Durable source-draft service shared by direct DSH Web and browser editors. It owns draft persistence and optimistic fencing; Git/PR side effects are delegated to an optional host publisher and otherwise fail closed.',
+    methods: [
+      {
+        signature: '@Remote(\'bootstrap\') async bootstrap(request: SourceDraftBootstrapRequest): Promise<SourceDraftBootstrapResult>',
+        description: 'Resolve the exact Git base used to create a new browser editor buffer.',
+        parameters: [{ name: 'request', description: 'Session whose project Git base should be resolved.' }],
+        returns: 'the exact current Git base or a safe rejection.',
+      },
+      {
+        signature: '@Remote(\'list\') async list(request: SourceDraftListRequest): Promise<SourceDraftListResult>',
+        description: 'List drafts belonging to one persisted Session lifecycle.',
+        parameters: [{ name: 'request', description: 'Session whose drafts should be listed.' }],
+        returns: 'drafts belonging to the requested Session or a safe rejection.',
+      },
+      {
+        signature: '@Remote(\'get\') async get(request: SourceDraftGetRequest): Promise<SourceDraftGetResult>',
+        description: 'Load one draft only when its Session lifecycle still matches.',
+        parameters: [{ name: 'request', description: 'Session and draft identity to load.' }],
+        returns: 'the requested draft or a safe rejection.',
+      },
+      {
+        signature: '@Remote(\'save\') save(request: SourceDraftSaveRequest): Promise<SourceDraftSaveResult>',
+        description: 'Save a complete, normalized source snapshot with optimistic fencing.',
+        parameters: [{ name: 'request', description: 'Source files and optional revision fence to save.' }],
+        returns: 'the saved draft or a validation/session/version rejection.',
+      },
+      {
+        signature: '@Remote(\'delete\') delete(request: SourceDraftDeleteRequest): Promise<SourceDraftDeleteResult>',
+        description: 'Delete one draft after an optional revision check.',
+        parameters: [{ name: 'request', description: 'Session, draft, and optional revision fence to delete.' }],
+        returns: 'the deletion result or a safe rejection.',
+      },
+      {
+        signature: '@Remote(\'publish\') publish(request: SourceDraftPublishRequest, signal: AbortSignal): Promise<SourceDraftPublishResult>',
+        description: 'Publish one exact saved revision through the optional host publisher.',
+        parameters: [{ name: 'request', description: 'Session, draft, and exact saved revision to publish.' }, { name: 'signal', description: 'Cancellation signal for the host publication.' }],
+        returns: 'the publication result or a safe rejection.',
+      },
+    ],
+  },
+  {
     key: 'spillStore',
     summary: 'Abstract spill storage service.',
     description: 'Abstract spill storage service. Subclass, implement saveText, and load the subclass as a plugin — it registers as `ctx.spillStore` (one implementation per context; loading a second throws, cordis\' standard duplicate-service behavior).\n\nSemantics every implementation must honor:\n\n- saveText persists the FULL `content` verbatim and returns an opaque locator, exact byte length, and model-facing retrieval guidance.\n- Storage is scoped by the request\'s SaveTextSpill.owner session; the backend chooses a private (not world-readable) location and a collision-free name derived from — never equal to — the caller\'s `suggestedName`.\n- `saveText` REJECTS on a real storage failure (permissions, ENOSPC, backend unavailable); the caller decides how to degrade (the spill policy treats a rejection as best-effort and keeps the inline result).',
@@ -2485,6 +2559,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Test whether an exact owner has a published session or unpublished spawn.',
         parameters: [{ name: 'owner', description: 'exact live owner to inspect.' }],
         returns: 'true across the entire spawn-to-close interval, with no publication gap.',
+      },
+      {
+        signature: 'activeCount(): number',
+        description: 'Count published sessions and in-flight spawns across every owner.',
+        parameters: [],
+        returns: 'the number of live terminal resources.',
       },
       {
         signature: 'startSend(owner: Agent, id: TerminalSessionId, request: TerminalSendRequest): TerminalSendOperation',
@@ -2810,6 +2890,17 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     summary: 'The browser HTTP carrier service.',
     description: 'The browser HTTP carrier service. Activation listens immediately. Route registration order does not affect requests because configured named routes must be distinct, and the fallback handler answers anything not yet claimed during startup with 404 until its owner registers. A listen failure rejects initialization, and the boot process reports the failed fiber.',
     methods: [
+      {
+        signature: 'recordActivity(at: number = Date.now()): void',
+        description: 'Record accepted application activity without exposing request contents.',
+        parameters: [{ name: 'at', description: 'Optional timestamp for the accepted activity event.' }],
+      },
+      {
+        signature: 'activitySnapshot(): WebActivitySnapshot',
+        description: 'Return redacted transport facts for host lifecycle policies.',
+        parameters: [],
+        returns: 'current request, WebSocket, and latest-activity facts.',
+      },
       {
         signature: 'register(route: WebRoute): () => void',
         description: 'Register a named route. Duplicate (kind, path) throws — route patterns are a composition-level contract, so a collision is a misconfiguration.',
@@ -4883,6 +4974,22 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface RedactedSecret {\n    path: string[];\n    set: boolean;\n}',
   },
   {
+    name: 'RelaceSearchReport',
+    declaration: 'export interface RelaceSearchReport {\n    readonly explanation: string;\n    readonly files: Readonly<Record<string, readonly (readonly [\n        number,\n        number\n    ])[]>>;\n}',
+  },
+  {
+    name: 'RelaceSearchToolBridge',
+    declaration: 'export interface RelaceSearchToolBridge {\n    readonly schemas: readonly ToolSchema[];\n    execute(name: RelaceSearchToolName, args: unknown, signal?: AbortSignal): Promise<unknown>;\n    report(): RelaceSearchReport | undefined;\n}',
+  },
+  {
+    name: 'RelaceSearchToolHandlers',
+    declaration: 'export interface RelaceSearchToolHandlers {\n    viewFile(args: {\n        readonly path: string;\n        readonly view_range: readonly [\n            number,\n            number\n        ];\n    }, signal?: AbortSignal): Promise<unknown>;\n    viewDirectory(args: {\n        readonly path: string;\n        readonly include_hidden: boolean;\n    }, signal?: AbortSignal): Promise<unknown>;\n    grepSearch(args: {\n        readonly query: string;\n        readonly case_sensitive: boolean;\n        readonly exclude_pattern: string | null;\n        readonly include_pattern: string | null;\n    }, signal?: AbortSignal): Promise<unknown>;\n    bash(args: {\n        readonly command: string;\n    }, signal?: AbortSignal): Promise<unknown>;\n}',
+  },
+  {
+    name: 'RelaceSearchToolName',
+    declaration: 'export type RelaceSearchToolName = \'view_file\' | \'view_directory\' | \'grep_search\' | \'bash\' | \'report_back\';',
+  },
+  {
     name: 'RemoteError',
     declaration: 'export class RemoteError<Code extends RemoteErrorCode = RemoteErrorCode> extends Error {\n    readonly isDSHRemoteError: true;\n    constructor(readonly code: Code, message: string, readonly details: RemoteErrorDetailsMap[Code], options?: ErrorOptions);\n}',
   },
@@ -6132,7 +6239,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ToolSchema',
-    declaration: 'export interface ToolSchema {\n    name: string;\n    description: string;\n    parameters: Record<string, unknown>;\n}',
+    declaration: 'export interface ToolSchema {\n    name: string;\n    description: string;\n    parameters: Record<string, unknown>;\n    strict?: boolean;\n}',
   },
   {
     name: 'TurnEndCancelCause',
@@ -6253,6 +6360,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'VerifiedWebhookDelivery',
     declaration: 'export interface VerifiedWebhookDelivery<K extends string = string> {\n    readonly kind: K;\n    readonly source: WebhookSourceId;\n    readonly deliveryId: WebhookDeliveryId;\n    readonly event: WebhookEventOf<K>;\n    readonly receivedAt: number;\n}',
+  },
+  {
+    name: 'WebActivitySnapshot',
+    declaration: 'export interface WebActivitySnapshot {\n    readonly lastActivityAt: number;\n    readonly activeRequests: number;\n    readonly activeWebSockets: number;\n}',
   },
   {
     name: 'WebBootBatch',

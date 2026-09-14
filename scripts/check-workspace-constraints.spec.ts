@@ -6,6 +6,7 @@ import {
   checkExperimentalDependencyIsolation,
   checkExperimentalManifest,
   expectedDshPackageFiles,
+  isPrivateArtifactDirectory,
   type WorkspaceManifest,
 } from './check-workspace-constraints.ts'
 
@@ -96,6 +97,13 @@ describe('experimental workspace constraints', () => {
     expect(checkExperimentalDependencyIsolation(manifests)).toEqual([
       '@deepseek-ai/dsh-python-runtime: dependencies.@deepseek-ai/dsh-experimental-prototype must not reference an experimental package',
     ])
+  })
+})
+
+describe('private artifact roots', () => {
+  it('keeps the EC2 runtime dependency root out of the npm release policy', () => {
+    expect(isPrivateArtifactDirectory('packages/deployment/dsh-ec2-runtime')).toBe(true)
+    expect(isPrivateArtifactDirectory('packages/host/webserver')).toBe(false)
   })
 })
 

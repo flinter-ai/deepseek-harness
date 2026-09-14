@@ -26,6 +26,7 @@ interface DemoPolicy {
 /** Public product launcher plus the private build-only WebWorker packer. */
 const MANIFEST_BIN_ALLOWLIST = new Map<string, ManifestBin>([
   ['apps/cli/package.json', { dsh: 'lib/bin.js' }],
+  ['packages/deployment/dsh-ec2-runtime/package.json', { 'dsh-ec2-runtime': 'runtime-bootstrap.mjs' }],
   ['packages/experimental/webworker-packer/package.json', { 'dsh-pack-vfs-image': './bin.js' }],
 ])
 
@@ -35,6 +36,7 @@ const EXECUTABLE_SOURCE_ALLOWLIST = new Map<string, string>([
   ['packages/context/time-context/tests/fixtures/driver.ts', 'test-only subprocess driver'],
   ['packages/experimental/webworker-packer/bin.js', 'private build-only wrapper'],
   ['packages/experimental/webworker-packer/src/bin.ts', 'private build-only implementation'],
+  ['packages/deployment/dsh-ec2-runtime/runtime-bootstrap.mjs', 'private packaging-only runtime dispatcher'],
   ['packages/sdk/client/tests/fake-runtime.ts', 'test-only SDK runtime peer'],
   ['packages/session/session-telemetry-otel/tests/fixtures/driver.ts', 'test-only subprocess driver'],
   ['packages/shell/tool-pwsh/tests/fixtures/loader/driver.ts', 'test-only subprocess driver'],
