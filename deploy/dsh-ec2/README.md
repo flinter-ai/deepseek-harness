@@ -137,20 +137,18 @@ environment subject (including the owner and repository IDs):
 repo:flinter-ai@316417709/deepseek-harness@1337175939:environment:dsh-ec2-production
 ```
 
-For this ordinary (non-reusable) deployment workflow, restrict the additional
-claim to:
+For this ordinary deployment workflow, restrict the additional claim to its
+fixed workflow name:
 
 ```text
-token.actions.githubusercontent.com:workflow_ref =
-  flinter-ai/deepseek-harness/.github/workflows/deploy-dsh-ec2.yml@refs/heads/reconcile/dsh-ec2-*
+token.actions.githubusercontent.com:workflow = Deploy DSH Web to EC2
 ```
 
-Use `workflow_ref`, not `job_workflow_ref`; the latter is for reusable
-workflows. The environment's deployment branch policy is a second, independent
-guard and should remain `master`-only in steady state. A pre-merge deployment
-may temporarily allow one exact reconcile branch, but that policy must be
-removed after the run. Until the variables and both trust guards exist, the
-workflow fails closed before sending a command.
+The environment's deployment branch policy is the independent branch guard and
+should remain `master`-only in steady state. A pre-merge deployment may
+temporarily allow one exact reconcile branch, but that policy must be removed
+after the run. Until the variables and both trust guards exist, the workflow
+fails closed before sending a command.
 
 ## EC2 prerequisites
 

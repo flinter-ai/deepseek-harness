@@ -119,18 +119,16 @@ environment subject：
 repo:flinter-ai@316417709/deepseek-harness@1337175939:environment:dsh-ec2-production
 ```
 
-这个普通（非 reusable）的 deployment workflow 还必须限制以下额外 claim：
+这个普通 deployment workflow 还必须限制以下固定的 workflow name claim：
 
 ```text
-token.actions.githubusercontent.com:workflow_ref =
-  flinter-ai/deepseek-harness/.github/workflows/deploy-dsh-ec2.yml@refs/heads/reconcile/dsh-ec2-*
+token.actions.githubusercontent.com:workflow = Deploy DSH Web to EC2
 ```
 
-这里应使用 `workflow_ref`，不要使用仅适用于 reusable workflow 的
-`job_workflow_ref`。environment 的 deployment branch policy 是第二道独立保护，
-稳定状态应保持只允许 `master`。合并前部署可以临时只允许一个精确的 reconcile
-branch，但 run 完成后必须移除该 policy。在环境变量和两道 trust 保护都存在前，
-工作流会在发送命令前 fail closed。
+environment 的 deployment branch policy 是独立的 branch 保护，稳定状态应保持只
+允许 `master`。合并前部署可以临时只允许一个精确的 reconcile branch，但 run 完成
+后必须移除该 policy。在环境变量和两道 trust 保护都存在前，工作流会在发送命令前
+fail closed。
 
 ## EC2 前置条件
 
