@@ -129,12 +129,28 @@ it should retain only the read access required by the profile.
 
 The repository currently does not create the GitHub OIDC provider or IAM role
 automatically. That is an account-level trust decision and must be provisioned
-once through the existing AWS infrastructure owner. The role trust policy must
-use the canonical `flinter-ai/deepseek-harness` repository's immutable OIDC
-subject for the `dsh-ec2-production` environment; the environment's deployment
-branch policy separately allows only `master`. Until the three environment
-variables and that trust relationship exist, the workflow fails closed before
-sending a command.
+once through the existing AWS infrastructure owner. This repository uses
+GitHub's immutable subject format, so the trust policy must match this exact
+environment subject (including the owner and repository IDs):
+
+```text
+repo:flinter-ai@316417709/deepseek-harness@1337175939:environment:dsh-ec2-production
+```
+
+For this ordinary (non-reusable) deployment workflow, restrict the additional
+claim to:
+
+```text
+token.actions.githubusercontent.com:workflow_ref =
+  flinter-ai/deepseek-harness/.github/workflows/deploy-dsh-ec2.yml@refs/heads/reconcile/dsh-ec2-*
+```
+
+Use `workflow_ref`, not `job_workflow_ref`; the latter is for reusable
+workflows. The environment's deployment branch policy is a second, independent
+guard and should remain `master`-only in steady state. A pre-merge deployment
+may temporarily allow one exact reconcile branch, but that policy must be
+removed after the run. Until the variables and both trust guards exist, the
+workflow fails closed before sending a command.
 
 ## EC2 prerequisites
 

@@ -111,11 +111,26 @@ GitHub role 需要区域内 EC2 状态读取、SSM 目标就绪检查、针对�
 应只保留 profile 实际需要的读取权限。
 
 本仓库当前不会自动创建 GitHub OIDC provider 或 IAM role。这是账户级信任
-决策，必须由现有 AWS 基础设施负责人一次性配置。role 的 trust policy 必须
-使用规范 `flinter-ai/deepseek-harness` 仓库在 `dsh-ec2-production` environment
-中的 immutable OIDC subject；environment 的 deployment branch policy 另外只允许
-`master`。在三项 environment 变量和该信任关系存在之前，工作流会在发送命令前
-fail closed。
+决策，必须由现有 AWS 基础设施负责人一次性配置。本仓库使用 GitHub immutable
+subject 格式，因此 trust policy 必须匹配以下包含 owner 和 repository ID 的完整
+environment subject：
+
+```text
+repo:flinter-ai@316417709/deepseek-harness@1337175939:environment:dsh-ec2-production
+```
+
+这个普通（非 reusable）的 deployment workflow 还必须限制以下额外 claim：
+
+```text
+token.actions.githubusercontent.com:workflow_ref =
+  flinter-ai/deepseek-harness/.github/workflows/deploy-dsh-ec2.yml@refs/heads/reconcile/dsh-ec2-*
+```
+
+这里应使用 `workflow_ref`，不要使用仅适用于 reusable workflow 的
+`job_workflow_ref`。environment 的 deployment branch policy 是第二道独立保护，
+稳定状态应保持只允许 `master`。合并前部署可以临时只允许一个精确的 reconcile
+branch，但 run 完成后必须移除该 policy。在环境变量和两道 trust 保护都存在前，
+工作流会在发送命令前 fail closed。
 
 ## EC2 前置条件
 
