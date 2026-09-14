@@ -11,8 +11,8 @@ SSM command `77817d8d-a6ba-419f-b6ab-1fee879df5fb`. EC2 now runs the exact
 release with service `active`, localhost `401`, explicit `ec2` compute, and
 Secrets Manager provider resolution without credential values in the service
 or process environment. The source is still unmerged and PR #69 remains a
-draft reconciliation/rollout branch; authenticated Web E2E and an induced
-rollback rehearsal remain open P0 gates.
+draft reconciliation/rollout branch. The authenticated Web E2E now passes; an
+induced rollback rehearsal remains the open P0 gate.
 
 **Source baseline:** `reconcile/dsh-ec2-upstream-20260913` at
 `abbddead9b0a53c31e2e41b673bda21e45d710a4`, based on the isolated
@@ -196,6 +196,12 @@ release. The deployment snapshot is retained at
 The public hostname returned `403` without an authenticated session, so this
 is ingress reachability/protection evidence rather than authenticated Web E2E.
 
+The redacted authenticated Web E2E was then run against the exact live release
+through SSM command `1aac1d4e-7d2f-4bac-8621-85e3370f3c52`: token exchange
+returned `303`, authorized `settings/describe` returned `200`, and the same
+cookie sent with an untrusted Host returned `403`. No token, cookie, or response
+body was recorded.
+
 **Gate:** the new path must prove that EC2 did not invoke package installation
 or source compilation, and that rollback returns the previously verified
 artifact to service.
@@ -213,9 +219,9 @@ artifact to service.
    health evidence, and rollback pointer. This record contains no secrets.
 
 The exact EC2 activation is complete for this reviewed SHA, but production
-success is still not claimed: the source PR is not merged, authenticated E2E
-evidence has not been run, and rollback has not yet been induced and
-rehearsed. A CI pass or an unauthenticated `401` health probe is necessary but
+success is still not claimed: the source PR is not merged and rollback has not
+yet been induced and rehearsed. A CI pass or an unauthenticated `401` health
+probe is necessary but
 not sufficient.
 
 ## Deferred work

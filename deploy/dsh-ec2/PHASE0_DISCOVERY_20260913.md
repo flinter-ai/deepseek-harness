@@ -97,17 +97,18 @@ tunnel were verified. The deployed release is now the exact SHA recorded above.
 
 The target architecture is known: **Linux ARM64 on `t4g.medium`**. Discovery,
 artifact distribution, exact-SHA activation, and redacted local ingress gates
-are closed for `abbddead9b…`. Authenticated Web E2E and rollback rehearsal are
-still open; the source remains on draft PR #69 and has not been merged into the
-FLINTER default branch.
+are closed for `abbddead9b…`. Authenticated Web E2E is also closed: the live
+release returned token exchange `303`, authorized `settings/describe` `200`,
+and wrong-Host `403` under SSM command
+`1aac1d4e-7d2f-4bac-8621-85e3370f3c52`. Rollback rehearsal remains open; the
+source remains on draft PR #69 and has not been merged into the FLINTER default
+branch.
 
 ### Next authorized in-scope step
 
-1. Run authenticated Web/profile E2E against the exact deployed SHA without
-   printing or placing credentials in the artifact.
-2. Rehearse a controlled post-switch failure and verify the saved previous
+1. Rehearse a controlled post-switch failure and verify the saved previous
    release pointer returns the legacy service to health.
-3. Decide whether this reviewed upstream reconciliation should be promoted in
+2. Decide whether this reviewed upstream reconciliation should be promoted in
    its own release process; do not merge it into the FLINTER default branch as
    an upstream-core update.
 
