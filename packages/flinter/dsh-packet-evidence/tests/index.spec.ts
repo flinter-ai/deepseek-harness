@@ -2,26 +2,39 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
+import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
-import PacketEvidence, { PacketEvidenceClient, PacketEvidenceError, apply } from '../src/index.ts'
+import PacketEvidence, {
+  DshSubprocessTransport,
+  PacketEvidenceClient,
+  PacketEvidenceError,
+  apply,
+} from '../src/index.ts'
 
 const fixture = fileURLToPath(new URL('./fixtures/packet-service.mjs', import.meta.url))
 
 async function tempClient() {
   const root = await mkdtemp(join(tmpdir(), 'dsh-packet-evidence-'))
   const log = join(root, 'requests.jsonl')
-  const client = new PacketEvidenceClient({
+  const ctx = new Context()
+  await ctx.plugin(LocalSubprocessRuntime)
+  const resolved = {
     command: process.execPath,
     args: [fixture, '--log', log],
     registryRoot: '/trusted/registry',
+    cwd: process.cwd(),
     timeoutMs: 3_000,
     maxResponseBytes: 4_096,
-  })
-  return { root, log, client }
+    toolPrefix: 'flinter_',
+  } as const
+  const executable = await ctx.subprocess.resolveExecutable(resolved.command)
+  const transport = new DshSubprocessTransport(ctx.subprocess, { ...resolved, executable })
+  const client = new PacketEvidenceClient(transport)
+  return { root, log, client, ctx, resolved, transport }
 }
 
 describe('PacketEvidenceClient', () => {
@@ -60,7 +73,7 @@ describe('PacketEvidenceClient', () => {
         max_item_chars: 300,
         max_items: 1,
       })
-      expect(response.operation).toBe('materialize_jacq')
+      expect(response.operation).toBe('materialize_snapshot')
       const request = JSON.parse(await readFile(log, 'utf8'))
       expect(request.params).toEqual({
         packet_id: 'pkt_demo', output_dir: '/isolated/jacq',
@@ -71,26 +84,36 @@ describe('PacketEvidenceClient', () => {
     }
   })
 
-  it('rejects invalid configuration before spawning a process', () => {
-    expect(() => new PacketEvidenceClient({
-      command: 'python3', args: ['--registry-root', '/wrong'], registryRoot: '/trusted/registry',
-    })).toThrow(/must not provide --registry-root/u)
+  it('rejects invalid configuration before registering tools or spawning a process', async () => {
+    const ctx = new Context()
+    await ctx.plugin(LocalSubprocessRuntime)
+    await ctx.plugin(ToolRuntime)
+    await expect(apply(ctx, {
+      command: process.execPath,
+      args: ['--registry-root', '/wrong'],
+      registryRoot: '/trusted/registry',
+    })).rejects.toThrow(/must not provide --registry-root/u)
+    expect(ctx.tools?.schemas?.() ?? []).toHaveLength(0)
   })
 
   it('rejects cancellation and process response overflow', async () => {
-    const { root, client } = await tempClient()
+    const { root, client, ctx, resolved } = await tempClient()
     try {
       const controller = new AbortController()
       controller.abort()
       await expect(client.packetDescribe('pkt_demo', controller.signal)).rejects.toMatchObject({
         code: 'ABORTED', name: 'AbortError',
       })
-      const oversized = new PacketEvidenceClient({
-        command: process.execPath,
+      const oversizedConfig = {
+        ...resolved,
         args: [fixture, '--log', join(root, 'oversized.jsonl')],
-        registryRoot: '/trusted/registry',
         maxResponseBytes: 256,
-      })
+      } as const
+      const oversizedExecutable = await ctx.subprocess.resolveExecutable(oversizedConfig.command)
+      const oversized = new PacketEvidenceClient(new DshSubprocessTransport(ctx.subprocess, {
+        ...oversizedConfig,
+        executable: oversizedExecutable,
+      }))
       await expect(oversized.packetDescribe('pkt_demo')).rejects.toMatchObject({ code: 'RESPONSE_TOO_LARGE' })
     } finally {
       await rm(root, { recursive: true, force: true })
@@ -103,9 +126,10 @@ describe('PacketEvidence plugin', () => {
     const { root, log } = await tempClient()
     try {
       const ctx = new Context()
+      await ctx.plugin(LocalSubprocessRuntime)
       await ctx.plugin(SystemPrompt)
       await ctx.plugin(ToolRuntime)
-      apply(ctx, {
+      await apply(ctx, {
         command: process.execPath,
         args: [fixture, '--log', log],
         registryRoot: '/trusted/registry',
@@ -133,16 +157,52 @@ describe('PacketEvidence plugin', () => {
 
   it('exports a directly attachable plugin object', () => {
     expect(PacketEvidence.name).toBe('packet-evidence')
-    expect(PacketEvidence.inject).toEqual(['tools', 'systemPrompt'])
+    expect(PacketEvidence.inject).toEqual(['tools', 'systemPrompt', 'subprocess'])
+  })
+
+  it('does not mount without the native subprocess capability', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    const fiber = await ctx.plugin(PacketEvidence, {
+      command: process.execPath,
+      args: [fixture],
+      registryRoot: '/trusted/registry',
+    })
+    // Cordis leaves a plugin with an unsatisfied injection pending rather than
+    // invoking its callback. The capability therefore never registers tools.
+    expect(fiber.state).toBe(0)
+    expect(ctx.tools?.schemas?.() ?? []).toHaveLength(0)
+  })
+
+  it('resolves the service executable once at capability load', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-packet-evidence-resolve-'))
+    const log = join(root, 'requests.jsonl')
+    try {
+      const ctx = new Context()
+      await ctx.plugin(LocalSubprocessRuntime)
+      await ctx.plugin(SystemPrompt)
+      await ctx.plugin(ToolRuntime)
+      const resolve = vi.spyOn(ctx.subprocess, 'resolveExecutable')
+      await apply(ctx, {
+        command: process.execPath,
+        args: [fixture, '--log', log],
+        registryRoot: '/trusted/registry',
+      })
+      expect(resolve).toHaveBeenCalledTimes(1)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 
   it('does not expose materialization as a model-facing tool', async () => {
     const { root, log } = await tempClient()
     try {
       const ctx = new Context()
+      await ctx.plugin(LocalSubprocessRuntime)
       await ctx.plugin(SystemPrompt)
       await ctx.plugin(ToolRuntime)
-      apply(ctx, {
+      await apply(ctx, {
         command: process.execPath,
         args: [fixture, '--log', log],
         registryRoot: '/trusted/registry',
