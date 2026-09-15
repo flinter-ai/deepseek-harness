@@ -1573,6 +1573,32 @@ export interface Config {
 
 Source: [`packages/feedback/message-feedback/src/index.ts:49`](../packages/feedback/message-feedback/src/index.ts)
 
+<a id="deepseek-aidsh-packet-evidence"></a>
+
+## `@deepseek-ai/dsh-packet-evidence`
+
+```ts config-catalog
+/** External process configuration for the canonical packet service. */
+export interface Config {
+  /** Executable that serves packet-registry-service-v1 (for example python3). */
+  command: string
+  /** Arguments before the plugin appends `--registry-root <registryRoot>`. */
+  args?: string[]
+  /** Trusted canonical registry root understood by the configured service. */
+  registryRoot: string
+  /** Optional process working directory; it is never sent to the model. */
+  cwd?: string
+  /** Cooperative deadline for one service invocation. */
+  timeoutMs?: number
+  /** Maximum response bytes accepted from one service invocation. */
+  maxResponseBytes?: number
+  /** Prefix for model-facing tool names, default `flinter_`. */
+  toolPrefix?: string
+}
+```
+
+Source: [`packages/flinter/dsh-packet-evidence/src/index.ts:40`](../packages/flinter/dsh-packet-evidence/src/index.ts)
+
 <a id="deepseek-aidsh-permission-presets"></a>
 
 ## `@deepseek-ai/dsh-permission-presets`
