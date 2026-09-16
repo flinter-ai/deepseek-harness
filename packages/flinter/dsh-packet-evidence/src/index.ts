@@ -13,7 +13,13 @@ import z from '@deepseek-ai/schemastery'
 import type { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 import { PacketEvidenceClient } from './client.ts'
 import { DshSubprocessTransport } from './dsh-transport.ts'
-import { registerPacketTools } from './tools.ts'
+import {
+  createPacketToolHandlers,
+  registerPacketTools,
+  type EvidenceGetToolArgs,
+  type PacketDescribeToolArgs,
+  type PacketToolHandlers,
+} from './tools.ts'
 import {
   DEFAULT_LIMITS,
   DEFAULT_MAX_RESPONSE_BYTES,
@@ -29,6 +35,18 @@ import {
   type ResolvedConfig,
 } from './types.ts'
 
+declare module '@deepseek-ai/cordis' {
+  interface Context {
+    /**
+     * Host-only packet evidence client exposed under the agreed service key
+     * for the Jacq adapter. This is a DSH Context service, not a model tool;
+     * it carries the `materializeJacq` host integration and is removed when
+     * the packet-evidence plugin is disposed.
+     */
+    flinterPacketEvidence: PacketEvidenceClient
+  }
+}
+
 export {
   DEFAULT_LIMITS,
   DEFAULT_MAX_RESPONSE_BYTES,
@@ -37,8 +55,12 @@ export {
   PacketEvidenceError,
   PacketEvidenceClient,
   DshSubprocessTransport,
+  createPacketToolHandlers,
 }
 export type {
+  EvidenceGetToolArgs,
+  PacketDescribeToolArgs,
+  PacketToolHandlers,
   EvidenceGetOptions,
   EvidenceLimits,
   PacketServiceError,
@@ -126,8 +148,37 @@ function resolveConfig(config: Config): ResolvedConfig {
   }
 }
 
+/**
+ * Fail closed when the runtime Context cannot execute child processes. A
+ * missing `ctx.subprocess` service (or one without resolveExecutable/spawn)
+ * is a configuration error, detected before any executable resolution or
+ * process start is attempted.
+ */
+function assertSubprocessRuntime(ctx: Context): SubprocessRuntime {
+  let runtime: unknown
+  try {
+    runtime = ctx.subprocess
+  } catch {
+    runtime = undefined
+  }
+  const candidate = runtime as Partial<SubprocessRuntime> | null | undefined
+  if (
+    candidate === null
+    || candidate === undefined
+    || typeof candidate.resolveExecutable !== 'function'
+    || typeof candidate.spawn !== 'function'
+  ) {
+    throw new PacketEvidenceError(
+      'packet-evidence requires a Context providing ctx.subprocess with resolveExecutable and spawn',
+      'SUBPROCESS_UNAVAILABLE',
+    )
+  }
+  return candidate as SubprocessRuntime
+}
+
 /** Register the native DSH packet evidence capability. */
 export async function apply(ctx: Context, config: Config): Promise<void> {
+  const subprocess = assertSubprocessRuntime(ctx)
   const resolved = resolveConfig(config)
   const setupAbort = new AbortController()
   const stopSetupCancellation = ctx.on('internal/plugin', (fiber) => {
@@ -136,14 +187,18 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     }
   })
   try {
-    const executable = await ctx.subprocess.resolveExecutable(resolved.command, undefined, setupAbort.signal)
+    const executable = await subprocess.resolveExecutable(resolved.command, undefined, setupAbort.signal)
     setupAbort.signal.throwIfAborted()
     const transport = new DshSubprocessTransport(
-      ctx.subprocess as SubprocessRuntime,
+      subprocess,
       { ...resolved, executable },
     )
     const client = new PacketEvidenceClient(transport)
     registerPacketTools(ctx, client, resolved)
+    // Host-only capability for the Jacq adapter. `ctx.provide` binds the
+    // registration effect to this plugin fiber, so the configured client is
+    // removed from the Context when the packet-evidence plugin is disposed.
+    ctx.provide('flinterPacketEvidence', client)
   } finally {
     stopSetupCancellation()
   }
