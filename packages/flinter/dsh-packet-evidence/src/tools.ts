@@ -20,10 +20,53 @@ const PROMPT_TEXT =
   + 'and distinguishes valid empty results, bounded/truncated views, and service errors. '
   + 'Evidence is advisory for inspection; it does not establish semantic ground truth.'
 
+/** Model-facing arguments of `<prefix>packet_describe`. */
+export interface PacketDescribeToolArgs {
+  readonly packet_id: string
+}
+
+/** Model-facing arguments of `<prefix>evidence_get`; unset bounds stay service-owned. */
+export interface EvidenceGetToolArgs {
+  readonly packet_id: string
+  readonly refs?: string[]
+  readonly max_total_chars?: number
+  readonly max_item_chars?: number
+  readonly max_items?: number
+}
+
+/** Named tool-handler seams bound to one protocol client. */
+export interface PacketToolHandlers {
+  handlePacketDescribe(args: PacketDescribeToolArgs, signal?: AbortSignal): Promise<JsonValue>
+  handleEvidenceGet(args: EvidenceGetToolArgs, signal?: AbortSignal): Promise<JsonValue>
+}
+
+/**
+ * Create the named handlers backing the model tools. Each handler only
+ * translates model arguments and forwards the DSH execution signal; all
+ * evidence semantics remain in the client and the canonical service.
+ */
+export function createPacketToolHandlers(client: PacketEvidenceClient): PacketToolHandlers {
+  return {
+    handlePacketDescribe(args, signal) {
+      return client.packetDescribe(args.packet_id, signal)
+        .then(value => value as unknown as JsonValue)
+    },
+    handleEvidenceGet(args, signal) {
+      return client.evidenceGet(args.packet_id, {
+        ...(args.refs === undefined ? {} : { refs: args.refs }),
+        ...(args.max_total_chars === undefined ? {} : { max_total_chars: args.max_total_chars }),
+        ...(args.max_item_chars === undefined ? {} : { max_item_chars: args.max_item_chars }),
+        ...(args.max_items === undefined ? {} : { max_items: args.max_items }),
+      }, signal).then(value => value as unknown as JsonValue)
+    },
+  }
+}
+
 /** Register the model-facing packet tools; evidence semantics stay in Search-R1. */
 export function registerPacketTools(ctx: Context, client: PacketEvidenceClient, config: ResolvedConfig): void {
   const describeName = `${config.toolPrefix}packet_describe`
   const evidenceName = `${config.toolPrefix}evidence_get`
+  const { handlePacketDescribe, handleEvidenceGet } = createPacketToolHandlers(client)
   ctx.systemPrompt.section({
     name: 'tool:packet-evidence',
     order: FIRST_PARTY_SECTION_ORDER.TOOL_SESSION_QUERY + 5,
@@ -39,8 +82,7 @@ export function registerPacketTools(ctx: Context, client: PacketEvidenceClient, 
     output: JSON_OUTPUT,
     timeoutMs: config.timeoutMs,
     isConcurrencySafe: () => true,
-    execute: async (args, exec) => client.packetDescribe(args.packet_id, exec.signal)
-      .then(value => value as unknown as JsonValue),
+    execute: (args, exec) => handlePacketDescribe(args, exec.signal),
   }))
 
   ctx.tools.register(defineTool({
@@ -57,11 +99,6 @@ export function registerPacketTools(ctx: Context, client: PacketEvidenceClient, 
     output: JSON_OUTPUT,
     timeoutMs: config.timeoutMs,
     isConcurrencySafe: () => true,
-    execute: async (args, exec) => client.evidenceGet(args.packet_id, {
-      ...(args.refs === undefined ? {} : { refs: args.refs }),
-      ...(args.max_total_chars === undefined ? {} : { max_total_chars: args.max_total_chars }),
-      ...(args.max_item_chars === undefined ? {} : { max_item_chars: args.max_item_chars }),
-      ...(args.max_items === undefined ? {} : { max_items: args.max_items }),
-    }, exec.signal).then(value => value as unknown as JsonValue),
+    execute: (args, exec) => handleEvidenceGet(args, exec.signal),
   }))
 }
