@@ -1,0 +1,119 @@
+# CircleCI is an additive PR validation path. Existing GitHub Actions and the
+# self-hosted runner fallback remain authoritative until a hosted run is proven.
+version: 2.1
+
+parameters:
+  run_deep_workflow:
+    type: boolean
+    default: false
+
+jobs:
+  pr-validation:
+    docker:
+      - image: cimg/node:24.21.0
+    resource_class: medium
+    working_directory: ~/deepseek-harness
+    environment:
+      DSH_TELEMETRY_DISABLED: "1"
+      DSH_GATE_CONCURRENCY: "2"
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - pnpm-v1-node24-{{ checksum "pnpm-lock.yaml" }}
+            - pnpm-v1-node24-
+      - run:
+          name: Install pinned pnpm
+          command: |
+            npm install --global --prefix "$HOME/.local" pnpm@11.7.0
+            export PATH="$HOME/.local/bin:$PATH"
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$BASH_ENV"
+            pnpm --version
+      - run:
+          name: Install dependencies (immutable)
+          command: pnpm install --frozen-lockfile
+      - save_cache:
+          key: pnpm-v1-node24-{{ checksum "pnpm-lock.yaml" }}
+          paths:
+            - ~/.local/share/pnpm/store
+      - run:
+          name: Run static CI gates
+          command: pnpm run check:ci:static
+          no_output_timeout: 30m
+      - run:
+          name: Run deterministic flinter package tests
+          command: |
+            packet_spec="packages/flinter/dsh-packet-evidence/tests/index.spec.ts"
+            if [ -f "$packet_spec" ]; then
+              pnpm exec vitest run "$packet_spec"
+            else
+              pnpm exec vitest run packages/flinter --passWithNoTests
+            fi
+          no_output_timeout: 15m
+
+  deep-coverage:
+    machine:
+      image: ubuntu-2404:current
+    resource_class: large
+    working_directory: ~/deepseek-harness
+    environment:
+      DSH_TELEMETRY_DISABLED: "1"
+      DSH_COVERAGE_MAX_WORKERS: "2"
+      DSH_COVERAGE_PARTITIONS: "4"
+      DSH_GATE_CONCURRENCY: "2"
+      RUNNER_TEMP: /tmp/circleci-runner-temp
+      GITHUB_PATH: /tmp/circleci-github-path
+    steps:
+      - checkout
+      - run:
+          name: Install Node 24.21.0 and pinned pnpm
+          command: |
+            node_version=24.21.0
+            node_dir="$HOME/.local/node-v${node_version}-linux-x64"
+            mkdir -p "$HOME/.local"
+            curl --fail --location --output /tmp/node.tar.xz "https://nodejs.org/dist/v${node_version}/node-v${node_version}-linux-x64.tar.xz"
+            curl --fail --location --output /tmp/SHASUMS256.txt "https://nodejs.org/dist/v${node_version}/SHASUMS256.txt"
+            grep "  node-v${node_version}-linux-x64.tar.xz$" /tmp/SHASUMS256.txt | (cd /tmp && sha256sum --check)
+            tar -xJf /tmp/node.tar.xz -C "$HOME/.local"
+            export PATH="$node_dir/bin:$PATH"
+            npm install --global --prefix "$HOME/.local" pnpm@11.7.0
+            export PATH="$HOME/.local/bin:$node_dir/bin:$PATH"
+            {
+              echo "export PATH=\"$HOME/.local/bin:$node_dir/bin:\$PATH\""
+            } >> "$BASH_ENV"
+            node --version
+            pnpm --version
+      - run:
+          name: Install dependencies and prepare bubblewrap
+          command: |
+            mkdir -p "$RUNNER_TEMP"
+            : > "$GITHUB_PATH"
+            pnpm install --frozen-lockfile
+            bash scripts/prepare-ci-bubblewrap.sh
+            while IFS= read -r path; do
+              [ -n "$path" ] && printf 'export PATH="%s:$PATH"\n' "$path" >> "$BASH_ENV"
+            done < "$GITHUB_PATH"
+          no_output_timeout: 30m
+      - run:
+          name: Run exhaustive coverage gate
+          command: pnpm run check:ci:coverage
+          no_output_timeout: 30m
+
+workflows:
+  pr-validation:
+    jobs:
+      - pr-validation:
+          filters:
+            branches:
+              ignore: master
+
+  # Invoke this workflow manually with run_deep_workflow=true. The hold keeps
+  # the existing exhaustive coverage gate an explicit approval action.
+  manual-deep-coverage:
+    when: << pipeline.parameters.run_deep_workflow >>
+    jobs:
+      - approve-deep-coverage:
+          type: approval
+      - deep-coverage:
+          requires:
+            - approve-deep-coverage
