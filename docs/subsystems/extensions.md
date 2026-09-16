@@ -256,6 +256,46 @@ Types: [Agent](core.md)
 
 Source: [`packages/extensions/cordis-host-runner/src/index.ts`](../../packages/extensions/cordis-host-runner/src/index.ts)
 
+<a id="ctxflinterpacketevidence--packetevidenceclient"></a>
+
+### `ctx.flinterPacketEvidence` — `PacketEvidenceClient`
+
+Protocol client; transport/runtime concerns are injected by the host.
+
+```ts cordis-catalog
+/**
+ * Fetch metadata only; evidence bodies are not returned.
+ *
+ * @param packetId opaque canonical packet identifier validated before the call
+ * @param signal optional abort signal forwarded to the transport request
+ * @returns the accepted service response carrying packet metadata
+ */
+async packetDescribe(packetId: string, signal?: AbortSignal): Promise<PacketServiceResponse>
+
+/**
+ * Fetch bounded evidence through the canonical service.
+ *
+ * @param packetId opaque canonical packet identifier validated before the call
+ * @param options caller-selected references and evidence bounds; unset bounds stay service-owned
+ * @param signal optional abort signal forwarded to the transport request
+ * @returns the accepted service response carrying the bounded evidence view
+ */
+async evidenceGet( packetId: string, options: EvidenceGetOptions = {}, signal?: AbortSignal, ): Promise<PacketServiceResponse>
+
+/**
+ * Host-side compatibility operation for Jacq; it is not a model tool.
+ *
+ * @param packetId opaque canonical packet identifier validated before the call
+ * @param outputDir host-only directory the service materializes the snapshot into
+ * @param limits caller-selected snapshot bounds; unset bounds stay service-owned
+ * @param signal optional abort signal forwarded to the transport request
+ * @returns the accepted service response confirming the bounded snapshot
+ */
+async materializeJacq( packetId: string, outputDir: string, limits: EvidenceLimits = {}, signal?: AbortSignal, ): Promise<PacketServiceResponse>
+```
+
+Source: [`packages/flinter/dsh-packet-evidence/src/client.ts`](../../packages/flinter/dsh-packet-evidence/src/client.ts)
+
 <a id="ctxinspector--inspectorservice"></a>
 
 ### `ctx.inspector` — `InspectorService`

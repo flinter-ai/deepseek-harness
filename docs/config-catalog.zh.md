@@ -1695,6 +1695,34 @@ export interface Config {
 
 来源：[`packages/feedback/message-feedback/src/index.ts:40`](../packages/feedback/message-feedback/src/index.ts)
 
+<a id="deepseek-aidsh-packet-evidence"></a>
+
+## `@deepseek-ai/dsh-packet-evidence`
+
+需要：`tools` · `systemPrompt` · `subprocess`
+
+```ts config-catalog
+/** Public capability configuration type; the value below is its schema. */
+export interface Config {
+  /** Executable that serves packet-registry-service-v1 (for example python3). */
+  command: string
+  /** Arguments before the capability appends `--registry-root <registryRoot>`. */
+  args?: string[]
+  /** Trusted canonical registry root understood by the configured service. */
+  registryRoot: string
+  /** Optional process working directory; it is never sent to the model. */
+  cwd?: string
+  /** DSH tool timeout; the standard timeout policy owns the deadline. */
+  timeoutMs?: number
+  /** Maximum response bytes accepted from one service invocation. */
+  maxResponseBytes?: number
+  /** Prefix for model-facing tool names, default `flinter_`. */
+  toolPrefix?: string
+}
+```
+
+来源：[`packages/flinter/dsh-packet-evidence/src/index.ts:74`](../packages/flinter/dsh-packet-evidence/src/index.ts)
+
 <a id="deepseek-aidsh-permission-presets"></a>
 
 ## `@deepseek-ai/dsh-permission-presets`

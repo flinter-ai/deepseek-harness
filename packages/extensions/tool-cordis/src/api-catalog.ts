@@ -950,6 +950,31 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'flinterPacketEvidence',
+    summary: 'Protocol client; transport/runtime concerns are injected by the host.',
+    description: 'Protocol client; transport/runtime concerns are injected by the host.',
+    methods: [
+      {
+        signature: 'async packetDescribe(packetId: string, signal?: AbortSignal): Promise<PacketServiceResponse>',
+        description: 'Fetch metadata only; evidence bodies are not returned.',
+        parameters: [{ name: 'packetId', description: 'opaque canonical packet identifier validated before the call' }, { name: 'signal', description: 'optional abort signal forwarded to the transport request' }],
+        returns: 'the accepted service response carrying packet metadata',
+      },
+      {
+        signature: 'async evidenceGet( packetId: string, options: EvidenceGetOptions = {}, signal?: AbortSignal, ): Promise<PacketServiceResponse>',
+        description: 'Fetch bounded evidence through the canonical service.',
+        parameters: [{ name: 'packetId', description: 'opaque canonical packet identifier validated before the call' }, { name: 'options', description: 'caller-selected references and evidence bounds; unset bounds stay service-owned' }, { name: 'signal', description: 'optional abort signal forwarded to the transport request' }],
+        returns: 'the accepted service response carrying the bounded evidence view',
+      },
+      {
+        signature: 'async materializeJacq( packetId: string, outputDir: string, limits: EvidenceLimits = {}, signal?: AbortSignal, ): Promise<PacketServiceResponse>',
+        description: 'Host-side compatibility operation for Jacq; it is not a model tool.',
+        parameters: [{ name: 'packetId', description: 'opaque canonical packet identifier validated before the call' }, { name: 'outputDir', description: 'host-only directory the service materializes the snapshot into' }, { name: 'limits', description: 'caller-selected snapshot bounds; unset bounds stay service-owned' }, { name: 'signal', description: 'optional abort signal forwarded to the transport request' }],
+        returns: 'the accepted service response confirming the bounded snapshot',
+      },
+    ],
+  },
+  {
     key: 'fs',
     summary: 'Abstract filesystem provider.',
     description: 'Abstract filesystem provider. Targets must preserve identity across aliases; reads expose regular UTF-8 text or typed errors, listings are stable and content-free, and mutations are atomic. Optional guards add stale protection without changing the unguarded provider contract.',
@@ -4294,6 +4319,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface EpochHeader {\n    config: LlmCallConfig;\n    adapterDefaults?: LlmCallConfigAdapterDefaults;\n    tools?: ToolSchema[];\n}',
   },
   {
+    name: 'EvidenceGetOptions',
+    declaration: 'export interface EvidenceGetOptions extends EvidenceLimits {\n    refs?: string[];\n}',
+  },
+  {
+    name: 'EvidenceLimits',
+    declaration: 'export interface EvidenceLimits {\n    max_total_chars?: number;\n    max_item_chars?: number;\n    max_items?: number;\n}',
+  },
+  {
     name: 'FeedbackCategory',
     declaration: 'export type FeedbackCategory = \'task-result\' | \'instruction-following\' | \'product-interaction\' | \'service-stability\' | \'resource-cost\' | \'security-privacy-permission\' | \'other\';',
   },
@@ -4840,6 +4873,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'OptionalSessionSeq',
     declaration: 'export type OptionalSessionSeq = SessionSeq | null;',
+  },
+  {
+    name: 'PacketServiceError',
+    declaration: 'export interface PacketServiceError {\n    readonly code: string;\n    readonly message: string;\n}',
+  },
+  {
+    name: 'PacketServiceResponse',
+    declaration: 'export interface PacketServiceResponse {\n    readonly schema: string;\n    readonly id: JsonValue;\n    readonly ok: boolean;\n    readonly operation?: string;\n    readonly packet_id?: string;\n    readonly source_sha256?: string;\n    readonly requested_refs?: readonly string[];\n    readonly limits?: EvidenceLimits;\n    readonly result?: JsonValue;\n    readonly error?: PacketServiceError;\n}',
   },
   {
     name: 'PermissionSelect',
