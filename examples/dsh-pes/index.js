@@ -24,6 +24,11 @@
  * plugin config or $PES_TRACE_* environment. Emission is at-most-once per
  * distinct result in-process, classified honestly on transport failure, and
  * never alters the scientific result.
+ *
+ * Optional `reasoning_bank` config registers a process-local `reasoningBank`
+ * service. The service receives only accepted trace records through the
+ * emitter callback; it is an adapter surface for a future self-improvement
+ * controller and is never a model-facing tool.
  */
 
 export const name = 'dsh-pes'
@@ -32,6 +37,7 @@ export const inject = ['tools']
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { resolveEngineConfig } from './engine.js'
 import { renderPesResult } from './render.js'
+import { createReasoningBank } from './reasoning-bank.js'
 import { createTraceEmitter, resolveTraceConfig } from './trace.js'
 import {
   SEARCH_EVENTS,
@@ -50,10 +56,17 @@ export function apply(ctx, config = {}) {
   const engine = resolveEngineConfig(config, process.env)
   const logger = ctx.logger
   const trace = resolveTraceConfig(config, process.env)
+  const reasoningBank = resolveReasoningBank(config)
+  const disposeReasoningBank = reasoningBank === undefined
+    ? undefined
+    : ctx.provide('reasoningBank', reasoningBank)
   const emitter = createTraceEmitter({
     traceConfig: trace,
     enginePin: engine.enginePin,
     logger,
+    onAcceptedTrace: reasoningBank === undefined
+      ? undefined
+      : (record, result) => reasoningBank.ingest(record, result),
   })
 
   const unregistered = [
@@ -115,7 +128,22 @@ export function apply(ctx, config = {}) {
   if (logger && trace.enabled) {
     logger.info('[dsh-pes] trace emitter enabled: automatic searchable-trace emission after completed results')
   }
+  if (logger && reasoningBank !== undefined) {
+    logger.info('[dsh-pes] reasoning bank enabled: accepted traces are available through ctx.reasoningBank')
+  }
   ctx.on('dispose', () => {
     for (const unregister of unregistered) unregister()
+    disposeReasoningBank?.()
   })
+}
+
+function resolveReasoningBank(config) {
+  const setting = config.reasoning_bank
+  if (setting === undefined || setting === false) return undefined
+  if (setting === true) return createReasoningBank()
+  if (setting === null || typeof setting !== 'object' || Array.isArray(setting)) {
+    throw new TypeError('[dsh-pes] config.reasoning_bank must be true, false, or an object')
+  }
+  const maxEntries = setting.max_entries ?? setting.maxEntries
+  return createReasoningBank(maxEntries === undefined ? {} : { maxEntries })
 }

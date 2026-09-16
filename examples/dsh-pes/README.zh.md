@@ -45,6 +45,7 @@ config: {
   timeout_ms: 30_000,                           // validated int in [1, 120_000]
   artifacts_root: '/data/artifacts',            // optional artifact root
   engine_pin: 'c05c3fc747f0aa0fcb9d0603009add71c59e091b', // optional producer pin
+  reasoning_bank: true,                           // opt in to ctx.reasoningBank
 }
 ```
 
@@ -71,6 +72,13 @@ config: {
 | `trace_run_ordinal_base` | `PES_TRACE_RUN_ORDINAL_BASE` | `0` | 首个发射的 run ordinal |
 | `trace_post_timeout_ms` | `PES_TRACE_POST_TIMEOUT_MS` | `10000` | POST 截止（校验 int in [1, 60000]） |
 
+### 证据推理库
+
+`reasoning-bank.js` 提供有界、确定性的内存证据库。设置 `reasoning_bank: true`（或带有
+`max_entries` 的对象）即可把它注册为 `ctx.reasoningBank` 服务。已接受的轨迹记录通过可选的
+`onAcceptedTrace` 适配器接缝流入；回调错误会吞掉，绝不改变科学结果。自我改进循环目前尚未上线；
+这个服务是面向未来控制器、可供审查的证据记忆接缝。绝不存储原始思维链、提示词、密钥、HMAC、媒体或无界 payload。
+
 ## 集成 gate（NOT_RUN —— 不由本 PR 完成）
 
 - **运行时引擎打包**：让 `python3 -m event_index.query` 在部署时可导入（包含 `event_index` 包及其数据文件的 wheel/镜像层）属于部署工作，不是本插件 PR。在此之前，无法导入的引擎会以结构化 `engine-nonzero-exit` / `engine-unavailable` 结果呈现——绝不是一个静默的空答案。
@@ -80,14 +88,14 @@ config: {
 
 ## 加载与测试
 
-headless profile 按 `dsh.profile.bundles` 顺序叠加 bundle；把 `@flinter/dsh-pes` 加入该列表即可通过 `cordis.patch.yml` 挂载插件。在本仓库中，该组合由 `tests/loader.spec.ts` 对着真实 bundle patch 校验，引擎接缝与结构化错误分类由 `tests/seam.spec.ts` 钉住，结构化结果契约由 `tests/contract.spec.ts` 钉住，插件端到端启动由 `tests/keyless-smoke.e2e.ts` 验证。运行时自有的发射器——规范字节/签名、传输归属、至多一次的重复/重试、400/401/409/503 分类、abstained/error 结果不发射——由 `tests/trace.spec.ts` 钉住；contract 与 smoke driver 还会启动 localhost receiver，端到端断言自动发射（每个不同的 completed 结果一条记录，精确请求体 + HMAC）。
+headless profile 按 `dsh.profile.bundles` 顺序叠加 bundle；把 `@flinter/dsh-pes` 加入该列表即可通过 `cordis.patch.yml` 挂载插件。在本仓库中，该组合由 `tests/loader.spec.ts` 对着真实 bundle patch 校验，引擎接缝与结构化错误分类由 `tests/seam.spec.ts` 钉住，结构化结果契约由 `tests/contract.spec.ts` 钉住，插件端到端启动由 `tests/keyless-smoke.e2e.ts` 验证。运行时自有的发射器——规范字节/签名、传输归属、至多一次的重复/重试、400/401/409/503 分类、abstained/error 结果不发射——由 `tests/trace.spec.ts` 与 `tests/reasoning-bank.spec.ts` 钉住；contract 与 smoke driver 还会启动 localhost receiver，端到端断言自动发射（每个不同的 completed 结果一条记录，精确请求体 + HMAC）。
 
 ```sh
 # From the worktree, after pnpm install:
-pnpm exec vitest run examples/dsh-pes/tests/loader.spec.ts examples/dsh-pes/tests/seam.spec.ts examples/dsh-pes/tests/contract.spec.ts examples/dsh-pes/tests/trace.spec.ts
+pnpm exec vitest run examples/dsh-pes/tests/loader.spec.ts examples/dsh-pes/tests/seam.spec.ts examples/dsh-pes/tests/contract.spec.ts examples/dsh-pes/tests/trace.spec.ts examples/dsh-pes/tests/reasoning-bank.spec.ts
 pnpm exec vitest run --config vitest.e2e.config.ts examples/dsh-pes/tests/keyless-smoke.e2e.ts
 # The same suites against built lib/ (as CI runs them):
-DSH_EXAMPLE_MODE=lib pnpm exec vitest run examples/dsh-pes/tests/loader.spec.ts examples/dsh-pes/tests/seam.spec.ts examples/dsh-pes/tests/contract.spec.ts examples/dsh-pes/tests/trace.spec.ts
+DSH_EXAMPLE_MODE=lib pnpm exec vitest run examples/dsh-pes/tests/loader.spec.ts examples/dsh-pes/tests/seam.spec.ts examples/dsh-pes/tests/contract.spec.ts examples/dsh-pes/tests/trace.spec.ts examples/dsh-pes/tests/reasoning-bank.spec.ts
 DSH_EXAMPLE_MODE=lib pnpm exec vitest run --config vitest.e2e.config.ts examples/dsh-pes/tests/keyless-smoke.e2e.ts
 ```
 

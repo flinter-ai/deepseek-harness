@@ -12,6 +12,9 @@
     "render.js",
     "trace.js",
     "trace-record.js",
+    "reasoning-bank.js",
+    "reasoning-bank.d.ts",
+    "trace.d.ts",
     "cordis.patch.yml"
   ],
   "dsh": {

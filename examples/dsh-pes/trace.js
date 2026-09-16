@@ -41,7 +41,7 @@ import {
   traceRecordFor,
 } from './trace-record.js'
 
-export const SIGNATURE_HEADER = 'x-webhook-signature'
+export const SIGNATURE_HEADER = 'x-dsh-signature'
 export const TRACE_POST_CONTENT_TYPE = 'application/json'
 export const TRACE_USER_AGENT = 'dsh-pes-trace-emitter/0.1.0'
 export const DEFAULT_TRACE_POST_TIMEOUT_MS = 10_000
@@ -275,7 +275,7 @@ export function resultFingerprint(result, enginePin) {
 
 /**
  * Default transport: POST the exact signed body to the callback URL with the
- * `x-webhook-signature` header convention (the CP webhook-verify convention; T1 producer seam reads this header)
+ * `x-dsh-signature` header convention selected by the CP producer seam.
  * (lowercase hex HMAC-SHA256 over the raw bytes), bounded by an abort
  * timeout. Network-level failures reject out of the promise.
  * @param callbackUrl - runtime-configured callback URL.
@@ -310,7 +310,7 @@ export async function postTrace(callbackUrl, body, signature, timeoutMs) {
  *   for keyless transport tests, defaulting to the fetch-based postTrace.
  * @returns `{ enabled, maybeEmit }`.
  */
-export function createTraceEmitter({ traceConfig, enginePin, post, logger }) {
+export function createTraceEmitter({ traceConfig, enginePin, post, logger, onAcceptedTrace }) {
   const enabled = traceConfig.enabled === true
   const seen = new Set()
   let ordinalCounter = traceConfig.runOrdinalBase
@@ -353,6 +353,11 @@ export function createTraceEmitter({ traceConfig, enginePin, post, logger }) {
       const status = await doPost(traceConfig.callbackUrl, body, signature, traceConfig.postTimeoutMs)
       outcome = { status: classifyTraceResponse(status), id: record.id }
       log(outcome.status === 'accepted' ? 'info' : 'warn', `: ${outcome.status}`, record.id)
+      if (outcome.status === 'accepted' && typeof onAcceptedTrace === 'function') {
+        try { await onAcceptedTrace(record, result) } catch {
+          log('warn', ': accepted-trace callback failed', record.id)
+        }
+      }
     } catch {
       outcome = { status: 'unreachable', id: record.id }
       log('warn', ': unreachable', record.id)

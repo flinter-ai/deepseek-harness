@@ -40,6 +40,7 @@ import {
   resolveTraceConfig,
   type ResolvedTraceConfig,
 } from '../trace.js'
+import { createReasoningBank } from '../reasoning-bank.js'
 
 const stubEngine = fileURLToPath(new URL('./fixtures/stub-engine.mjs', import.meta.url))
 const eventsPath = fileURLToPath(new URL('./fixtures/events.jsonl', import.meta.url))
@@ -302,6 +303,36 @@ describe('dsh-pes trace emitter (trace.js)', () => {
     })))
     expect(calls[0]!.signature).toBe(signTraceBody(calls[0]!.body, config.hmacSecret!))
     expect(calls[0]!.timeoutMs).toBe(config.postTimeoutMs)
+  })
+
+  it('feeds the optional reasoning-bank seam only after accepted transport and cannot fail the result', async () => {
+    const bank = createReasoningBank()
+    const { post } = fakePost(200)
+    const emitter = createTraceEmitter({
+      traceConfig: resolvedConfig(),
+      post,
+      onAcceptedTrace: async (record, result) => {
+        bank.ingest(record, result)
+      },
+    })
+    const result = completedResult()
+    expect(await emitter.maybeEmit(result)).toMatchObject({ status: 'accepted' })
+    expect(bank.size()).toBe(1)
+    expect(bank.list()[0]!.traceKind).toBe(SEARCH_EVENTS)
+
+    const failedCallback = createTraceEmitter({
+      traceConfig: resolvedConfig(traceEnv({ PES_TRACE_RUN_ORDINAL_BASE: '7' })),
+      post,
+      onAcceptedTrace: async () => { throw new Error('bank unavailable') },
+    })
+    await expect(failedCallback.maybeEmit(result)).resolves.toMatchObject({ status: 'accepted' })
+
+    const notAccepted = createTraceEmitter({
+      traceConfig: resolvedConfig(traceEnv({ PES_TRACE_RUN_ORDINAL_BASE: '8' })),
+      post: fakePost(503).post,
+      onAcceptedTrace: () => { throw new Error('must not run') },
+    })
+    await expect(notAccepted.maybeEmit(result)).resolves.toMatchObject({ status: 'unavailable' })
   })
 
   it('never lets a result control the destination: transport comes only from runtime config', async () => {

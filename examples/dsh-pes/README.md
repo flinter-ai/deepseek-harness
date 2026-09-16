@@ -71,6 +71,7 @@ config: {
   timeout_ms: 30_000,                           // validated int in [1, 120_000]
   artifacts_root: '/data/artifacts',            // optional artifact root
   engine_pin: 'c05c3fc747f0aa0fcb9d0603009add71c59e091b', // optional producer pin
+  reasoning_bank: true,                           // opt in to ctx.reasoningBank
 }
 ```
 
@@ -125,6 +126,17 @@ and can never select or observe its own destination.
 | `trace_run_ordinal_base` | `PES_TRACE_RUN_ORDINAL_BASE` | `0` | first emitted run ordinal |
 | `trace_post_timeout_ms` | `PES_TRACE_POST_TIMEOUT_MS` | `10000` | POST deadline (validated int in [1, 60000]) |
 
+### Evidence reasoning bank
+
+`reasoning-bank.js` provides a bounded, deterministic in-memory evidence bank.
+Set `reasoning_bank: true` (or an object with `max_entries`) to register it as
+the `ctx.reasoningBank` service. Accepted trace records flow into the bank
+through the optional `onAcceptedTrace` adapter seam; callback errors are
+swallowed and never change the scientific result. The self-improvement loop is
+not live yet; this service is the reviewable evidence-memory seam for a future
+controller. Raw chain-of-thought, prompts, secrets, HMAC, media, and unbounded
+payloads are never stored.
+
 ## Integration gates (NOT_RUN — not completed by this PR)
 
 - **Runtime engine packaging**: making `python3 -m event_index.query`
@@ -157,16 +169,16 @@ result contract is pinned by `tests/contract.spec.ts`, and the plugin is
 booted end-to-end by `tests/keyless-smoke.e2e.ts`. The runtime-owned emitter —
 canonical bytes/signature, transport ownership, at-most-once duplicate/retry,
 400/401/409/503 classification, and no emission for abstained/error results —
-is pinned by `tests/trace.spec.ts`; the contract and smoke drivers also boot
+is pinned by `tests/trace.spec.ts` and `tests/reasoning-bank.spec.ts`; the contract and smoke drivers also boot
 a localhost receiver and assert the automatic emission end to end (one record
 per distinct completed result, exact body + HMAC).
 
 ```sh
 # From the worktree, after pnpm install:
-pnpm exec vitest run examples/dsh-pes/tests/loader.spec.ts examples/dsh-pes/tests/seam.spec.ts examples/dsh-pes/tests/contract.spec.ts examples/dsh-pes/tests/trace.spec.ts
+pnpm exec vitest run examples/dsh-pes/tests/loader.spec.ts examples/dsh-pes/tests/seam.spec.ts examples/dsh-pes/tests/contract.spec.ts examples/dsh-pes/tests/trace.spec.ts examples/dsh-pes/tests/reasoning-bank.spec.ts
 pnpm exec vitest run --config vitest.e2e.config.ts examples/dsh-pes/tests/keyless-smoke.e2e.ts
 # The same suites against built lib/ (as CI runs them):
-DSH_EXAMPLE_MODE=lib pnpm exec vitest run examples/dsh-pes/tests/loader.spec.ts examples/dsh-pes/tests/seam.spec.ts examples/dsh-pes/tests/contract.spec.ts examples/dsh-pes/tests/trace.spec.ts
+DSH_EXAMPLE_MODE=lib pnpm exec vitest run examples/dsh-pes/tests/loader.spec.ts examples/dsh-pes/tests/seam.spec.ts examples/dsh-pes/tests/contract.spec.ts examples/dsh-pes/tests/trace.spec.ts examples/dsh-pes/tests/reasoning-bank.spec.ts
 DSH_EXAMPLE_MODE=lib pnpm exec vitest run --config vitest.e2e.config.ts examples/dsh-pes/tests/keyless-smoke.e2e.ts
 ```
 

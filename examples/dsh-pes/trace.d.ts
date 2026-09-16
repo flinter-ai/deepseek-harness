@@ -68,4 +68,5 @@ export function createTraceEmitter(options: {
   enginePin?: string
   post?: (callbackUrl: string, body: string, signature: string, timeoutMs: number) => Promise<number>
   logger?: Record<string, (message: string, meta?: unknown) => void>
+  onAcceptedTrace?: (record: import('./trace-record.js').TraceRecord, result: PesResult) => void | Promise<void>
 }): TraceEmitter
