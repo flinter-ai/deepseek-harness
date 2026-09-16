@@ -253,6 +253,10 @@
       // in its directory, so keep its source aliases explicit.
       "@deepseek-ai/dsh-aws-worker-profile": ["./packages/flinter/dsh-aws-worker-profile/src"],
       "@deepseek-ai/dsh-aws-worker-profile/invariant": ["./packages/flinter/dsh-aws-worker-profile/src/invariant.ts"],
+      // Packet evidence keeps a dsh-prefixed public package name in a FLINTER
+      // directory, so its aliases are hand-owned too.
+      "@deepseek-ai/dsh-packet-evidence": ["./packages/flinter/dsh-packet-evidence/src"],
+      "@deepseek-ai/dsh-packet-evidence/invariant": ["./packages/flinter/dsh-packet-evidence/src/invariant.ts"],
       // BEGIN generated package aliases — pnpm run gen-tsconfig-paths
       "@deepseek-ai/dsh-acp": ["./packages/acp/acp/src"],
       "@deepseek-ai/dsh-acp/invariant": ["./packages/acp/acp/src/invariant.ts"],
