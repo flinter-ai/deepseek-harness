@@ -1,0 +1,56 @@
+# Additive CircleCI validation for the EC2 reconciliation line. Existing
+# GitHub Actions and self-hosted fallback workflows remain authoritative for
+# artifact publication and deployment.
+version: 2.1
+
+jobs:
+  pr-validation:
+    docker:
+      - image: cimg/node:24.21.0
+    resource_class: medium
+    working_directory: ~/deepseek-harness
+    environment:
+      DSH_TELEMETRY_DISABLED: "1"
+      DSH_GATE_CONCURRENCY: "2"
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - dsh-pnpm-v1-node24-{{ checksum "pnpm-lock.yaml" }}
+            - dsh-pnpm-v1-node24-
+      - run:
+          name: Install pinned pnpm
+          command: |
+            npm install --global --prefix "$HOME/.local" pnpm@11.7.0
+            export PATH="$HOME/.local/bin:$PATH"
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$BASH_ENV"
+            pnpm --version
+      - run:
+          name: Install dependencies (immutable)
+          command: pnpm install --frozen-lockfile
+      - save_cache:
+          key: dsh-pnpm-v1-node24-{{ checksum "pnpm-lock.yaml" }}
+          paths:
+            - ~/.local/share/pnpm/store
+      - run:
+          name: Run static CI gates
+          command: pnpm run check:ci:static
+          no_output_timeout: 30m
+      - run:
+          name: Run packet evidence tests when present
+          command: |
+            packet_spec="packages/flinter/dsh-packet-evidence/tests/index.spec.ts"
+            if [ -f "$packet_spec" ]; then
+              pnpm exec vitest run "$packet_spec"
+            else
+              echo "Packet evidence package is not present on this EC2 base line; static gates remain the validation surface."
+            fi
+          no_output_timeout: 15m
+
+workflows:
+  pr-validation:
+    jobs:
+      - pr-validation:
+          filters:
+            branches:
+              ignore: master
