@@ -47,7 +47,13 @@ function buildEvidenceParams(packetId: string, options: EvidenceGetOptions = {})
 export class PacketEvidenceClient {
   constructor(private readonly transport: PacketServiceTransport) {}
 
-  /** Fetch metadata only; evidence bodies are not returned. */
+  /**
+   * Fetch metadata only; evidence bodies are not returned.
+   *
+   * @param packetId opaque canonical packet identifier validated before the call
+   * @param signal optional abort signal forwarded to the transport request
+   * @returns the accepted service response carrying packet metadata
+   */
   async packetDescribe(packetId: string, signal?: AbortSignal): Promise<PacketServiceResponse> {
     const response = await this.transport.request(
       'packet_describe',
@@ -61,7 +67,14 @@ export class PacketEvidenceClient {
     return accepted
   }
 
-  /** Fetch bounded evidence through the canonical service. */
+  /**
+   * Fetch bounded evidence through the canonical service.
+   *
+   * @param packetId opaque canonical packet identifier validated before the call
+   * @param options caller-selected references and evidence bounds; unset bounds stay service-owned
+   * @param signal optional abort signal forwarded to the transport request
+   * @returns the accepted service response carrying the bounded evidence view
+   */
   async evidenceGet(
     packetId: string,
     options: EvidenceGetOptions = {},
@@ -71,7 +84,15 @@ export class PacketEvidenceClient {
     return this.assertSuccess(response, packetId)
   }
 
-  /** Host-side compatibility operation for Jacq; it is not a model tool. */
+  /**
+   * Host-side compatibility operation for Jacq; it is not a model tool.
+   *
+   * @param packetId opaque canonical packet identifier validated before the call
+   * @param outputDir host-only directory the service materializes the snapshot into
+   * @param limits caller-selected snapshot bounds; unset bounds stay service-owned
+   * @param signal optional abort signal forwarded to the transport request
+   * @returns the accepted service response confirming the bounded snapshot
+   */
   async materializeJacq(
     packetId: string,
     outputDir: string,
