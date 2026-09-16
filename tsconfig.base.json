@@ -264,6 +264,7 @@
       "@deepseek-ai/dsh-aws-worker-profile": ["./packages/flinter/dsh-aws-worker-profile/src"],
       "@deepseek-ai/dsh-aws-worker-profile/invariant": ["./packages/flinter/dsh-aws-worker-profile/src/invariant.ts"],
       "@deepseek-ai/dsh-packet-evidence": ["./packages/flinter/dsh-packet-evidence/src"],
+      "@deepseek-ai/dsh-packet-evidence/invariant": ["./packages/flinter/dsh-packet-evidence/src/invariant.ts"],
       "@deepseek-ai/dsh-util-values": ["./packages/util/values/src"],
       // util/ folders are role-named without the util- prefix their npm names carry,
       // so these aliases stay hand-written like dsh-util-crypto above.

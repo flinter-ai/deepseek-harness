@@ -78,7 +78,7 @@ Search-R1 进程是规范证据的 owner。本包是传输与 DSH presentation c
 | [`src/client.ts`](src/client.ts) | 协议 client 以及 packet identity/error 校验。 |
 | [`src/dsh-transport.ts`](src/dsh-transport.ts) | 使用 `ctx.subprocess` 的 transport 与有界输出收集。 |
 | [`src/tools.ts`](src/tools.ts) | 面向 DSH 模型的 tool schema、提示和 handler。 |
-| — | 不发布 runtime invariant companion；packet evidence 除单次有界请求外不持有可变状态，协议和生命周期测试覆盖 service 边界。 |
+| [`src/invariant.ts`](src/invariant.ts) | DSH test host 使用的包级 invariant companion。 |
 | [`tests/index.spec.ts`](tests/index.spec.ts) | 紧凑请求、进程边界、工具表面、超时和响应边界测试。 |
 | [`tests/fixtures/packet-service.mjs`](tests/fixtures/packet-service.mjs) | 确定性的协议 fixture；它不是 provider 或证据实现。 |
 

@@ -78,7 +78,7 @@ The Search-R1 process is the canonical evidence owner. This package is a transpo
 | [`src/client.ts`](src/client.ts) | Protocol client and packet identity/error validation. |
 | [`src/dsh-transport.ts`](src/dsh-transport.ts) | `ctx.subprocess` transport with bounded collected output. |
 | [`src/tools.ts`](src/tools.ts) | DSH model-facing tool schemas, guidance, and handlers. |
-| — | No runtime invariant companion is published; packet evidence owns no mutable state beyond one bounded request, and protocol and lifecycle tests cover the service boundary. |
+| [`src/invariant.ts`](src/invariant.ts) | Package-owned invariant companion for the DSH test host. |
 | [`tests/index.spec.ts`](tests/index.spec.ts) | Compact-request, process-boundary, tool-surface, timeout, and response-bound tests. |
 | [`tests/fixtures/packet-service.mjs`](tests/fixtures/packet-service.mjs) | Deterministic protocol fixture; it is not a provider or evidence implementation. |
 
