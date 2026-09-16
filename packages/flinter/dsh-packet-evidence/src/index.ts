@@ -121,7 +121,7 @@ function resolveConfig(config: Config): ResolvedConfig {
   if (args.some(arg => typeof arg !== 'string')) {
     throw new TypeError('packet-evidence: args must contain only strings')
   }
-  if (args.includes('--registry-root')) {
+  if (args.some(arg => arg === '--registry-root' || arg.startsWith('--registry-root='))) {
     throw new TypeError('packet-evidence: args must not provide --registry-root')
   }
   const timeoutMs = assertPositiveInteger(config.timeoutMs ?? DEFAULT_TIMEOUT_MS, 'timeoutMs') ?? DEFAULT_TIMEOUT_MS
