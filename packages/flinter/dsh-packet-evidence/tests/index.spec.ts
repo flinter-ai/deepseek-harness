@@ -98,6 +98,18 @@ describe('PacketEvidenceClient', () => {
     expect(ctx.tools?.schemas?.() ?? []).toHaveLength(0)
   })
 
+  it('rejects the equals form of --registry-root as a separate-flag bypass', async () => {
+    const ctx = new Context()
+    await ctx.plugin(LocalSubprocessRuntime)
+    await ctx.plugin(ToolRuntime)
+    await expect(apply(ctx, {
+      command: process.execPath,
+      args: ['--registry-root=/wrong'],
+      registryRoot: '/trusted/registry',
+    })).rejects.toThrow(/must not provide --registry-root/u)
+    expect(ctx.tools?.schemas?.() ?? []).toHaveLength(0)
+  })
+
   it('rejects cancellation and process response overflow', async () => {
     const { root, client, ctx, resolved } = await tempClient()
     try {

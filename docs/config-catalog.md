@@ -1599,7 +1599,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/flinter/dsh-packet-evidence/src/index.ts:52`](../packages/flinter/dsh-packet-evidence/src/index.ts)
+Source: [`packages/flinter/dsh-packet-evidence/src/index.ts:74`](../packages/flinter/dsh-packet-evidence/src/index.ts)
 
 <a id="deepseek-aidsh-permission-presets"></a>
 

@@ -1601,7 +1601,7 @@ export interface Config {
 }
 ```
 
-来源：[`packages/flinter/dsh-packet-evidence/src/index.ts:52`](../packages/flinter/dsh-packet-evidence/src/index.ts)
+来源：[`packages/flinter/dsh-packet-evidence/src/index.ts:74`](../packages/flinter/dsh-packet-evidence/src/index.ts)
 
 <a id="deepseek-aidsh-permission-presets"></a>
 
