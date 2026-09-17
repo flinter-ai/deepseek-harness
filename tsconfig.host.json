@@ -231,6 +231,7 @@
     { "path": "./packages/flinter/dsh-alpha-profile" },
     { "path": "./packages/flinter/dsh-aws-worker-profile" },
     { "path": "./packages/flinter/dsh-packet-evidence" },
+    { "path": "./packages/flinter/dsh-reasoning-bank" },
     { "path": "./packages/llm/llm-workbuddy" },
     { "path": "./packages/shell/bash-local" },
     { "path": "./packages/shell/shell-env" },

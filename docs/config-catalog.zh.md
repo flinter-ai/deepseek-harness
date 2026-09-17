@@ -1603,6 +1603,22 @@ export interface Config {
 
 来源：[`packages/flinter/dsh-packet-evidence/src/index.ts:74`](../packages/flinter/dsh-packet-evidence/src/index.ts)
 
+<a id="deepseek-aidsh-reasoning-bank"></a>
+
+## `@deepseek-ai/dsh-reasoning-bank`
+
+```ts config-catalog
+/** Plugin configuration. The bank is opt-in and process-local. */
+export interface Config {
+  /** Whether the optional host service should be mounted. */
+  readonly enabled?: boolean
+  /** Maximum number of entries retained by this process-local bank. */
+  readonly maxEntries?: number
+}
+```
+
+来源：[`packages/flinter/dsh-reasoning-bank/src/index.ts:65`](../packages/flinter/dsh-reasoning-bank/src/index.ts)
+
 <a id="deepseek-aidsh-permission-presets"></a>
 
 ## `@deepseek-ai/dsh-permission-presets`

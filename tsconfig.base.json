@@ -257,6 +257,10 @@
       // directory, so its aliases are hand-owned too.
       "@deepseek-ai/dsh-packet-evidence": ["./packages/flinter/dsh-packet-evidence/src"],
       "@deepseek-ai/dsh-packet-evidence/invariant": ["./packages/flinter/dsh-packet-evidence/src/invariant.ts"],
+      // Reasoning bank keeps a dsh-prefixed public package name in a FLINTER
+      // directory, so its aliases are hand-owned too.
+      "@deepseek-ai/dsh-reasoning-bank": ["./packages/flinter/dsh-reasoning-bank/src"],
+      "@deepseek-ai/dsh-reasoning-bank/invariant": ["./packages/flinter/dsh-reasoning-bank/src/invariant.ts"],
       // BEGIN generated package aliases — pnpm run gen-tsconfig-paths
       "@deepseek-ai/dsh-acp": ["./packages/acp/acp/src"],
       "@deepseek-ai/dsh-acp/invariant": ["./packages/acp/acp/src/invariant.ts"],
