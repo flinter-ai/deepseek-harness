@@ -1,0 +1,198 @@
+{
+  "schema": "flinter.g1-runtime-input.v1",
+  "author": "root-coordinator",
+  "scope": "local-runtime-fixture",
+  "settled_session_id": "g1-full-corpus",
+  "interrupted_session_id": "g1-interrupted",
+  "tool_name": "segment.qualify",
+  "timeout_ms": 25,
+  "request_defaults": {
+    "allowed_actions": [
+      "action:segment.keep",
+      "action:segment.split"
+    ],
+    "chosen_action": "action:segment.keep",
+    "requested_evidence_refs": [
+      "evidence:requested",
+      "evidence:fetched",
+      "evidence:displayed"
+    ],
+    "fetched_evidence_refs": [
+      "evidence:fetched",
+      "evidence:displayed"
+    ],
+    "displayed_evidence_refs": [
+      "evidence:displayed"
+    ],
+    "observed_evidence_refs": [],
+    "budget_before": 7,
+    "source_ref": "source:local-g1",
+    "model_ref": "model:deterministic-fixture",
+    "policy_revision_ref": "policy:g1-baseline"
+  },
+  "cases": [
+    {
+      "case_id": "case-01-success",
+      "call_id": "call-01",
+      "execution_group": "settled",
+      "candidate_ref": "candidate:g1-01",
+      "stimulus": {
+        "kind": "return",
+        "outcome": "success",
+        "disposition": "retained",
+        "usage": 3,
+        "result_refs": [
+          "result:g1-01"
+        ]
+      }
+    },
+    {
+      "case_id": "case-02-rejection",
+      "call_id": "call-02",
+      "execution_group": "settled",
+      "candidate_ref": "candidate:g1-02",
+      "stimulus": {
+        "kind": "return",
+        "outcome": "rejection",
+        "disposition": "discarded",
+        "usage": null
+      }
+    },
+    {
+      "case_id": "case-03-abstention",
+      "call_id": "call-03",
+      "execution_group": "settled",
+      "candidate_ref": "candidate:g1-03",
+      "stimulus": {
+        "kind": "return",
+        "outcome": "abstention",
+        "disposition": "abstained",
+        "usage": 0
+      }
+    },
+    {
+      "case_id": "case-04-unavailable-evidence",
+      "call_id": "call-04",
+      "execution_group": "settled",
+      "candidate_ref": "candidate:g1-04",
+      "request_overrides": {
+        "fetched_evidence_refs": [],
+        "displayed_evidence_refs": []
+      },
+      "stimulus": {
+        "kind": "return",
+        "outcome": "unavailable-evidence",
+        "disposition": "unavailable",
+        "usage": null
+      }
+    },
+    {
+      "case_id": "case-05-malformed-response",
+      "call_id": "call-05",
+      "execution_group": "settled",
+      "candidate_ref": "candidate:g1-05",
+      "stimulus": {
+        "kind": "throw",
+        "error_code": "FIXTURE_MALFORMED_RESPONSE"
+      }
+    },
+    {
+      "case_id": "case-06-provider-error",
+      "call_id": "call-06",
+      "execution_group": "settled",
+      "candidate_ref": "candidate:g1-06",
+      "stimulus": {
+        "kind": "throw",
+        "error_code": "FIXTURE_PROVIDER_ERROR"
+      }
+    },
+    {
+      "case_id": "case-07-timeout",
+      "call_id": "call-07",
+      "execution_group": "settled",
+      "candidate_ref": "candidate:g1-07",
+      "stimulus": {
+        "kind": "timeout"
+      }
+    },
+    {
+      "case_id": "case-08-exhaustion",
+      "call_id": "call-08",
+      "execution_group": "settled",
+      "candidate_ref": "candidate:g1-08",
+      "request_overrides": {
+        "budget_before": 0
+      },
+      "stimulus": {
+        "kind": "return",
+        "outcome": "exhaustion",
+        "disposition": "abstained",
+        "usage": 7
+      }
+    },
+    {
+      "case_id": "case-09-partial-retention",
+      "call_id": "call-09",
+      "execution_group": "settled",
+      "candidate_ref": "candidate:g1-09",
+      "stimulus": {
+        "kind": "return",
+        "outcome": "partial-retention",
+        "disposition": "partial",
+        "usage": null,
+        "result_refs": [
+          "result:g1-09-child-a"
+        ]
+      }
+    },
+    {
+      "case_id": "case-10-export-conflict",
+      "call_id": "call-10",
+      "execution_group": "settled",
+      "candidate_ref": "candidate:g1-10",
+      "stimulus": {
+        "kind": "return",
+        "outcome": "export-conflict",
+        "disposition": "partial",
+        "usage": null,
+        "result_refs": [
+          "result:g1-10-conflict-a",
+          "result:g1-10-conflict-b"
+        ]
+      }
+    },
+    {
+      "case_id": "case-11-cancelled",
+      "call_id": "call-11",
+      "execution_group": "settled",
+      "candidate_ref": "candidate:g1-11",
+      "stimulus": {
+        "kind": "cancel"
+      }
+    },
+    {
+      "case_id": "case-12-interrupted",
+      "call_id": "call-12",
+      "execution_group": "crash-after-selection-ack",
+      "candidate_ref": "candidate:g1-12",
+      "stimulus": {
+        "kind": "interrupt-after-selection-ack"
+      }
+    },
+    {
+      "case_id": "case-13-unknown",
+      "call_id": "call-13",
+      "execution_group": "settled",
+      "candidate_ref": "candidate:g1-13",
+      "request_overrides": {
+        "budget_before": null
+      },
+      "stimulus": {
+        "kind": "return",
+        "outcome": "unknown",
+        "disposition": "unknown",
+        "usage": null
+      }
+    }
+  ]
+}

@@ -2,12 +2,13 @@ import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import { loadBeforeAck, runG1CrashQualification } from './g1-crash-qualification.ts'
-const inputPath = '/Users/oldap/flinter/.worktrees/search-r1-g1-local-qualification-20260918/docs/physical-experience-search/delivery-gates/g1-coordinator-runtime-input.v1.json'
+const inputPath = fileURLToPath(new URL('./fixtures/g1-coordinator-runtime-input.v1.json', import.meta.url))
 const inputSha = 'bbe385a9a89f2c9b4a749ddc8b00b71855cf8a66c1d4aa724e77f9836c19d6be'
 describe.skipIf(process.platform === 'win32')('G1 hard crash qualification', () => {
   it('records durable crash boundaries from coordinator input', async () => {

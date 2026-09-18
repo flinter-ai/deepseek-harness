@@ -1,6 +1,7 @@
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { parseTestData, runG1Full } from './g1-full-qualification.ts'
 
@@ -8,7 +9,7 @@ import { parseTestData, runG1Full } from './g1-full-qualification.ts'
 
 type EventRecord = { type: string; data: { projection: Record<string, unknown> } }
 
-const inputPath = '/Users/oldap/flinter/.worktrees/search-r1-g1-local-qualification-20260918/docs/physical-experience-search/delivery-gates/g1-coordinator-runtime-input.v1.json'
+const inputPath = fileURLToPath(new URL('./fixtures/g1-coordinator-runtime-input.v1.json', import.meta.url))
 const load = async () => parseTestData(JSON.parse(await readFile(inputPath, 'utf8')))
 
 describe('G1 full qualification', () => {
