@@ -63,14 +63,23 @@ export interface GitHubSourcePublisherConfig {
 
 /** Optional Web composition row. Missing repository identity leaves publishing unavailable. */
 export interface Config {
+  /** Enable GitHub publication for this composition. */
   readonly enabled?: boolean
+  /** Repository root containing the source checkout. */
   readonly repositoryRoot?: string
+  /** Worktree root used for publication operations. */
   readonly worktreeRoot?: string
+  /** GitHub repository owner. */
   readonly owner?: string
+  /** GitHub repository name. */
   readonly repo?: string
+  /** Target branch for pull requests. */
   readonly baseBranch?: string
+  /** Git remote name. */
   readonly remote?: string
+  /** Prefix for generated publication branches. */
   readonly branchPrefix?: string
+  /** Environment variable containing the token. */
   readonly tokenEnv?: string
 }
 
@@ -86,6 +95,9 @@ export class SourcePublisherError extends Error {
 export class GitHubPullRequestClient implements PullRequestClient {
   constructor(private readonly request: typeof fetch = fetch) {}
 
+  /** Create a pull request through GitHub's REST API.
+   * @param input - Pull request details and bearer token.
+   */
   async create(input: PullRequestRequest): Promise<string> {
     const response = await this.request(
       `https://api.github.com/repos/${encodeURIComponent(input.owner)}/${encodeURIComponent(input.repo)}/pulls`,

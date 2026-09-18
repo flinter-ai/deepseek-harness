@@ -3392,9 +3392,6 @@ importers:
       '@deepseek-ai/dsh-client-locale':
         specifier: workspace:^
         version: link:../locale
-      '@deepseek-ai/dsh-client-test-runtime':
-        specifier: workspace:^
-        version: link:../../test-support/client-runtime
       '@deepseek-ai/dsh-client-ui-conversation':
         specifier: workspace:^
         version: link:../ui-conversation
@@ -6152,13 +6149,6 @@ importers:
         version: link:../../typert/protocol
 
   packages/host/source-publisher-github:
-    dependencies:
-      '@deepseek-ai/dsh-home-paths':
-        specifier: workspace:^
-        version: link:../../util/home-paths
-      '@deepseek-ai/dsh-workspace':
-        specifier: workspace:^
-        version: link:../../workspace/workspace
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: workspace:^

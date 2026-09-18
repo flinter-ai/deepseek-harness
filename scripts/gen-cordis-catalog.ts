@@ -62,6 +62,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   attachments: 'attachment.md',
   shell: 'shell.md',
   shellEnv: 'shell.md',
+  sourceController: 'extensions.md',
   clientModules: 'client-modules.md',
   codeRuntime: 'code-runtime.md',
   commands: 'commands.md',
@@ -174,6 +175,8 @@ export const SERVICE_WALK_EXEMPTIONS: Record<string, string> = {
   slots: 'client-side interface-typed browser service — packages/client/ui-renderer/README.md owns the API',
   theme: 'client-side interface-typed browser service — packages/client/ui-theme/README.md owns the API',
   workspaces: 'client-side interface-typed browser service — packages/api/workspace-controller/README.md owns the API',
+  sourceDrafts: 'client-side source draft remote — packages/client/ui-source-editor/README.md owns the API',
+  sourcePublisher: 'optional Host publication adapter — packages/host/source-publisher-github/README.md owns the API',
 }
 
 /**
@@ -654,6 +657,18 @@ export const FOUNDATION_TYPE_NAMES: ReadonlySet<string> = new Set([
 
 /** Project types deliberately documented outside the subsystems catalog. */
 export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
+  SourceDraftBootstrapRequest: 'source-draft request contract is owned by packages/core/source-draft-model/src/types.ts',
+  SourceDraftBootstrapResult: 'source-draft result contract is owned by packages/core/source-draft-model/src/types.ts',
+  SourceDraftListRequest: 'source-draft request contract is owned by packages/core/source-draft-model/src/types.ts',
+  SourceDraftListResult: 'source-draft result contract is owned by packages/core/source-draft-model/src/types.ts',
+  SourceDraftGetRequest: 'source-draft request contract is owned by packages/core/source-draft-model/src/types.ts',
+  SourceDraftGetResult: 'source-draft result contract is owned by packages/core/source-draft-model/src/types.ts',
+  SourceDraftSaveRequest: 'source-draft request contract is owned by packages/core/source-draft-model/src/types.ts',
+  SourceDraftSaveResult: 'source-draft result contract is owned by packages/core/source-draft-model/src/types.ts',
+  SourceDraftDeleteRequest: 'source-draft request contract is owned by packages/core/source-draft-model/src/types.ts',
+  SourceDraftDeleteResult: 'source-draft result contract is owned by packages/core/source-draft-model/src/types.ts',
+  SourceDraftPublishRequest: 'source-draft request contract is owned by packages/core/source-draft-model/src/types.ts',
+  SourceDraftPublishResult: 'source-draft result contract is owned by packages/core/source-draft-model/src/types.ts',
   z: 'schemastery schema constructor is owned by vendor/schemastery (vendored upstream)',
   BeginCommandRequest: 'event-local request contract is owned by packages/client/ui-input-trigger/src/types.ts',
   InsertReferenceRequest: 'event-local request contract is owned by packages/client/ui-input-trigger/src/types.ts',
