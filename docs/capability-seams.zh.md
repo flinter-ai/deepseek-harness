@@ -12,7 +12,7 @@ flowchart LR
   pkg_dsh_packet_evidence["dsh-packet-evidence"]
   svc_flinterPacketEvidence["ctx.flinterPacketEvidence<br/>Canonical packet evidence service"]
   pkg_dsh_decision_trace["dsh-decision-trace"]
-  svc_flinterDecisionTrace["ctx.flinterDecisionTrace<br/>Bounded decision trace capture"]
+  svc_flinterDecisionTrace["ctx.flinterDecisionTrace<br/>有界决策轨迹捕获"]
   pkg_source_controller["source-controller"]
   svc_sourceController["ctx.sourceController<br/>Durable source draft controller"]
   pkg_source_editor["source-editor"]

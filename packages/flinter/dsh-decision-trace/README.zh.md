@@ -60,7 +60,7 @@ kind: "package-reference"
 | 文件 | 作用 |
 |---|---|
 | [`src/index.ts`](src/index.ts) | 捕获服务、有界验证器、`tools/pre-execute` 与 `tools/result` 观察器以及 `foldDecisionEpisodes`。 |
-| [`src/types.ts`](src/types.ts) | 决策身份、状态、处置、投影、事件、 episode 与适配器合约。 |
+| [`src/types.ts`](src/types.ts) | 决策身份、状态、处置、投影、事件、episode（决策片段）与适配器合约。 |
 | [`src/invariant.ts`](src/invariant.ts) | DSH test host 使用的包级 invariant companion。 |
 | [`tests/decision-trace.spec.ts`](tests/decision-trace.spec.ts) | 有界捕获、失败、回放与 HMR 安全测试。 |
 
