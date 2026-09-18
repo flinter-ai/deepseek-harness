@@ -278,7 +278,7 @@ async function run(cases: readonly G1CaseInput[], root: string) {
         callId: ToolCallId(p.callId),
         name: TOOL_NAME,
         arguments: { callId: p.callId },
-        agent: h.agent,
+        ...(h.agent ? { agent: h.agent } : {}),
       })
       results.push(
         r.isError
@@ -355,10 +355,14 @@ export async function runG1Capture(
     const r = await run(input.cases, root)
     const equal = JSON.stringify(r.live) === JSON.stringify(r.loaded.events)
     if (!equal) throw new Error('live and reloaded events differ')
-    const inputSha256 = options.inputPath
-      ? createHash('sha256').update(await readFile(options.inputPath, 'utf8'))
-        .digest('hex')
-      : undefined
+    const inputProvenance = options.inputPath
+      ? {
+        inputPath: resolve(options.inputPath),
+        inputSha256: createHash('sha256')
+          .update(await readFile(options.inputPath, 'utf8'))
+          .digest('hex'),
+      }
+      : {}
     const out: G1CaptureOutput = {
       schema: 'flinter.g1-session-events.v1',
       scope: SCOPE,
@@ -366,9 +370,7 @@ export async function runG1Capture(
         harness:
           'dsh-segmentation-decision-trace/tests/g1-local-qualification.ts',
         node: process.version,
-        ...(options.inputPath
-          ? { inputPath: resolve(options.inputPath), inputSha256 }
-          : {}),
+        ...inputProvenance,
         persistence: 'jsonl-reloaded',
         provider: 'local-deterministic-tool-only',
         rootMode: external ? 'external' : 'temp',
@@ -413,7 +415,7 @@ export async function runG1Reload(
     readonly persistenceRoot: string
     readonly outputPath: string
   },
-): Promise<unknown> {
+): Promise<G1ReloadOutput> {
   const inputSha256 = createHash('sha256').update(
     await readFile(options.inputPath, 'utf8'),
   ).digest('hex')
@@ -421,7 +423,7 @@ export async function runG1Reload(
   try {
     const loaded = await h.ctx.sessionPersistence.load(SessionId(SESSION_ID))
     const out = {
-      schema: 'flinter.g1-process-reload-proof.v1',
+      schema: 'flinter.g1-process-reload-proof.v1' as const,
       inputSha256,
       sessionId: SESSION_ID,
       durableEventCount: loaded.events.length,
@@ -439,6 +441,19 @@ export async function runG1Reload(
     return out
   } finally {
     await h.dispose()
+  }
+}
+interface G1ReloadOutput {
+  readonly schema: 'flinter.g1-process-reload-proof.v1'
+  readonly inputSha256: string
+  readonly sessionId: string
+  readonly durableEventCount: number
+  readonly durableEventDigest: string
+  readonly events: readonly SessionEvent[]
+  readonly session: {
+    readonly sessionId: string
+    readonly header: SessionHeader
+    readonly events: readonly SessionEvent[]
   }
 }
 async function main() {
@@ -459,12 +474,16 @@ async function main() {
     return
   }
   const out = await runG1Capture({
-    input: inputPath
-      ? parseTestData(JSON.parse(await readFile(inputPath, 'utf8')))
-      : undefined,
-    inputPath,
-    outputPath,
-    persistenceRoot: process.env.G1_PERSISTENCE_ROOT,
+    ...(inputPath
+      ? {
+        input: parseTestData(JSON.parse(await readFile(inputPath, 'utf8'))),
+        inputPath,
+      }
+      : {}),
+    ...(outputPath ? { outputPath } : {}),
+    ...(process.env.G1_PERSISTENCE_ROOT
+      ? { persistenceRoot: process.env.G1_PERSISTENCE_ROOT }
+      : {}),
   })
   process.stdout.write(
     `${
