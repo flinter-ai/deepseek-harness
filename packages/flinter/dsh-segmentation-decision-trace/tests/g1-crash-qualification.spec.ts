@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -19,6 +20,21 @@ describe.skipIf(process.platform === 'win32')('G1 hard crash qualification', () 
       expect(out.crashEvidence.childSignals.afterAck).toEqual({ code: null, signal: 'SIGKILL' })
       expect(out.crashEvidence.beforeAck).toMatchObject({ classification: 'incomplete', reloadStatus: 'absent', reloadCount: 0, marker: { persistenceAck: false } })
       expect(out.crashEvidence.afterAck).toMatchObject({ classification: 'interrupted', reloadStatus: 'durable-one-half', reloadCount: 1, marker: { persistenceAck: true } })
+      const beforeMarker = out.crashEvidence.beforeAck.marker as { liveEvents: readonly unknown[]; liveDigest: string }
+      const afterMarker = out.crashEvidence.afterAck.marker as { liveEvents: readonly unknown[]; liveDigest: string }
+      const expectedDigest = (events: readonly unknown[]) => createHash('sha256').update(JSON.stringify(events)).digest('hex')
+      expect(beforeMarker.liveEvents).toHaveLength(1)
+      expect(afterMarker.liveEvents).toHaveLength(1)
+      expect(beforeMarker.liveEvents[0]).toMatchObject({ type: 'flinter/decision-selection', data: { callId: 'call-12', toolName: 'segment.qualify' } })
+      const withoutTime = (event: unknown) => {
+        if (!event || typeof event !== 'object') return event
+        const { time: _time, ...stable } = event as Record<string, unknown>
+        return stable
+      }
+      expect(withoutTime(afterMarker.liveEvents[0])).toEqual(withoutTime(beforeMarker.liveEvents[0]))
+      expect(beforeMarker.liveDigest).toBe(expectedDigest(beforeMarker.liveEvents))
+      expect(afterMarker.liveDigest).toBe(expectedDigest(afterMarker.liveEvents))
+      expect(afterMarker.liveEvents).toEqual(out.events)
       expect(out.events[0]).toMatchObject({ type: 'flinter/decision-selection', data: { callId: 'call-12', toolName: 'segment.qualify' } })
       expect(out.events.filter(event => event.type === 'flinter/decision-selection')).toHaveLength(1)
       expect(out.events.filter(event => event.type === 'flinter/decision-result')).toHaveLength(0)
