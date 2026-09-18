@@ -325,6 +325,55 @@ describe('LocalJobRegistry reads and settlement', () => {
     expect(() => ctx.jobs.read(JobId('bash-99'))).toThrow('unknown job bash-99')
   })
 
+  it('counts every non-terminal job across owners for host lifecycle policies', async () => {
+    const ctx = await harness()
+    const ownerA = stubAgent(ctx, 'count-a')
+    const ownerB = stubAgent(ctx, 'count-b')
+    ctx.agents.register(ownerA)
+    ctx.agents.register(ownerB)
+    expect(ctx.jobs.activeCount()).toBe(0)
+
+    const jobA = producer({ owner: ownerA })
+    const jobB = producer({ owner: ownerB })
+    const jobC = producer()
+    ctx.jobs.start(jobA.spec)
+    ctx.jobs.start(jobB.spec)
+    ctx.jobs.start(jobC.spec)
+    expect(ctx.jobs.activeCount()).toBe(3)
+
+    jobA.settle({ status: 'completed' })
+    jobB.settle({ status: 'failed' })
+    await tick()
+    expect(ctx.jobs.activeCount()).toBe(1)
+
+    jobC.settle({ status: 'killed' })
+    await tick()
+    expect(ctx.jobs.activeCount()).toBe(0)
+    await disposeAgentScope(ownerA)
+    await disposeAgentScope(ownerB)
+  })
+
+  it('delivers done notices to listeners filed along the owner scope chain', async () => {
+    const ctx = await harness()
+    const scope = createScope(ctx, {})
+    await attachControllerIn(scope.ctx)
+    const owner = stubAgent(ctx, 'owned', scopeOf(scope.ctx))
+    ctx.agents.register(owner)
+    const seen: JobId[] = []
+    await scope.ctx.plugin({
+      inject: ['jobs'],
+      apply(pluginCtx: Context) { pluginCtx.jobs.onJobDone(snapshot => void seen.push(snapshot.id)) },
+    })
+
+    const p = producer({ owner })
+    const id = ctx.jobs.start(p.spec)
+    p.settle({ status: 'completed' })
+    await tick()
+
+    expect(seen).toEqual([id])
+    await disposeAgentScope(owner)
+  })
+
   it('notifies onJobDone once per job with containment across listeners', async () => {
     const ctx = await harness()
     const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})

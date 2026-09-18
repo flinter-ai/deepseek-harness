@@ -132,7 +132,9 @@ export async function writeState(path: string, state: IdleGuardState): Promise<v
     await writeFile(temporary, `${JSON.stringify(state)}\n`, { mode: 0o640 })
     await rename(temporary, path)
   } catch (error) {
-    await rm(temporary, { force: true }).catch(() => {})
+    await rm(temporary, { force: true }).catch(
+      /* v8 ignore next -- runs only when the best-effort temporary-file removal itself fails */
+      () => {})
     throw error
   }
 }
@@ -141,6 +143,8 @@ export async function writeState(path: string, state: IdleGuardState): Promise<v
 export async function apply(ctx: Context, config: Config): Promise<void> {
   if (config.enabled !== true) return
 
+  /* v8 ignore next -- `?? DEFAULT_STATE_FILE` arm: the deployment-owned default
+     path is not writable inside tests, which always pass an explicit stateFile. */
   const stateFile = config.stateFile ?? DEFAULT_STATE_FILE
   const intervalMs = config.intervalMs ?? DEFAULT_INTERVAL_MS
   const ptyMode = config.ptyMode ?? 'required'
