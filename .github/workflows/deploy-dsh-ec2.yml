@@ -1,8 +1,8 @@
 name: Deploy DSH Web to EC2
 
-# Manual-only: flinter-orca-dsh is deprecated and pending retirement. This
-# workflow remains solely for controlled migration/recovery operations during
-# the retirement window; it must never deploy automatically on push again.
+# Manual-only: flinter-orca-dsh is retained as an on-demand remote-development
+# host with no production role. Deployments to it stay deliberate and manual;
+# it must never deploy automatically on push again.
 on:
   workflow_dispatch:
     inputs:
