@@ -232,6 +232,7 @@ flowchart TD
   subgraph group_flinter["packages/flinter"]
     pkg_alpha_profile["alpha-profile"]
     pkg_aws_worker_profile["aws-worker-profile"]
+    pkg_decision_trace["decision-trace"]
     pkg_packet_evidence["packet-evidence"]
   end
   subgraph group_guard["packages/guard"]
@@ -886,6 +887,10 @@ flowchart TD
   pkg_cordis_host_runner --> pkg_session
   pkg_cordis_host_runner --> pkg_tools
   pkg_cordis_host_runner --> pkg_typert_protocol
+  pkg_decision_trace --> pkg_brand
+  pkg_decision_trace --> pkg_invariants
+  pkg_decision_trace --> pkg_session
+  pkg_decision_trace --> pkg_tools
   pkg_packet_evidence --> pkg_invariants
   pkg_packet_evidence --> pkg_llm
   pkg_packet_evidence --> pkg_subprocess
@@ -1913,6 +1918,7 @@ flowchart TD
 | [`agent-instructions`](../packages/context/agent-instructions) | `context` | [`agent`](../packages/core/agent), [`fs`](../packages/fs/fs), [`home-paths`](../packages/util/home-paths), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`tools`](../packages/core/tools) |
 | [`file-reference-local`](../packages/context/file-reference-local) | `context` | [`agent`](../packages/core/agent), [`file-reference`](../packages/context/file-reference), [`invariants`](../packages/runtime-diagnostics/invariants), [`system-prompt`](../packages/core/system-prompt), [`tools`](../packages/core/tools), [`workspace`](../packages/workspace/workspace) |
 | [`cordis-host-runner`](../packages/extensions/cordis-host-runner) | `extensions` | [`agent`](../packages/core/agent), [`brand`](../packages/util/brand), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`scope`](../packages/core/scope), [`session`](../packages/core/session), [`tools`](../packages/core/tools), [`typert-protocol`](../packages/typert/protocol) |
+| [`decision-trace`](../packages/flinter/dsh-decision-trace) | `flinter` | [`brand`](../packages/util/brand), [`invariants`](../packages/runtime-diagnostics/invariants), [`session`](../packages/core/session), [`tools`](../packages/core/tools) |
 | [`packet-evidence`](../packages/flinter/dsh-packet-evidence) | `flinter` | [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`subprocess`](../packages/subprocess/subprocess), [`system-prompt`](../packages/core/system-prompt), [`tools`](../packages/core/tools) |
 | [`repeat-tool-reminder`](../packages/guard/repeat-tool-reminder) | `guard` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`tools`](../packages/core/tools) |
 | [`tool-call-timeout-policy`](../packages/guard/timeout-policy) | `guard` | [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`timeout`](../packages/util/timeout), [`tools`](../packages/core/tools) |
