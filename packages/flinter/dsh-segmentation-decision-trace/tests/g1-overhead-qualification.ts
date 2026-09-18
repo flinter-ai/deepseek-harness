@@ -11,13 +11,13 @@ import { lstat, mkdir, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, resolve } from 'node:path'
 import * as segmentationTrace from '../src/index.ts'
 
-export const WARMUP_PAIRS = 5
-export const MEASURED_PAIRS = 30
-export const CALLS_PER_ARM = 64
-export const CANDIDATE_COUNT = 24
-export const BOOTSTRAP_RESAMPLES = 10_000
-export const SEED = 20260918
-export const THRESHOLD = 0.05
+const WARMUP_PAIRS = 5
+const MEASURED_PAIRS = 30
+const CALLS_PER_ARM = 64
+const CANDIDATE_COUNT = 24
+const BOOTSTRAP_RESAMPLES = 10_000
+const SEED = 20260918
+const THRESHOLD = 0.05
 type Arm = 'off' | 'on'
 export interface PairSample { phase: 'warmup' | 'measured'; pair: number; first: Arm; offNanoseconds: number; onNanoseconds: number; offEvents: number; onEvents: number; offAcknowledged: boolean; onAcknowledged: boolean; pairedRatio: number }
 export interface Analysis { estimate: number; interval: { lower: number; upper: number }; classification: 'PASS' | 'INCONCLUSIVE' | 'FAIL' }
@@ -44,7 +44,7 @@ async function arm(root: string, enabled: boolean, pair: number): Promise<{ ns: 
   const acknowledged = await ctx.sessions.flush(session); const ns = Number(process.hrtime.bigint() - start); const digest = createHash('sha256').update(JSON.stringify(outputs)).digest('hex'); const events = session.events.length; await ctx.fiber.dispose(); return { ns, outputs, digest, events, acknowledged }
 }
 async function requireFreshRoot(root: string): Promise<void> { try { await lstat(root); throw new TypeError('persistenceRoot must not already exist') } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error } }
-export async function runG1Overhead(options: { outputPath: string; persistenceRoot: string }): Promise<unknown> {
+async function runG1Overhead(options: { outputPath: string; persistenceRoot: string }): Promise<unknown> {
   if (!isAbsolute(options.outputPath) || !isAbsolute(options.persistenceRoot)) throw new TypeError('outputPath and persistenceRoot must be absolute'); await requireFreshRoot(options.persistenceRoot)
   const warmupSamples: PairSample[] = []; const samples: PairSample[] = []; let outputDigest: string | undefined; let outputEqual = true; const eventCounts = { off: 0, on: 0 }; let persistenceAcknowledged = true
   for (const phase of ['warmup', 'measured'] as const) { const count = phase === 'warmup' ? WARMUP_PAIRS : MEASURED_PAIRS; for (let pair = 0; pair < count; pair++) { const order = alternation(pair); const roots = { off: resolve(options.persistenceRoot, phase, `off-${pair}`), on: resolve(options.persistenceRoot, phase, `on-${pair}`) }; const first = await arm(roots[order.first], order.first === 'on', pair); const second = await arm(roots[order.second], order.second === 'on', pair); const arms = { [order.first]: first, [order.second]: second } as Record<Arm, typeof first>; const equal = first.digest === second.digest && JSON.stringify(first.outputs) === JSON.stringify(second.outputs); outputDigest ??= first.digest; outputEqual &&= equal && first.digest === outputDigest; eventCounts.off += arms.off.events; eventCounts.on += arms.on.events; persistenceAcknowledged &&= first.acknowledged && second.acknowledged; const sample = { phase, pair, first: order.first, offNanoseconds: arms.off.ns, onNanoseconds: arms.on.ns, offEvents: arms.off.events, onEvents: arms.on.events, offAcknowledged: arms.off.acknowledged, onAcknowledged: arms.on.acknowledged, pairedRatio: ratio(arms.off.ns, arms.on.ns) } satisfies PairSample; (phase === 'warmup' ? warmupSamples : samples).push(sample) } }
