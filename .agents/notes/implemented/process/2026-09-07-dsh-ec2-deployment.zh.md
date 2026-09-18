@@ -24,4 +24,4 @@ live DSH Web 主机此前通过手动 EC2/SSM 操作完成修复，但 source ch
 
 ## 结果
 
-由于 `flinter-orca-dsh` 已弃用并等待退役，工作流仅支持手动触发（`workflow_dispatch`），在退役窗口内仅用于受控的迁移和恢复操作。部署串行化，可通过 commit 和 SSM command ID 审计，并在主机留下回滚备份。source 检查变绿不等于 live-cloud 证据；只有工作流到达目标并报告脱敏成功行才算。浏览器授权记录在重启之间仍保存在进程内，模型 API-key reference 继续在请求时从 Secrets Manager 解析。
+由于 `flinter-orca-dsh` 作为无生产职责的按需远程开发主机保留，工作流仅支持手动触发（`workflow_dispatch`），部署保持为刻意的 operator 操作。部署串行化，可通过 commit 和 SSM command ID 审计，并在主机留下回滚备份。source 检查变绿不等于 live-cloud 证据；只有工作流到达目标并报告脱敏成功行才算。浏览器授权记录在重启之间仍保存在进程内，模型 API-key reference 继续在请求时从 Secrets Manager 解析。
