@@ -18,6 +18,9 @@ import {
 } from './translation-pairing-record.ts'
 import {
   blobHash,
+  canonicalCatalogTsCode,
+  generatedRegionDiffs,
+  isLocaleAwareCatalogFence,
   isTranslationPairingManifestExcluded,
   isTranslationScopeFile,
   languageSwitcherTargets,
@@ -513,6 +516,97 @@ describe('pair CLI arguments', () => {
   })
 })
 
+describe('locale-aware catalog declaration fences', () => {
+  const enFence = '```ts persistence-catalog\n'
+    + '/**\n'
+    + ' * Bounded selection facts captured before one registered tool executes.\n'
+    + ' * Raw arguments, prompts, content, credentials, and error text are excluded.\n'
+    + ' * @param data - stable call identity and the producer\'s validated allowlist projection.\n'
+    + ' * @dshScopeScan unsupported\n'
+    + ' */\n'
+    + '\'flinter/decision-selection\': DecisionSelectionEvent\n'
+    + '```'
+  const zhFence = enFence
+    .replace(' * Bounded selection facts captured before one registered tool executes.\n', ' * 在一次已注册工具执行前捕获的有界选择事实。\n')
+    .replace(' * Raw arguments, prompts, content, credentials, and error text are excluded.\n', ' * 排除原始参数、提示词、内容、凭证与错误文本。\n')
+    .replace(' * @param data - stable call identity and the producer\'s validated allowlist projection.\n', ' * @param data - 稳定的调用身份与生产者经过验证的白名单投影。\n')
+  const withFence = (fence: string) => [
+    '# T',
+    '',
+    '[English](counterpart.md) | 中文',
+    '',
+    fence,
+    '',
+  ].join('\n')
+
+  it('recognizes only the two generated catalog fence metas as locale-aware', () => {
+    expect(isLocaleAwareCatalogFence('ts', 'persistence-catalog')).toBe(true)
+    expect(isLocaleAwareCatalogFence('ts', 'cordis-catalog')).toBe(true)
+    expect(isLocaleAwareCatalogFence('ts', null)).toBe(false)
+    expect(isLocaleAwareCatalogFence('ts', undefined)).toBe(false)
+    expect(isLocaleAwareCatalogFence('bash', 'persistence-catalog')).toBe(false)
+  })
+
+  it('accepts translated JSDoc prose inside a `ts persistence-catalog` fence', () => {
+    expect(translationStructureDiff(
+      signature(withFence(enFence)),
+      signature(withFence(zhFence)),
+    )).toEqual([])
+  })
+
+  it('accepts translated JSDoc prose inside a `ts cordis-catalog` fence', () => {
+    const en = '```ts cordis-catalog\n/**\n * Register one adapter.\n * @param toolName - exact DSH tool name.\n * @returns a disposer.\n */\nregister(toolName: string): () => void\n```'
+    const zh = '```ts cordis-catalog\n/**\n * 注册一个适配器。\n * @param toolName - 准确的 DSH 工具名。\n * @returns 一个解除函数。\n */\nregister(toolName: string): () => void\n```'
+    expect(translationStructureDiff(signature(withFence(en)), signature(withFence(zh)))).toEqual([])
+  })
+
+  it('rejects declaration drift hidden among translated comments', () => {
+    // One renamed identifier in the non-comment declaration: even a single
+    // divergent code token breaks pairing, exactly like the byte-identical rule.
+    const drifted = zhFence.replace('DecisionSelectionEvent', 'DecisionSelectionEventPayload')
+    const divergence = translationStructureDiff(signature(withFence(enFence)), signature(withFence(drifted)))
+    expect(divergence).toHaveLength(1)
+    expect(divergence[0]).toContain('code block #1 diverges')
+  })
+
+  it('rejects an edited machine tag even though tag prose may be localized', () => {
+    const drifted = zhFence.replace('@dshScopeScan unsupported', '@dshScopeScan 不支持')
+    expect(translationStructureDiff(signature(withFence(enFence)), signature(withFence(drifted)))).not.toEqual([])
+  })
+
+  it('rejects a renamed @param identity and a dropped JSDoc block', () => {
+    const renamed = zhFence.replace('@param data - 稳定的调用身份与生产者经过验证的白名单投影。', '@param payload - 稳定的调用身份。')
+    expect(translationStructureDiff(signature(withFence(enFence)), signature(withFence(renamed)))).not.toEqual([])
+    const dropped = '```ts persistence-catalog\n\'flinter/decision-selection\': DecisionSelectionEvent\n```'
+    expect(translationStructureDiff(signature(withFence(enFence)), signature(withFence(dropped)))).not.toEqual([])
+  })
+
+  it('keeps every other fence byte-identical, comments included', () => {
+    const en = '```ts\n/** English prose. */\nconst x = 1\n```'
+    const zh = '```ts\n/** 中文说明。 */\nconst x = 1\n```'
+    expect(translationStructureDiff(signature(withFence(en)), signature(withFence(zh)))).not.toEqual([])
+  })
+
+  it('localizes only the declared human-readable Mermaid node label', () => {
+    const en = '```mermaid\nflowchart LR\n  svc_flinterDecisionTrace["ctx.flinterDecisionTrace<br/>Bounded decision trace capture"]\n  pkg --> svc_flinterDecisionTrace\n```'
+    const zh = en.replace('Bounded decision trace capture', '有界决策轨迹捕获')
+    expect(translationStructureDiff(signature(withFence(en)), signature(withFence(zh)))).toEqual([])
+    expect(translationStructureDiff(
+      signature(withFence(en)),
+      signature(withFence(zh.replace('ctx.flinterDecisionTrace', 'ctx.other'))),
+    )).not.toEqual([])
+    expect(translationStructureDiff(
+      signature(withFence(en)),
+      signature(withFence(zh.replace('pkg -->', 'other -->'))),
+    )).not.toEqual([])
+  })
+
+  it('reduces comment blocks to their scaffold while pinning every other byte', () => {
+    expect(canonicalCatalogTsCode('/**\n * prose\n * @param data - words\n */\nx: T')).toBe('/**\n@param data\n*/\nx: T')
+    expect(canonicalCatalogTsCode('y: U')).toBe('y: U')
+  })
+})
+
 describe('generated regions', () => {
   const BEGIN = '<!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->'
   const END = '<!-- END GENERATED cordis-surface -->'
@@ -549,5 +643,65 @@ describe('generated regions', () => {
     // `git hash-object` of the empty file and of "x\n" — pinned upstream values.
     expect(blobHash(Buffer.from(''))).toBe('e69de29bb2d1d6434b8b29ae775ad8c2e48c5391')
     expect(blobHash(Buffer.from('x\n'))).toBe('587be6b4c3f93f93c489c0111bba5596147a26cb')
+  })
+})
+
+describe('generated region cross-locale scaffold', () => {
+  const region = (doc: string, jsDoc: string, extra = '') => [
+    '<!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->',
+    '',
+    '<a id="ctxflinterdecisiontrace--decisiontraceservice"></a>',
+    '',
+    '### `ctx.flinterDecisionTrace` — `DecisionTraceService`',
+    '',
+    doc,
+    '',
+    '```ts cordis-catalog',
+    jsDoc,
+    'register(toolName: string): () => void',
+    '```',
+    '',
+    'Source: [`packages/x/y/src/index.ts`](../../packages/x/y/src/index.ts)',
+    extra,
+    '<!-- END GENERATED cordis-surface -->',
+  ].join('\n')
+  const EN_DOC = 'Registry used by producer plugins to opt exact tool names into capture.'
+  const ZH_DOC = '供生产者插件按准确工具名启用捕获的注册表。'
+  const EN_JSDOC = '/**\n * Register one exact tool-name adapter until the returned disposer runs.\n * @param toolName - exact DSH tool name owned by the producer.\n * @returns a disposer that removes this registration.\n */'
+  const ZH_JSDOC = '/**\n * 注册一个准确工具名的适配器，直到返回的解除函数运行。\n * @param toolName - 生产者拥有的准确 DSH 工具名。\n * @returns 一个解除函数：当此注册仍拥有该名称时将其移除。\n */'
+
+  it('accepts a region whose only differences are localized prose and catalog comments', () => {
+    expect(generatedRegionDiffs(region(EN_DOC, EN_JSDOC), region(ZH_DOC, ZH_JSDOC))).toEqual([])
+  })
+
+  it('rejects a signature drifted inside the localized catalog fence', () => {
+    const drifted = region(ZH_DOC, ZH_JSDOC).replace('toolName: string', 'toolName: number')
+    expect(generatedRegionDiffs(region(EN_DOC, EN_JSDOC), drifted)).not.toEqual([])
+  })
+
+  it('rejects a dropped JSDoc block inside the localized catalog fence', () => {
+    const drifted = region(ZH_DOC, ZH_JSDOC).replace(`${ZH_JSDOC}\n`, '')
+    expect(generatedRegionDiffs(region(EN_DOC, EN_JSDOC), drifted)).not.toEqual([])
+  })
+
+  it('rejects heading, marker-anchor, and source-pointer drift', () => {
+    expect(generatedRegionDiffs(region(EN_DOC, EN_JSDOC), region(EN_DOC, EN_JSDOC).replace('### `ctx.flinterDecisionTrace`', '### `ctx.other`'))).not.toEqual([])
+    expect(generatedRegionDiffs(region(EN_DOC, EN_JSDOC), region(EN_DOC, EN_JSDOC).replace('ctxflinterdecisiontrace--decisiontraceservice', 'ctxflinterdecisiontrace--other'))).not.toEqual([])
+    expect(generatedRegionDiffs(region(EN_DOC, EN_JSDOC), region(EN_DOC, EN_JSDOC).replaceAll('packages/x/y', 'packages/x/z'))).not.toEqual([])
+  })
+
+  it('rejects prose edits inside non-catalog fences of a region', () => {
+    const withPlain = (comment: string) => region(EN_DOC, EN_JSDOC).replace(
+      '```ts cordis-catalog',
+      '```ts\n/** PLACEHOLDER */\nconst k = 1\n```\n\n```ts cordis-catalog',
+    ).replace('PLACEHOLDER', comment)
+    expect(generatedRegionDiffs(withPlain('English prose.'), withPlain('中文说明。'))).not.toEqual([])
+  })
+
+  it('keeps prose byte-identical in generated sections without declared localization', () => {
+    const source = region(EN_DOC, EN_JSDOC).replaceAll('flinterDecisionTrace', 'otherService')
+      .replace('DecisionTraceService', 'OtherService')
+    const translated = source.replace(EN_DOC, ZH_DOC)
+    expect(generatedRegionDiffs(source, translated)).not.toEqual([])
   })
 })

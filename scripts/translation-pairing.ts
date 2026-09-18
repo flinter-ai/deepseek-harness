@@ -304,6 +304,132 @@ export function parseTranslationPairingCliArgs(argv: string[]): TranslationPairi
   }
 }
 
+/**
+ * The explicitly locale-aware generated declaration surface. ` ```ts
+ * cordis-catalog ` signature blocks (Cordis subsystem regions, owned for
+ * BOTH locales by gen-cordis-catalog.ts) and ` ```ts persistence-catalog `
+ * declaration blocks (session persistence catalog; the generator owns the
+ * English side, the reviewed Chinese counterpart is authored) may localize
+ * their human-readable JSDoc comment prose across a pair. Every other fence
+ * stays byte-identical, and inside these fences every byte outside comments
+ * — info string, signature tokens, decorators, punctuation — still compares
+ * exactly, via {@link canonicalCatalogTsCode}.
+ */
+const LOCALE_AWARE_CATALOG_FENCE_META: ReadonlySet<string> = new Set([
+  'cordis-catalog',
+  'persistence-catalog',
+])
+
+/** Whether a fenced code block belongs to the locale-aware catalog surface. */
+export function isLocaleAwareCatalogFence(lang: string | null | undefined, meta: string | null | undefined): boolean {
+  return lang === 'ts' && meta != null && LOCALE_AWARE_CATALOG_FENCE_META.has(meta)
+}
+
+/** JSDoc tags whose first argument is a named identity rather than prose. */
+const JSDOC_NAMED_IDENTITY_TAGS: ReadonlySet<string> = new Set([
+  'param', 'arg', 'argument', 'typeParam', 'template', 'prop', 'property',
+])
+
+/** JSDoc tags whose entire remainder is human-readable prose. */
+const JSDOC_PROSE_TAGS: ReadonlySet<string> = new Set([
+  'returns', 'return', 'throws', 'exception', 'yields', 'yield',
+  'deprecated', 'remarks',
+])
+
+/**
+ * Append the cross-locale scaffold line for one JSDoc comment line, or
+ * nothing when the line carries only prose. Named-identity tags keep their
+ * name (`@param toolName`), prose tags reduce to the bare tag (`@returns`),
+ * and every other tag keeps its remainder VERBATIM, so machine directives
+ * such as `@dshScopeScan unsupported` cannot be localized or drifted.
+ */
+function appendJsDocTagScaffold(content: string, out: string[]): void {
+  const match = /^@(\w+)(?:\s+\{[^}]*\})?(?:\s+(.*))?$/.exec(content)
+  if (!match?.[1]) return
+  const tag = match[1]
+  const rest = (match[2] ?? '').trimEnd()
+  if (JSDOC_NAMED_IDENTITY_TAGS.has(tag)) {
+    const name = /^[^\s]+/.exec(rest.replace(/\s+-\s.*$/s, ''))?.[0] ?? ''
+    out.push(`@${tag} ${name}`.trimEnd())
+  } else if (JSDOC_PROSE_TAGS.has(tag)) {
+    out.push(`@${tag}`)
+  } else {
+    out.push(rest === '' ? `@${tag}` : `@${tag} ${rest}`)
+  }
+}
+
+/**
+ * Canonical cross-locale form of a catalog TypeScript declaration block.
+ * Every non-comment line compares byte-wise; a JSDoc comment block
+ * reduces to its structural scaffold — the block itself plus one line per
+ * tag via {@link appendJsDocTagScaffold} — so the tag skeleton (count,
+ * order, parameter names) stays pinned while sentence text may be
+ * translated. A comment that is removed, added, re-tagged, or re-named on
+ * one side changes the scaffold and fails the comparison; only human
+ * prose inside existing tags and paragraphs may differ.
+ * @param code - Fenced code block content (no info string).
+ * @returns The canonical form both language sides must share.
+ */
+export function canonicalCatalogTsCode(code: string): string {
+  const out: string[] = []
+  let inComment = false
+  for (const line of code.split('\n')) {
+    const trimmed = line.trim()
+    if (!inComment) {
+      if (trimmed.startsWith('/**')) {
+        out.push('/**')
+        if (trimmed.endsWith('*/')) {
+          appendJsDocTagScaffold(trimmed.slice(3, -2).trim(), out)
+          out.push('*/')
+        } else {
+          inComment = true
+        }
+        continue
+      }
+      out.push(line)
+      continue
+    }
+    const closing = trimmed.endsWith('*/')
+    const content = (closing ? trimmed.slice(0, -2) : trimmed).replace(/^\*\s?/, '').trim()
+    appendJsDocTagScaffold(content, out)
+    if (closing) {
+      out.push('*/')
+      inComment = false
+    }
+  }
+  return out.join('\n')
+}
+
+/** Mermaid nodes whose human-readable label has a reviewed Chinese form. */
+const LOCALE_AWARE_MERMAID_NODES: ReadonlyMap<string, string> = new Map([
+  ['svc_flinterDecisionTrace', 'ctx.flinterDecisionTrace'],
+])
+
+/**
+ * Canonical cross-locale form of Mermaid code. Only the human-readable text
+ * after `<br/>` in an explicitly declared node is replaceable; node identity,
+ * service identity, graph syntax, edges, and every other label remain exact.
+ */
+function canonicalMermaidCode(code: string): string {
+  return code.split('\n').map((line) => {
+    for (const [nodeId, stableLabel] of LOCALE_AWARE_MERMAID_NODES) {
+      const prefix = `${nodeId}["${stableLabel}<br/>`
+      const trimmed = line.trimStart()
+      if (!trimmed.startsWith(prefix) || !trimmed.endsWith('"]')) continue
+      const indentation = line.slice(0, line.length - trimmed.length)
+      return `${indentation}${prefix}<localized-prose>"]`
+    }
+    return line
+  }).join('\n')
+}
+
+/** Canonical content for one paired fenced block. */
+function canonicalPairedCodeBlock(lang: string | null | undefined, meta: string | null | undefined, code: string): string {
+  if (isLocaleAwareCatalogFence(lang, meta)) return canonicalCatalogTsCode(code)
+  if (lang === 'mermaid') return canonicalMermaidCode(code)
+  return code
+}
+
 /** The structural signature compared between the two sides of a pair. */
 export interface TranslationStructureSignature {
   /** Heading depths in document order (h2 -> 2). */
@@ -377,7 +503,9 @@ export function translationStructureSignature(
         sig.headings.push(node.depth)
         break
       case 'code':
-        sig.code.push(`\`\`\`${node.lang ?? ''}${node.meta ? ` ${node.meta}` : ''}\n${node.value}`)
+        // Locale-aware catalog fences compare their non-comment bytes plus
+        // the JSDoc tag scaffold; every other fence stays byte-identical.
+        sig.code.push(`\`\`\`${node.lang ?? ''}${node.meta ? ` ${node.meta}` : ''}\n${canonicalPairedCodeBlock(node.lang, node.meta, node.value)}`)
         break
       case 'table':
         sig.tables.push(`${node.children.length}x${node.children[0]?.children.length ?? 0}`)
@@ -407,6 +535,128 @@ export function translationStructureSignature(
   }
   visit(tree)
   return sig
+}
+
+/**
+ * Ordered scaffold of one explicitly locale-aware generated section for the
+ * cross-locale check. Region markers and anchors (`html` comments/elements),
+ * headings, fences, table/list shapes, and link targets must match exactly —
+ * catalog fences by their {@link canonicalCatalogTsCode} form, every other
+ * fence byte-identical. Human-readable text inside paragraphs (and JSDoc prose
+ * inside catalog fences) is not content-compared; each paragraph still
+ * contributes one placeholder so prose cannot be reordered around structure
+ * or dropped wholesale.
+ * @param region - One marker-delimited region, links pre-normalized.
+ * @returns The ordered scaffold tokens.
+ */
+function generatedRegionScaffold(region: string): string[] {
+  const tree = parseTranslationMarkdown(region)
+  const scaffold: string[] = []
+  const definitions = new Map<string, string>()
+  const collectDefinitions = (node: Nodes): void => {
+    if (node.type === 'definition' && !definitions.has(node.identifier)) definitions.set(node.identifier, node.url)
+    if ('children' in node) for (const child of node.children) collectDefinitions(child)
+  }
+  collectDefinitions(tree)
+  const visit = (node: Nodes): void => {
+    switch (node.type) {
+      case 'html':
+        scaffold.push(`html:${node.value}`)
+        break
+      case 'heading':
+        scaffold.push(`heading:${node.depth}:${region.slice(node.position?.start.offset ?? 0, node.position?.end.offset ?? 0)}`)
+        break
+      case 'code':
+        scaffold.push(`code:${node.lang ?? ''}${node.meta ? ` ${node.meta}` : ''}:${canonicalPairedCodeBlock(node.lang, node.meta, node.value)}`)
+        break
+      case 'table':
+        scaffold.push(`table:${node.children.length}x${node.children[0]?.children.length ?? 0}`)
+        break
+      case 'list':
+        scaffold.push(node.ordered ? `list:ordered:${node.start ?? 1}:${node.children.length}` : `list:bullet:${node.children.length}`)
+        break
+      case 'paragraph':
+        scaffold.push('paragraph')
+        break
+      case 'link':
+        scaffold.push(`link:${node.url}`)
+        break
+      case 'linkReference': {
+        const target = definitions.get(node.identifier)
+        if (target !== undefined) scaffold.push(`link:${target}`)
+        break
+      }
+      default:
+        break
+    }
+    if ('children' in node) for (const child of node.children) visit(child)
+  }
+  visit(tree)
+  return scaffold
+}
+
+/** Generated sections whose owning generator emits reviewed locale prose. */
+const LOCALE_AWARE_GENERATED_SECTION_KEYS: ReadonlySet<string> = new Set([
+  'ctx.flinterDecisionTrace',
+])
+
+interface GeneratedRegionSection {
+  readonly key: string | null
+  readonly content: string
+}
+
+/** Split a generated region at service headings while retaining every byte. */
+function generatedRegionSections(region: string): GeneratedRegionSection[] {
+  const lines = region.split('\n')
+  const sections: GeneratedRegionSection[] = []
+  let start = 0
+  let key: string | null = null
+  for (let index = 0; index < lines.length; index++) {
+    const match = /^### `ctx\.([\w$]+)`(?:\s|$)/.exec(lines[index] ?? '')
+    if (!match?.[1]) continue
+    if (index > start) sections.push({ key, content: lines.slice(start, index).join('\n') })
+    start = index
+    key = `ctx.${match[1]}`
+  }
+  sections.push({ key, content: lines.slice(start).join('\n') })
+  return sections
+}
+
+/**
+ * Compare two corresponding generated regions the way the pairing gate does.
+ * Bytes remain exact everywhere except the stable service sections named in
+ * {@link LOCALE_AWARE_GENERATED_SECTION_KEYS}; those sections compare through
+ * {@link generatedRegionScaffold}. The owning generator's freshness gate
+ * (`--check`) pins the exact bytes of both sides.
+ * @returns one message per divergence (empty when equivalent).
+ */
+export function generatedRegionDiffs(sourceRegion: string, zhRegion: string): string[] {
+  const source = generatedRegionSections(sourceRegion)
+  const zh = generatedRegionSections(zhRegion)
+  const length = Math.max(source.length, zh.length)
+  for (let index = 0; index < length; index++) {
+    const sourceSection = source[index]
+    const zhSection = zh[index]
+    if (sourceSection?.key !== zhSection?.key) {
+      return [`generated region section #${index + 1} has a different owner: ${show(sourceSection?.key ?? undefined)} vs ${show(zhSection?.key ?? undefined)}`]
+    }
+    if (sourceSection === undefined || zhSection === undefined) {
+      return [`generated region section #${index + 1} is missing on one side`]
+    }
+    if (sourceSection.key !== null && LOCALE_AWARE_GENERATED_SECTION_KEYS.has(sourceSection.key)) {
+      const sourceScaffold = generatedRegionScaffold(sourceSection.content)
+      const zhScaffold = generatedRegionScaffold(zhSection.content)
+      const scaffoldLength = Math.max(sourceScaffold.length, zhScaffold.length)
+      for (let item = 0; item < scaffoldLength; item++) {
+        if (sourceScaffold[item] !== zhScaffold[item]) {
+          return [`generated region ${sourceSection.key} item #${item + 1} diverges beyond localized prose and catalog-comment localization: ${show(sourceScaffold[item])} vs ${show(zhScaffold[item])}`]
+        }
+      }
+    } else if (sourceSection.content !== zhSection.content) {
+      return [`generated region ${sourceSection.key ?? 'preamble'} differs outside an explicitly locale-aware section`]
+    }
+  }
+  return []
 }
 
 /** Render a signature element for an error message, truncated for readability. */
