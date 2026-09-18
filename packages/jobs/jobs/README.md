@@ -31,6 +31,8 @@ Use this package when you are composing a background-job capability or writing a
 
 A producer registers work with a kind and a one-line label; the registry returns a `<kind>-N` id such as `bash-1`. Anyone who owns the job can read output, list jobs, wait up to a timeout for settlement, and request cancellation — each call returns a fresh snapshot of the job's status, from `running` and `stopping` to the terminal `completed`, `killed`, or `failed`. When a job settles, the owning agent is notified through the completion listener that `dsh-tool-jobs` turns into an in-session notice, so no polling is needed. A producer may attach an optional byte cap so each complete model-facing output read or completion notice stays bounded.
 
+Host lifecycle integrations may call `ctx.jobs.activeCount()` for a process-wide count of `running` and `stopping` jobs. This returns a count only; it exposes no labels or output and does not change ownership rules.
+
 ### The ownership boundary
 
 A job belongs to the agent session that started it: another agent cannot read or stop it. Ids such as `bash-1` are predictable, so this fence is authorization, not secrecy. A job started without an owner is open to any caller and lasts until the service is disposed.

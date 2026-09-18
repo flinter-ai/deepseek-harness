@@ -50,6 +50,10 @@ kind: "package-reference"
 
 index 启动输入分两层。`collectIndexInjections()` 收集一张全新的注入表——每次调用发一次 `webserver/index-inject` 事件，每个订阅方推入其当前行——`renderIndex(html)` 先把这些行渲染进 index.html 正文，再按注册顺序应用原始 `tapIndex(transform)` 转换。`script-preload` 行会渲染为 classic script 的提示性 preload 链接。静态部署会在启动 payload 中携带同一批行。`applyIndexTaps(html)` 只应用原始转换；它是任何行都无法表达的标记的逃生口。
 
+### 活动快照
+
+`recordActivity()` 与 `activitySnapshot()` 为可选的 idle-stop 插件等宿主策略提供脱敏生命周期接口。快照只包含最近一次已接受的应用活动时间、活动 HTTP handler 数量和活动 upgrade socket 数量，不包含请求数据、凭据或 route 名称；宿主策略会把它与 job、PTY 数量合并后再执行生命周期操作。
+
 ### 失败时的行为
 
 监听失败（例如 EADDRINUSE）会以绑定诊断信息拒绝插件初始化。handler 抛错的 HTTP 请求会得到 400——若响应头已经发出则销毁 socket——并记录 warning；它绝不会退出进程。upgrade handler 抛错或升级 socket 出现传输错误时，会记录 warning 并销毁对应 socket。

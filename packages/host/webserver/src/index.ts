@@ -55,6 +55,16 @@ export interface WebUpgradeRoute {
   handler: (req: IncomingMessage, socket: Duplex, head: Buffer) => void | Promise<void>
 }
 
+/** Current transport activity used by host lifecycle policies. */
+export interface WebActivitySnapshot {
+  /** Most recent accepted application activity, or the server-start baseline. */
+  readonly lastActivityAt: number
+  /** HTTP handlers that have not returned yet. */
+  readonly activeRequests: number
+  /** Upgraded sockets still owned by the webserver. */
+  readonly activeWebSockets: number
+}
+
 /** Web server listen and response-compression config. */
 export interface Config {
   /** Listen host; the two supported values are loopback and all-interfaces. */
@@ -135,6 +145,8 @@ export class WebServer extends Service {
   private readonly upgrades = new Map<string, WebUpgradeRoute>()
   private readonly upgradedSockets = new Set<Duplex>()
   private readonly indexTaps: ((html: string) => string)[] = []
+  private activeRequests = 0
+  private lastActivityAt = Date.now()
   private fallback: WebRoute['handler'] | undefined
   private server!: Server
   private listenedPort!: number
@@ -154,6 +166,27 @@ export class WebServer extends Service {
   /** The configured bind host (the loopback or all-interfaces literal). */
   get host(): Config['host'] {
     return this.config.host
+  }
+
+  /**
+   * Record accepted application activity without exposing request contents.
+   * @param at - Optional timestamp for the accepted activity event.
+   */
+  recordActivity(at: number = Date.now()): void {
+    if (!Number.isFinite(at)) return
+    this.lastActivityAt = Math.max(this.lastActivityAt, at)
+  }
+
+  /**
+   * Return redacted transport facts for host lifecycle policies.
+   * @returns current request, WebSocket, and latest-activity facts.
+   */
+  activitySnapshot(): WebActivitySnapshot {
+    return {
+      lastActivityAt: this.lastActivityAt,
+      activeRequests: this.activeRequests,
+      activeWebSockets: this.upgradedSockets.size,
+    }
   }
 
   /**
@@ -219,21 +252,26 @@ export class WebServer extends Service {
   /** Listen; resolves once the socket is bound (rejection = FAILED fiber). */
   async [Service.init](): Promise<void> {
     const handle = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
-      /* v8 ignore next -- `?? '/'` arm: node:http always sets url on server
-      requests; the field is only optional on the client-side IncomingMessage type */
-      const rawPath = new URL(req.url ?? '/', 'http://x').pathname
-      const route = this.match(rawPath)
-      if (route !== undefined) {
-        await route.handler(req, res)
-        return
+      this.activeRequests += 1
+      try {
+        /* v8 ignore next -- `?? '/'` arm: node:http always sets url on server
+        requests; the field is only optional on the client-side IncomingMessage type */
+        const rawPath = new URL(req.url ?? '/', 'http://x').pathname
+        const route = this.match(rawPath)
+        if (route !== undefined) {
+          await route.handler(req, res)
+          return
+        }
+        const fallback = this.fallback
+        if (fallback === undefined) {
+          res.writeHead(404)
+          res.end()
+          return
+        }
+        await fallback(req, res)
+      } finally {
+        this.activeRequests -= 1
       }
-      const fallback = this.fallback
-      if (fallback === undefined) {
-        res.writeHead(404)
-        res.end()
-        return
-      }
-      await fallback(req, res)
     }
     // Last-resort guard: handle() rejecting would otherwise be an unhandled
     // rejection killing the process on one malformed request (bad %-escape,

@@ -1639,6 +1639,9 @@ importers:
       '@deepseek-ai/dsh-host-frontend-static':
         specifier: workspace:^
         version: link:../../host/frontend-static
+      '@deepseek-ai/dsh-host-idle-guard':
+        specifier: workspace:^
+        version: link:../../host/idle-guard
       '@deepseek-ai/dsh-host-plugin-inventory':
         specifier: workspace:^
         version: link:../../host/plugin-inventory
@@ -6155,6 +6158,28 @@ importers:
       '@deepseek-ai/dsh-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
+
+  packages/host/idle-guard:
+    dependencies:
+      '@deepseek-ai/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-host-webserver':
+        specifier: workspace:^
+        version: link:../webserver
+      '@deepseek-ai/dsh-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@deepseek-ai/dsh-jobs':
+        specifier: workspace:^
+        version: link:../../jobs/jobs
+      '@deepseek-ai/dsh-terminal':
+        specifier: workspace:^
+        version: link:../../terminal/terminal
 
   packages/host/plugin-inventory:
     dependencies:

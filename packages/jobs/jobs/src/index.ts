@@ -90,6 +90,12 @@ export abstract class JobRegistry extends Service {
   abstract list(caller?: Agent): JobSnapshot[]
 
   /**
+   * Return all process-wide live jobs, independent of caller ownership.
+   * @returns the number of non-terminal jobs.
+   */
+  abstract activeCount(): number
+
+  /**
    * Return a non-consuming snapshot without changing its read cursor or notice
    * state. Throws for an unknown or foreign job.
    * @param id - job to look up.

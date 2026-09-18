@@ -944,6 +944,31 @@ export interface Config {
 
 Source: [`packages/host/frontend-static/src/index.ts:30`](../packages/host/frontend-static/src/index.ts)
 
+<a id="deepseek-aidsh-host-idle-guard"></a>
+
+## `@deepseek-ai/dsh-host-idle-guard`
+
+Requires: `webServer`
+
+```ts config-catalog
+/** Idle guard configuration. The plugin is disabled unless explicitly enabled. */
+export interface Config {
+  /** Write the state file and keep it fresh. Defaults to false. */
+  enabled?: boolean
+  /** Absolute state-file path owned by the host deployment. */
+  stateFile?: string
+  /** State refresh period in milliseconds. Defaults to 30 seconds. */
+  intervalMs?: number
+  /** Declare whether a missing PTY registry is expected in this composition. */
+  ptyMode?: IdleGuardPtyMode
+}
+
+/** Whether the composed host must provide a PTY registry. */
+export type IdleGuardPtyMode = 'required' | 'absent'
+```
+
+Source: [`packages/host/idle-guard/src/index.ts:46`](../packages/host/idle-guard/src/index.ts)
+
 <a id="deepseek-aidsh-host-source-publisher-github"></a>
 
 ## `@deepseek-ai/dsh-host-source-publisher-github`
@@ -994,7 +1019,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/host/webserver/src/index.ts:59`](../packages/host/webserver/src/index.ts)
+Source: [`packages/host/webserver/src/index.ts:69`](../packages/host/webserver/src/index.ts)
 
 <a id="deepseek-aidsh-invariants"></a>
 
