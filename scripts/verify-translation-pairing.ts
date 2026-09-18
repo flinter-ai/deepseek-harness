@@ -24,6 +24,7 @@ import {
   translationPairPaths,
 } from './translation-pairing-record.ts'
 import {
+  generatedRegionDiffs,
   languageSwitcherTargets,
   parseTranslationMarkdown,
   parseTranslationPairingCliArgs,
@@ -267,10 +268,14 @@ for (const source of [...pairAnchors].sort()) {
     state.set(source, 'out-of-sync')
   }
 
-  // Generated regions must remain byte-identical after paired document paths
-  // are normalized to one semantic target. The structural signature below
-  // compares their contents again as part of the whole document; this named
-  // check rejects any prose, ordering, code, marker, or non-locale URL drift.
+  // Generated regions remain byte-identical after paired paths are normalized,
+  // except for the stable service sections explicitly declared locale-aware by
+  // generatedRegionDiffs. Those sections still pin markers, anchors, headings,
+  // table/list shape, ordering, links, and all non-comment code bytes; only
+  // paragraph prose and catalog JSDoc prose may carry reviewed Chinese. The
+  // owning generator's freshness check pins the exact output bytes.
+  // The structural signature below compares their contents again as part of
+  // the whole document; this named check adds marker/anchor fidelity.
   let sourceRegions: { regions: string[]; stripped: string }
   let zhRegions: { regions: string[]; stripped: string }
   try {
@@ -280,6 +285,11 @@ for (const source of [...pairAnchors].sort()) {
     errors.push(`${source} ↔ ${zh}: ${error instanceof Error ? error.message : String(error)}`)
     state.set(source, 'out-of-sync')
     continue
+  }
+  const regionCountMatches = sourceRegions.regions.length === zhRegions.regions.length
+  if (!regionCountMatches) {
+    errors.push(`${source} ↔ ${zh}: generated region count differs — regenerate both sides`)
+    state.set(source, 'out-of-sync')
   }
   const normalizedSourceRegions = sourceRegions.regions.map(region => normalizeTranslationMarkdownLinks(region, {
     repoRoot: root,
@@ -293,10 +303,13 @@ for (const source of [...pairAnchors].sort()) {
     isTranslationPairSource,
     repositoryFileExists,
   }))
-  if (normalizedSourceRegions.length !== normalizedZhRegions.length
-    || normalizedSourceRegions.some((region, index) => region !== normalizedZhRegions[index])) {
-    errors.push(`${source} ↔ ${zh}: generated regions differ beyond paired-document locale paths — regenerate both sides`)
-    state.set(source, 'out-of-sync')
+  if (regionCountMatches) {
+    for (let index = 0; index < normalizedSourceRegions.length; index++) {
+      for (const divergence of generatedRegionDiffs(normalizedSourceRegions[index] ?? '', normalizedZhRegions[index] ?? '')) {
+        errors.push(`${source} ↔ ${zh}: ${divergence}`)
+        state.set(source, 'out-of-sync')
+      }
+    }
   }
 
   const sourceTree = parseTranslationMarkdown(sourceText)

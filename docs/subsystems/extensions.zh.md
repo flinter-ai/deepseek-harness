@@ -260,27 +260,27 @@ Source: [`packages/extensions/cordis-host-runner/src/index.ts`](../../packages/e
 
 ### `ctx.flinterDecisionTrace` — `DecisionTraceService`
 
-Registry used by producer plugins to opt exact tool names into capture.
+供生产者插件按准确工具名启用捕获的注册表。
 
 ```ts cordis-catalog
 /**
- * Register one exact tool-name adapter until the returned disposer runs.
- * @param toolName - exact DSH tool name owned by the producer.
- * @param adapter - trusted same-process projection callbacks.
- * @returns a disposer that removes this registration when it still owns the name.
+ * 注册一个准确工具名的适配器，直到返回的解除函数运行。
+ * @param toolName - 生产者拥有的准确 DSH 工具名。
+ * @param adapter - 可信的同进程投影回调。
+ * @returns 一个解除函数：当此注册仍拥有该名称时将其移除。
  */
 register(toolName: string, adapter: DecisionTraceAdapter): () => void
 
 /**
- * Find the adapter registered for one exact tool name.
- * @param toolName - exact DSH tool name.
- * @returns its adapter, or undefined when capture is not enabled.
+ * 查找某个准确工具名已注册的适配器。
+ * @param toolName - 准确 DSH 工具名。
+ * @returns 对应的适配器；未启用捕获时为 undefined。
  */
 adapter(toolName: string): DecisionTraceAdapter | undefined
 
 /**
- * Record one bounded internal failure code without thrown data.
- * @param code - closed diagnostic code selected by the capture observer.
+ * 记录一个有界的内部失败码，不携带抛出数据。
+ * @param code - 由捕获观察器选定的封闭诊断码。
  */
 recordDiagnostic(code: DiagnosticCode): void
 ```

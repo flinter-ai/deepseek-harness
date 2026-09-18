@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/extensions.md
 extensions.md: a7b8f282a2d6959a9c7ee568f7d93860e00d731f
-extensions.zh.md: 7ccd5dd5f1012edcb422fa212d8e7a3c5695bf01
+extensions.zh.md: bf2d332bf53d154ee394e7066d4756c5c32f7159

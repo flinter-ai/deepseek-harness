@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/flinter/dsh-decision-trace/README.md
 README.md: 9e6e7dd3d4f9307122da8222677a86b84fe22302
-README.zh.md: 41db2c06aaf1da95f231ea88cbff52e1930afdd0
+README.zh.md: 55ffee1452c033c4b22e4b18ecfacc3b59e78093

@@ -408,9 +408,9 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 
 ```ts persistence-catalog
 /**
- * Bounded result facts captured after one registered tool settles.
- * Raw content, provider responses, credentials, and error text are excluded.
- * @param data - stable call identity and the producer's validated allowlist projection.
+ * 在一次已注册工具结算后捕获的有界结果事实。
+ * 排除原始内容、提供方响应、凭证与错误文本。
+ * @param data - 稳定的调用身份与生产者经过验证的白名单投影。
  * @dshScopeScan unsupported
  */
 'flinter/decision-result': DecisionResultEvent
@@ -424,9 +424,9 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 
 ```ts persistence-catalog
 /**
- * Bounded selection facts captured before one registered tool executes.
- * Raw arguments, prompts, content, credentials, and error text are excluded.
- * @param data - stable call identity and the producer's validated allowlist projection.
+ * 在一次已注册工具执行前捕获的有界选择事实。
+ * 排除原始参数、提示词、内容、凭证与错误文本。
+ * @param data - 稳定的调用身份与生产者经过验证的白名单投影。
  * @dshScopeScan unsupported
  */
 'flinter/decision-selection': DecisionSelectionEvent
