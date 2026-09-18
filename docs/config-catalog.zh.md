@@ -1961,6 +1961,125 @@ export interface JsonRpcConfig {
 
 来源：[`packages/sdk/server/src/index.ts:25`](../packages/sdk/server/src/index.ts)
 
+<a id="deepseek-aidsh-segmentation-decision-trace"></a>
+
+## `@deepseek-ai/dsh-segmentation-decision-trace`
+
+需要：`flinterDecisionTrace`
+
+```ts config-catalog
+/**
+ * Plugin config: which existing tool to trace and the producer-owned source
+ * that normalizes its executions. Not YAML-expressible — `source` carries
+ * functions — so producers mount this plugin programmatically.
+ */
+export interface Config {
+  /** Exact name of the existing segmentation tool to trace. */
+  readonly toolName: string
+  /** Producer-owned normalized decision resolvers. */
+  readonly source: SegmentationDecisionSource
+}
+
+/**
+ * Producer-owned resolvers that extract normalized decision facts from one
+ * tool execution. The producer decides which facts its tool can truthfully
+ * report; this package validates and projects whatever it returns.
+ */
+export interface SegmentationDecisionSource {
+  /**
+   * Extract normalized pre-execution facts for one tool call.
+   * @param exec - the immutable tool execution snapshot.
+   * @returns the normalized request record for this call.
+   */
+  readonly request: (exec: Readonly<ToolExecution>) => SegmentationDecisionRequest
+  /**
+   * Extract normalized post-execution facts for one settled tool call.
+   * @param exec - the immutable tool execution snapshot.
+   * @param result - the immutable tool execution result (success or failure).
+   * @returns the normalized result record for this call.
+   */
+  readonly result: (
+    exec: Readonly<ToolExecution>,
+    result: Readonly<ToolExecutionResult>,
+  ) => SegmentationDecisionResult
+}
+
+/**
+ * Bounded pre-execution decision facts for one segmentation call.
+ *
+ * Every field is either an opaque producer-assigned reference or a measured
+ * scalar. Raw model arguments, prompts, provider payloads, URLs, media, and
+ * error text are never representable here.
+ */
+export interface SegmentationDecisionRequest {
+  /** Opaque refs for every action the decision boundary allowed. Non-empty. */
+  readonly allowedActions: readonly DecisionRef[]
+  /** Opaque ref for the chosen action; must be a member of `allowedActions`. */
+  readonly chosenAction: DecisionRef
+  /** Opaque refs identifying bounded decision parameters. Defaults to none. */
+  readonly parameterRefs?: readonly DecisionRef[]
+  /** Evidence refs requested before the decision. Defaults to none. */
+  readonly requestedEvidenceRefs?: readonly DecisionRef[]
+  /** Evidence refs actually fetched before the decision. Defaults to none. */
+  readonly fetchedEvidenceRefs?: readonly DecisionRef[]
+  /** Evidence refs surfaced to the requester before execution. Defaults to none. */
+  readonly displayedEvidenceRefs?: readonly DecisionRef[]
+  /** Evidence refs observed at the decision boundary. Defaults to none. */
+  readonly observedEvidenceRefs?: readonly DecisionRef[]
+  /**
+   * Non-negative safe-integer budget measured before the decision, or `null`
+   * when the producer did not measure one. Defaults to `null` (unknown).
+   */
+  readonly budgetBefore?: number | null
+  /** Opaque refs for candidates the decision considered. Defaults to none. */
+  readonly candidateRefs?: readonly DecisionRef[]
+  /** Opaque refs for decision-input lineage. Defaults to none. */
+  readonly lineageRefs?: readonly DecisionRef[]
+  /** Opaque ref for the producing source revision. Required. */
+  readonly sourceRef: DecisionRef
+  /** Opaque ref for the producing model revision. Required. */
+  readonly modelRef: DecisionRef
+  /** Opaque ref for the policy revision in force. Required. */
+  readonly policyRevisionRef: DecisionRef
+}
+
+/**
+ * Bounded post-execution decision facts for one segmentation call.
+ *
+ * `outcome` and `disposition` are required so the producer must state each
+ * explicitly — including `'unknown'` — instead of letting a default hide a
+ * missing fact.
+ */
+export interface SegmentationDecisionResult {
+  /** The decision outcome, including failure and replay statuses. Required. */
+  readonly outcome: DecisionStatus
+  /** The final retention state of the decision result. Required. */
+  readonly disposition: Disposition
+  /**
+   * Non-negative safe-integer usage measured for the decision, or `null` when
+   * cost is unknown. Defaults to `null` (unknown); never fabricated.
+   */
+  readonly usage?: number | null
+  /** Opaque refs for produced result artifacts. Defaults to none. */
+  readonly resultRefs?: readonly DecisionRef[]
+  /** Opaque refs for evidence attached to the result. Defaults to none. */
+  readonly evidenceRefs?: readonly DecisionRef[]
+  /**
+   * Whether result lineage is established. Defaults to `'unknown'` when the
+   * producer did not supply it.
+   */
+  readonly lineageStatus?: 'known' | 'unknown'
+  /** Whether the result is ready for durable recording. Defaults to `false`. */
+  readonly recordingReady?: boolean
+  /** Whether the result is ready for indexing. Defaults to `false`. */
+  readonly indexReady?: boolean
+}
+```
+
+依赖：[`DecisionRef`](../packages/flinter/dsh-decision-trace/src/index.ts) · [`DecisionStatus`](../packages/flinter/dsh-decision-trace/src/index.ts) · [`Disposition`](../packages/flinter/dsh-decision-trace/src/index.ts) · [`ToolExecution`](subsystems/tools.zh.md) · [`ToolExecutionResult`](subsystems/tools.zh.md)
+
+来源：[`packages/flinter/dsh-segmentation-decision-trace/src/index.ts:191`](../packages/flinter/dsh-segmentation-decision-trace/src/index.ts)
+
 <a id="deepseek-aidsh-session-log-deepseek"></a>
 
 ## `@deepseek-ai/dsh-session-log-deepseek`
