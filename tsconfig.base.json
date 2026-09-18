@@ -261,6 +261,10 @@
       // directory, so its aliases are hand-owned too.
       "@deepseek-ai/dsh-decision-trace": ["./packages/flinter/dsh-decision-trace/src"],
       "@deepseek-ai/dsh-decision-trace/invariant": ["./packages/flinter/dsh-decision-trace/src/invariant.ts"],
+      // The segmentation decision-trace adapter keeps a dsh-prefixed public
+      // package name in a FLINTER directory, so its aliases are hand-owned too.
+      "@deepseek-ai/dsh-segmentation-decision-trace": ["./packages/flinter/dsh-segmentation-decision-trace/src"],
+      "@deepseek-ai/dsh-segmentation-decision-trace/invariant": ["./packages/flinter/dsh-segmentation-decision-trace/src/invariant.ts"],
       // BEGIN generated package aliases — pnpm run gen-tsconfig-paths
       "@deepseek-ai/dsh-acp": ["./packages/acp/acp/src"],
       "@deepseek-ai/dsh-acp/invariant": ["./packages/acp/acp/src/invariant.ts"],
