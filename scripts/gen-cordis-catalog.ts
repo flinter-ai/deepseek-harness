@@ -3,8 +3,9 @@
  * Typert catalog projection. Every harness `ctx.<key>` service and event scope
  * maps to exactly one `docs/subsystems/` page through the curated tables below;
  * the generator injects each page's Cordis API reference between its GENERATED markers —
- * into both language sides of the pair, localizing paired document paths for
- * the Chinese side while retaining every other byte — and re-records a pair's
+ * into both language sides of the pair, localizing paired document paths PLUS
+ * the declared, symbol-keyed prose of {@link ZH_CATALOG_PROSE} for the Chinese
+ * side while retaining every other byte — and re-records a pair's
  * `.i18n.yaml` only when nothing outside the region changed. The
  * projection enforces event modes, JSDoc parameter/return completeness, and
  * signature type-link coverage; the inherited (vendor) tier renders to
@@ -27,11 +28,12 @@ import {
   REGION_BEGIN,
   REGION_END,
 } from '@deepseek-ai/dsh-typert-generator'
-import type { CordisCatalogPolicy } from '@deepseek-ai/dsh-typert-generator'
+import type { CordisCatalogPolicy, ServiceEntry } from '@deepseek-ai/dsh-typert-generator'
 import { renderCordisCoreApiPages } from './cordis-core-api.ts'
 import { contextKeyMap, contextMergeFiles, eventNameList } from './cordis-walk.ts'
 import {
   blobHash,
+  canonicalCatalogTsCode,
   parsePairMeta,
   parseTranslationPairingManifest,
   partitionGeneratedRegions,
@@ -870,17 +872,211 @@ export interface WalkPartitionMaps {
   readonly eventWalkExemptions: Readonly<Record<string, string>>
 }
 
+/**
+ * One service's declared Simplified-Chinese prose for the explicitly
+ * locale-aware generated surface. Both fields replace ONLY human-readable
+ * text: signatures, decorators, type tokens, anchors, and links stay the
+ * projection's own bytes, and {@link zhCatalogProseProblems} plus the
+ * pairing gate's canonical catalog-fence comparison pin the JSDoc tag
+ * scaffold (`@param` names, tag order, machine tags) against the English
+ * original. Keyed by stable symbol identity — the `ctx.<key>` service key
+ * and the rendered method name — never by line number or free-text match,
+ * so a moved or renamed service fails loud instead of mis-localizing.
+ */
+export interface ZhServiceProse {
+  /** Localized class-level description paragraph (replaces the service doc line). */
+  readonly doc?: string
+  /** Localized JSDoc blocks keyed by method name. */
+  readonly methods?: Readonly<Record<string, string>>
+}
+
+/**
+ * The declared locale-aware content of the Cordis catalog: services whose
+ * generated explanatory prose is reviewed Simplified Chinese on the `.zh.md`
+ * side. Identifiers, signatures, types, event names, paths, and commands
+ * stay literal — only prose is localized. Add an entry ONLY with its
+ * reviewed translation; {@link zhCatalogProseProblems} rejects a key or
+ * method the projection no longer renders, and a localized JSDoc whose tag
+ * scaffold no longer matches the English original.
+ */
+export const ZH_CATALOG_PROSE: Readonly<Record<string, ZhServiceProse>> = {
+  flinterDecisionTrace: {
+    doc: '供生产者插件按准确工具名启用捕获的注册表。',
+    methods: {
+      register: [
+        '/**',
+        ' * 注册一个准确工具名的适配器，直到返回的解除函数运行。',
+        ' * @param toolName - 生产者拥有的准确 DSH 工具名。',
+        ' * @param adapter - 可信的同进程投影回调。',
+        ' * @returns 一个解除函数：当此注册仍拥有该名称时将其移除。',
+        ' */',
+      ].join('\n'),
+      adapter: [
+        '/**',
+        ' * 查找某个准确工具名已注册的适配器。',
+        ' * @param toolName - 准确 DSH 工具名。',
+        ' * @returns 对应的适配器；未启用捕获时为 undefined。',
+        ' */',
+      ].join('\n'),
+      recordDiagnostic: [
+        '/**',
+        ' * 记录一个有界的内部失败码，不携带抛出数据。',
+        ' * @param code - 由捕获观察器选定的封闭诊断码。',
+        ' */',
+      ].join('\n'),
+    },
+  },
+}
+
+/**
+ * The method name that opens a rendered catalog signature line, skipping
+ * decorators and modifiers (`@Remote('x') async foo(...) -> foo`).
+ * @param signature - Rendered signature text (JSDoc stripped).
+ * @returns The member name, or undefined when no name can be identified.
+ */
+export function methodNameOfSignature(signature: string): string | undefined {
+  const first = signature.split('\n', 1)[0]?.trim() ?? ''
+  return /^(?:@\w+\([^)]*\)\s*)*(?:async\s+)?([A-Za-z_$][\w$]*)\s*[(<]/.exec(first)?.[1]
+}
+
+/**
+ * Judge the declared zh prose against the projected services, fail-closed:
+ * every keyed service and method must still render exactly once, and every
+ * localized JSDoc must share the English original's canonical tag scaffold
+ * (so a signature/tag change on the English side forces a deliberate
+ * localization update instead of silently drifting). Pure; the caller
+ * aggregates the messages with the partition problems.
+ * @param services - rendered services from the projection.
+ * @param prose - declared zh localization (defaults to {@link ZH_CATALOG_PROSE}).
+ * @returns one message per violation, empty when the declaration is live.
+ */
+export function zhCatalogProseProblems(
+  services: ServiceEntry[],
+  prose: Readonly<Record<string, ZhServiceProse>> = ZH_CATALOG_PROSE,
+): string[] {
+  const problems: string[] = []
+  const byKey = new Map(services.map(service => [service.key, service]))
+  for (const [key, entry] of Object.entries(prose)) {
+    const service = byKey.get(key)
+    if (!service) {
+      problems.push(`ZH_CATALOG_PROSE names 'ctx.${key}' but the projection renders no such service; remove the stale localization entry.`)
+      continue
+    }
+    for (const [method, jsDoc] of Object.entries(entry.methods ?? {})) {
+      const matches = service.methods.filter(member => methodNameOfSignature(member.signature) === method)
+      if (matches.length !== 1) {
+        problems.push(`ZH_CATALOG_PROSE names method '${method}' of ctx.${key} but the rendered ${service.type} has ${matches.length} such method(s); update the stale localization entry.`)
+        continue
+      }
+      if (canonicalCatalogTsCode(matches[0]?.jsDoc ?? '') !== canonicalCatalogTsCode(jsDoc)) {
+        problems.push(`ZH_CATALOG_PROSE localized JSDoc for ctx.${key}.${method} no longer matches the English tag scaffold; re-translate against the current original.`)
+      }
+    }
+  }
+  return problems
+}
+
+/** One `### \`ctx.<key>\`` section heading match, or null. */
+function serviceHeadingKey(line: string): string | null {
+  return /^### `ctx\.([\w$]+)`/.exec(line)?.[1] ?? null
+}
+
+/**
+ * Splice the declared zh prose into one rendered Chinese region. Every
+ * substitution locates its subject by symbol identity (service heading key,
+ * method name opening the signature line after a JSDoc block) and is
+ * fail-closed: a declared key/method absent from the section it should
+ * occupy, or an unexpected section shape, throws rather than passing the
+ * region through partially localized.
+ * @param region - One rendered page region (EN as projected).
+ * @param page - Owning page basename without locale suffix, e.g. `core.md`.
+ * @returns The region with the declared zh prose applied.
+ */
+export function localizeZhCatalogProse(region: string, page: string): string {
+  const pageKeys = new Set(
+    Object.entries(SERVICE_PAGE).filter(([, mapped]) => mapped === page).map(([key]) => key),
+  )
+  const pending = new Map(
+    Object.entries(ZH_CATALOG_PROSE).filter(([key]) => pageKeys.has(key)),
+  )
+  if (pending.size === 0) return region
+  const lines = region.split('\n')
+  const out: string[] = []
+  let i = 0
+  let currentKey: string | null = null
+  let inFence = false
+  while (i < lines.length) {
+    const line = lines[i] ?? ''
+    if (line.startsWith('```')) inFence = !inFence
+    const headingKey = serviceHeadingKey(line)
+    if (!inFence && headingKey !== null) currentKey = headingKey
+    out.push(line)
+    i++
+    if (currentKey === null) continue
+    const prose = pending.get(currentKey)
+    if (prose === undefined) continue
+    if (!inFence && headingKey !== null && prose.doc !== undefined) {
+      // Section shape: heading, blank line(s), doc paragraph, blank line(s),
+      // then the signature fence (or the Types:/Source: footer when the
+      // service exposes no methods). Replace exactly the paragraph gap.
+      while (i < lines.length && lines[i] === '') { out.push(lines[i] ?? ''); i++ }
+      let end = i
+      while (end < lines.length && lines[end] !== '') end++
+      if (end === i) throw new Error(`gen-cordis-catalog: ctx.${currentKey} renders no doc paragraph for ZH_CATALOG_PROSE to replace.`)
+      out.push(prose.doc)
+      pending.set(currentKey, prose.methods === undefined ? {} : { methods: prose.methods })
+      i = end
+      continue
+    }
+    if (inFence && line.trim() === '/**' && prose.methods !== undefined) {
+      // A JSDoc block: read through its close, then the signature line(s)
+      // that follow name the method this block documents.
+      let end = i
+      while (end < lines.length && !(lines[end]?.trim().endsWith('*/') ?? false)) end++
+      const close = end
+      if (close >= lines.length) throw new Error(`gen-cordis-catalog: unterminated JSDoc block in the ctx.${currentKey} catalog fence.`)
+      let signatureLine = close + 1
+      while (signatureLine < lines.length && lines[signatureLine] === '') signatureLine++
+      const name = methodNameOfSignature(lines[signatureLine] ?? '')
+      const replacement = name !== undefined ? prose.methods[name] : undefined
+      if (replacement !== undefined) {
+        const replacementLines = replacement.split('\n')
+        if (replacementLines[0]?.trim() !== '/**') throw new Error(`gen-cordis-catalog: ZH_CATALOG_PROSE localized JSDoc for ctx.${currentKey}.${name} must open with '/**'.`)
+        out.pop() // the `/**` start line pushed above is replaced whole
+        out.push(...replacementLines)
+        i = close + 1
+        pending.set(currentKey, {
+          ...prose,
+          methods: Object.fromEntries(Object.entries(prose.methods).filter(([key]) => key !== name)),
+        })
+        continue
+      }
+      // Method not localized: keep the original block.
+      for (let cursor = i; cursor <= close; cursor++) out.push(lines[cursor] ?? '')
+      i = close + 1
+    }
+  }
+  const missing = [...pending.entries()]
+    .filter(([, entry]) => entry.doc !== undefined || Object.keys(entry.methods ?? {}).length > 0)
+    .map(([key]) => `ctx.${key}`)
+  if (missing.length > 0) {
+    throw new Error(`gen-cordis-catalog: ZH_CATALOG_PROSE declares prose for ${missing.join(', ')} but the ${page} region did not render it; the localization is stale.`)
+  }
+  return out.join('\n')
+}
+
 /** Project paired Markdown destinations in one generated region to the page's locale. */
 export function localizePageRegion(region: string, pageRel: string, scanRoot: string = root): string {
   if (!pageRel.endsWith('.zh.md')) return region
   const manifest = parseTranslationPairingManifest(
     readFileSync(resolve(scanRoot, 'scripts/translation-pairing.manifest.json'), 'utf8'),
   )
-  return rewriteTranslationLinkLocales(region, {
+  const localized = rewriteTranslationLinkLocales(region, {
     repoRoot: scanRoot,
     sourcePath: pageRel,
     isTranslationPairSource: translationPairSourcePredicate(manifest),
   }).content
+  return localizeZhCatalogProse(localized, pageRel.split('/').at(-1)?.replace(/\.zh\.md$/, '.md') ?? pageRel)
 }
 
 /**
@@ -978,18 +1174,21 @@ export function computeOutputs(): [string, string][] {
       if (!declaredEvents.has(name)) declaredEvents.set(name, rel)
     }
   }
-  const problems = walkPartitionProblems({
-    renderedKeys: new Map(services.map(s => [s.key, s.source])),
-    renderedScopes: new Set(events.map(e => e.scope)),
-    renderedEventNames: new Set(events.map(e => e.name)),
-    declaredKeys,
-    declaredEvents,
-  }, {
-    servicePage: SERVICE_PAGE,
-    serviceWalkExemptions: SERVICE_WALK_EXEMPTIONS,
-    eventScopePage: EVENT_SCOPE_PAGE,
-    eventWalkExemptions: EVENT_WALK_EXEMPTIONS,
-  })
+  const problems = [
+    ...zhCatalogProseProblems(services),
+    ...walkPartitionProblems({
+      renderedKeys: new Map(services.map(s => [s.key, s.source])),
+      renderedScopes: new Set(events.map(e => e.scope)),
+      renderedEventNames: new Set(events.map(e => e.name)),
+      declaredKeys,
+      declaredEvents,
+    }, {
+      servicePage: SERVICE_PAGE,
+      serviceWalkExemptions: SERVICE_WALK_EXEMPTIONS,
+      eventScopePage: EVENT_SCOPE_PAGE,
+      eventWalkExemptions: EVENT_WALK_EXEMPTIONS,
+    }),
+  ]
   if (problems.length > 0) throw new Error(`gen-cordis-catalog: ${problems.length} partition violation(s):\n${problems.map(p => `  ${p}`).join('\n')}`)
 
   const pages = [...new Set([...Object.values(SERVICE_PAGE), ...Object.values(EVENT_SCOPE_PAGE)])].sort()
