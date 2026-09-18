@@ -8,11 +8,17 @@ Systems Manager（SSM）部署固定的 Git commit，重新构建 DSH Web 所需
 profile 安装命令，并在不把模型 API 密钥放进 systemd 或进程环境的前提下验证
 需要认证的 Web 端点。
 
-## 自动运行的内容
+> **已弃用 — 待退役。** EC2 DSH Web 主机（`flinter-orca-dsh`）已弃用；仅在
+> 迁移/恢复窗口内保持停止状态并保留 EBS。此部署路径仅用于受控的迁移与
+> 恢复操作，直到 DSH Web 能力被迁移或明确退役、且该主机的专属资源被移除为止。
+> 请勿将其用于日常部署。
 
-`.github/workflows/deploy-dsh-ec2.yml` 会在 `master` 分支的 push 修改 DSH
-runtime、profile、provider 或部署文件时运行，也可以手动输入明确的 Git ref。
-工作流会：
+## 运行方式
+
+`.github/workflows/deploy-dsh-ec2.yml` 仅支持手动触发
+（`workflow_dispatch`）：不再在 `master` 分支 push 时自动部署，并且在
+主机剩余生命周期内保持如此。当受控的迁移或恢复操作需要时，使用明确的
+Git ref 手动启动。工作流会：
 
 1. checkout 一个精确 commit 并记录完整 SHA；
 2. 通过 GitHub OIDC 和范围受限的部署 role 认证 AWS；

@@ -9,11 +9,19 @@ Web (including Typert and browser bundles), reapplies the supported profile
 install command, and verifies the authenticated Web endpoint without putting
 model API keys in systemd or the process environment.
 
-## What runs automatically
+> **Deprecated — pending retirement.** The EC2 DSH Web host
+> (`flinter-orca-dsh`) is deprecated; it stays stopped with EBS retained only
+> during the migration/recovery window. This deployment path exists solely for
+> controlled migration and recovery operations until the DSH Web capability is
+> migrated or explicitly retired and the host's exclusive resources are
+> removed. Do not use it for routine deployments.
 
-`.github/workflows/deploy-dsh-ec2.yml` runs on pushes to `master` when the DSH
-runtime, profile, provider, or deployment files change. It can also be started
-manually with an explicit Git ref. The workflow:
+## What runs
+
+`.github/workflows/deploy-dsh-ec2.yml` is manual-only (`workflow_dispatch`):
+it no longer deploys on pushes to `master`, and it stays that way for the rest
+of the host's life. It is started manually with an explicit Git ref when a
+controlled migration or recovery operation needs it. The workflow:
 
 1. checks out one exact commit and records its full SHA;
 2. authenticates to AWS with GitHub OIDC and a narrowly scoped deployment role;
