@@ -23,6 +23,14 @@ readonly PUBLIC_TUNNEL_BINARY="${DSH_CLOUDFLARED_BIN:-/home/ubuntu/bin/cloudflar
 readonly PUBLIC_TUNNEL_CONFIG_SOURCE='deploy/dsh-ec2/cloudflared/dsh-ec2-phase2.yml'
 readonly PUBLIC_TUNNEL_UNIT_SOURCE='deploy/dsh-ec2/cloudflared/dsh-ec2-phase2-named-tunnel.service'
 readonly PUBLIC_HOST_DROPIN_SOURCE='deploy/dsh-ec2/systemd/10-dsh-web-public-host.conf'
+readonly IDLE_STOP_SCRIPT_SOURCE='deploy/dsh-ec2/idle-stop.sh'
+readonly IDLE_STOP_SERVICE_SOURCE='deploy/dsh-ec2/systemd/dsh-idle-stop.service'
+readonly IDLE_STOP_TIMER_SOURCE='deploy/dsh-ec2/systemd/dsh-idle-stop.timer'
+readonly IDLE_STOP_SCRIPT_TARGET='/usr/local/libexec/dsh-phase2/idle-stop.sh'
+readonly IDLE_STOP_SERVICE_TARGET='/etc/systemd/system/dsh-idle-stop.service'
+readonly IDLE_STOP_TIMER_TARGET='/etc/systemd/system/dsh-idle-stop.timer'
+readonly IDLE_STOP_TIMER='dsh-idle-stop.timer'
+readonly DEPLOY_LOCK_FILE='/run/lock/dsh-phase2-deploy.lock'
 
 die() {
   printf 'dsh-ec2-deploy: error: %s\n' "$*" >&2
@@ -112,6 +120,75 @@ git_blob_matches_live_file() {
     || die "the protected ingress file has the wrong owner: $live_path"
 }
 
+install_target_idle_guard() {
+  local source target mode temporary target_name index
+  local -a sources=(
+    "$IDLE_STOP_SCRIPT_SOURCE"
+    "$IDLE_STOP_SERVICE_SOURCE"
+    "$IDLE_STOP_TIMER_SOURCE"
+  )
+  local -a targets=(
+    "$IDLE_STOP_SCRIPT_TARGET"
+    "$IDLE_STOP_SERVICE_TARGET"
+    "$IDLE_STOP_TIMER_TARGET"
+  )
+  local -a modes=(700 644 644)
+  # Mark this before the first filesystem mutation. If installation fails
+  # halfway through, the EXIT rollback must restore the files already copied.
+  IDLE_GUARD_INSTALLED=1
+  mkdir -p "$BACKUP_DIR/idle-guard" /var/lib/dsh-phase2 /usr/local/libexec/dsh-phase2
+  chmod 750 /var/lib/dsh-phase2
+  for index in "${!sources[@]}"; do
+    source="${sources[$index]}"
+    target="${targets[$index]}"
+    mode="${modes[$index]}"
+    target_name=$(basename "$target")
+    git -C "$REPOSITORY_ROOT" cat-file -e "$DEPLOY_SHA:$source" \
+      || die "the deployment revision is missing the idle guard file: $source"
+    if [[ -e "$target" || -L "$target" ]]; then
+      [[ -f "$target" && ! -L "$target" ]] || die "the idle guard target is not a regular file: $target"
+      cp -a "$target" "$BACKUP_DIR/idle-guard/$target_name"
+      : >"$BACKUP_DIR/idle-guard/$target_name.present"
+    else
+      : >"$BACKUP_DIR/idle-guard/$target_name.absent"
+    fi
+    temporary=$(mktemp "$BACKUP_DIR/idle-guard/.$target_name.XXXXXX")
+    git -C "$REPOSITORY_ROOT" show "$DEPLOY_SHA:$source" >"$temporary"
+    install -o root -g root -m "$mode" "$temporary" "$target"
+    rm -f "$temporary"
+  done
+  systemctl daemon-reload
+  systemctl enable --now "$IDLE_STOP_TIMER"
+  printf 'dsh-ec2-deploy: idle-guard=installed timer=%s\n' "$IDLE_STOP_TIMER"
+}
+
+restore_target_idle_guard() {
+  local target target_name
+  local -a targets=(
+    "$IDLE_STOP_SCRIPT_TARGET"
+    "$IDLE_STOP_SERVICE_TARGET"
+    "$IDLE_STOP_TIMER_TARGET"
+  )
+  systemctl stop "$IDLE_STOP_TIMER" >/dev/null 2>&1 || true
+  for target in "${targets[@]}"; do
+    target_name=$(basename "$target")
+    if [[ -e "$BACKUP_DIR/idle-guard/$target_name.present" ]]; then
+      cp -a "$BACKUP_DIR/idle-guard/$target_name" "$target"
+    elif [[ -e "$BACKUP_DIR/idle-guard/$target_name.absent" ]]; then
+      rm -f "$target"
+    fi
+  done
+  systemctl daemon-reload >/dev/null 2>&1 || true
+  if [[ "${IDLE_TIMER_WAS_ENABLED:-0}" == 1 ]]; then
+    systemctl enable "$IDLE_STOP_TIMER" >/dev/null 2>&1 || true
+  else
+    systemctl disable "$IDLE_STOP_TIMER" >/dev/null 2>&1 || true
+  fi
+  if [[ "${IDLE_TIMER_WAS_ACTIVE:-0}" == 1 ]]; then
+    systemctl start "$IDLE_STOP_TIMER" >/dev/null 2>&1 || true
+  fi
+}
+
 verify_public_ingress() {
   local service_definition
   [[ -x "$PUBLIC_TUNNEL_BINARY" ]] || die "cloudflared binary is missing: $PUBLIC_TUNNEL_BINARY"
@@ -145,6 +222,7 @@ verify_public_ingress() {
 completed=0
 rollback_ready=0
 switched=0
+IDLE_GUARD_INSTALLED=0
 rollback() {
   local status=$?
   if (( completed == 1 || rollback_ready == 0 )); then
@@ -155,6 +233,9 @@ rollback() {
   printf 'dsh-ec2-deploy: rollback=started\n' >&2
   if (( switched == 1 )); then
     git -C "$REPOSITORY_ROOT" checkout --detach "$PREVIOUS_SHA" >/dev/null 2>&1
+  fi
+  if (( IDLE_GUARD_INSTALLED == 1 )); then
+    restore_target_idle_guard
   fi
   restore_profile
   if (( SERVICE_WAS_ACTIVE == 1 )); then
@@ -170,6 +251,10 @@ trap rollback EXIT
 [[ "$PORT_NUMBER" =~ ^[0-9]+$ ]] || die 'port is invalid'
 [[ "$DEPLOY_SHA" =~ ^[0-9a-f]{40}$ ]] || die 'DSH_DEPLOY_SHA must be a 40-character commit SHA'
 [[ -n "$EXPECTED_REMOTE" ]] || die 'DSH_DEPLOY_REMOTE is required'
+
+mkdir -p "$(dirname "$DEPLOY_LOCK_FILE")"
+exec 8>"$DEPLOY_LOCK_FILE"
+flock -n 8 || die 'another DSH deployment or idle-stop check is active'
 
 git -C "$REPOSITORY_ROOT" rev-parse --git-dir >/dev/null 2>&1 || die "not a Git checkout: $REPOSITORY_ROOT"
 PROFILE_DIR="$HOME_ROOT/profiles/$PROFILE_NAME"
@@ -233,8 +318,11 @@ run_logged install pnpm -C "$REPOSITORY_ROOT" install --frozen-lockfile
 run_logged build-libs pnpm -C "$REPOSITORY_ROOT" run build:lib
 run_logged settings-compat python3 "$REPOSITORY_ROOT/deploy/dsh-ec2/migrate-settings.py" "$SETTINGS_FILE"
 migrate_legacy_worker_overlay
+if systemctl is-enabled --quiet "$IDLE_STOP_TIMER"; then IDLE_TIMER_WAS_ENABLED=1; fi
+if systemctl is-active --quiet "$IDLE_STOP_TIMER"; then IDLE_TIMER_WAS_ACTIVE=1; fi
+install_target_idle_guard
 run_logged profile-install env DSH_HOME="$HOME_ROOT" DSH_ROOT="$REPOSITORY_ROOT" pnpm -C "$REPOSITORY_ROOT" dsh plugin --profile "$PROFILE_NAME" add --save-exact "$REPOSITORY_ROOT/packages/flinter/dsh-aws-worker-profile"
-run_logged dump-config env DSH_HOME="$HOME_ROOT" DSH_ROOT="$REPOSITORY_ROOT" pnpm -C "$REPOSITORY_ROOT" dsh --profile "$PROFILE_NAME" --dump-config
+run_logged dump-config env DSH_HOME="$HOME_ROOT" DSH_ROOT="$REPOSITORY_ROOT" DSH_IDLE_GUARD_ENABLED=1 DSH_IDLE_STATE_FILE=/var/lib/dsh-phase2/idle-state.json pnpm -C "$REPOSITORY_ROOT" dsh --profile "$PROFILE_NAME" --dump-config
 run_logged settings-compat-check python3 "$REPOSITORY_ROOT/deploy/dsh-ec2/migrate-settings.py" --check "$SETTINGS_FILE"
 
 grep -q 'credentials-aws-secrets-manager' "$BACKUP_DIR/dump-config.log" \

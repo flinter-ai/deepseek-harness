@@ -50,6 +50,10 @@ Set `compression: 'gzip'` to wrap eligible socket-backed responses without chang
 
 Index startup inputs are two layers. `collectIndexInjections()` gathers a fresh injection table — one `webserver/index-inject` emit per call, each subscriber pushing its current rows — and `renderIndex(html)` renders those rows into the index.html body before applying the raw `tapIndex(transform)` transforms in registration order. A `script-preload` row renders an advisory classic-script preload link. Static deployments carry the same rows in their boot payload. `applyIndexTaps(html)` applies only the raw transforms; it is the escape hatch for markup no row expresses.
 
+### Activity snapshot
+
+`recordActivity()` and `activitySnapshot()` provide a redacted lifecycle seam for host policies such as the optional idle-stop plugin. The snapshot contains only the latest accepted application timestamp, active HTTP handler count, and active upgraded-socket count. It contains no request data, credentials, or route names; the host policy combines it with job and PTY counts before taking any lifecycle action.
+
 ### Behavior under failure
 
 A listen failure (for example EADDRINUSE) rejects plugin initialization with the bind diagnostic. An HTTP request whose handler throws is answered 400 — or the socket destroyed when headers are already out — and logged as a warning; it never exits the process. An upgrade-handler exception or upgraded-socket transport error logs a warning and destroys its socket.

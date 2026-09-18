@@ -46,6 +46,26 @@ only when that tail is byte-for-byte identical to the checked-in AWS worker
 bundle. Any customized or ambiguous overlay stops deployment and is restored
 from the profile backup.
 
+## Idle-stop safety boundary
+
+The EC2 deployment enables the opt-in `dsh-host-idle-guard` and installs a
+separate `dsh-idle-stop.timer`. The guard atomically writes only a redacted
+snapshot under `/var/lib/dsh-phase2/idle-state.json`; the controller requires
+all HTTP, WebSocket, job, and PTY counts to be zero, a fresh state file, no
+deployment lock, and 30 minutes since the last accepted application activity.
+Missing, malformed, stale, or clock-inconsistent state is fail-closed. An
+operator can place `/var/lib/dsh-phase2/idle-stop.hold` to suppress shutdown.
+
+The controller stops `dsh.service` before requesting `systemctl poweroff`; it
+never runs inside the DSH process and never uses CPU percentage as proof that
+work is idle. The pre-existing slower CloudWatch CPU alarm remains a fallback
+until its account-level policy is separately reviewed. A dry-run check is safe:
+
+```bash
+sudo DSH_IDLE_STOP_DRY_RUN=1 \
+  /usr/local/libexec/dsh-phase2/idle-stop.sh
+```
+
 ## Stable Cloudflare ingress (one-time host provisioning)
 
 The DSH service stays bound to loopback. The reviewed public path is a separate

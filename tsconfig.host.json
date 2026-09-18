@@ -327,6 +327,7 @@
     { "path": "./packages/host/directory-picker-browse" },
     { "path": "./packages/host/directory-picker-native" },
     { "path": "./packages/host/frontend-static" },
+    { "path": "./packages/host/idle-guard" },
     { "path": "./packages/host/plugin-inventory" },
     { "path": "./packages/host/source-publisher-github" },
     { "path": "./packages/llm/plugin-package-inventory-deepseek" },

@@ -216,6 +216,37 @@ describe('TerminalSessionService ownership and lifecycle', () => {
     expect(b.requests).toEqual([])
   })
 
+  it('rejects a workspace request when no workspace registry is mounted', async () => {
+    const ctx = await harness()
+    const b = backend()
+    ctx.terminals.registerBackend(b.provider)
+    const owner = stubAgent(ctx, 'owner')
+    ctx.agents.register(owner)
+    const workspace: WorkspaceHandle = { id: 'workspace-1' as WorkspaceHandle['id'], path: '/workspace' }
+
+    await expect(ctx.terminals.spawn(owner, { type: 'stub', workspace }))
+      .rejects.toMatchObject({ code: 'NO_WORKSPACE' })
+    expect(b.requests).toEqual([])
+  })
+
+  it('reports non-Error registry failures with their string form', async () => {
+    const ctx = await harness()
+    const b = backend()
+    ctx.terminals.registerBackend(b.provider)
+    const owner = stubAgent(ctx, 'owner')
+    ctx.agents.register(owner)
+    const workspace: WorkspaceHandle = { id: 'workspace-1' as WorkspaceHandle['id'], path: '/workspace' }
+    ctx.provide('workspaceRegistry', {
+      resolvePath() {
+        throw 'foreign handle'
+      },
+    } as never)
+
+    await expect(ctx.terminals.spawn(owner, { type: 'stub', workspace }))
+      .rejects.toMatchObject({ code: 'INVALID_WORKSPACE', message: 'invalid PTY workspace: foreign handle' })
+    expect(b.requests).toEqual([])
+  })
+
   it('rejects unknown backends, non-live owners, duplicate names, and active sends', async () => {
     const ctx = await harness()
     const owner = stubAgent(ctx, 'owner')
@@ -260,6 +291,34 @@ describe('TerminalSessionService ownership and lifecycle', () => {
     await expect(pending).rejects.toMatchObject({ code: 'OWNER_NOT_LIVE' })
     await disposal
     expect(session.closed).toEqual(['PTY spawn rolled back'])
+  })
+
+  it('counts published sessions and in-flight spawns across every owner', async () => {
+    const ctx = await harness()
+    const stub = backend()
+    ctx.terminals.registerBackend(stub.provider)
+    const ownerA = stubAgent(ctx, 'count-a')
+    const ownerB = stubAgent(ctx, 'count-b')
+    ctx.agents.register(ownerA)
+    ctx.agents.register(ownerB)
+    expect(ctx.terminals.activeCount()).toBe(0)
+
+    await ctx.terminals.spawn(ownerA, { type: 'stub', name: 'one' })
+    await ctx.terminals.spawn(ownerB, { type: 'stub', name: 'two' })
+    expect(ctx.terminals.activeCount()).toBe(2)
+
+    const gate = Promise.withResolvers<TerminalBackendSession>()
+    ctx.terminals.registerBackend({ type: 'slow', spawn: () => gate.promise })
+    const pending = ctx.terminals.spawn(ownerA, { type: 'slow', name: 'three' })
+    const rolledBack = pending.then(() => 'published', () => 'rolled back')
+    expect(ctx.terminals.activeCount()).toBe(3)
+
+    const disposal = disposeTerminalSessionService(ctx)
+    gate.resolve(new StubSession())
+    expect(await rolledBack).toBe('rolled back')
+    await disposal
+    await disposeAgentScope(ownerA)
+    await disposeAgentScope(ownerB)
   })
 
   it('preserves caller cancellation when a pending backend spawn completes', async () => {

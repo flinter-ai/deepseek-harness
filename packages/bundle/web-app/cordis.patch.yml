@@ -143,6 +143,20 @@
         compressionLevel: 1
         compressionThresholdBytes: 1024
 
+    # Redacted host activity state for the deployment-owned idle-stop timer.
+    # Disabled everywhere unless the host explicitly opts in; this plugin does
+    # not perform the stop itself and never sees credential or request content.
+    - id: idle-guard
+      name: '@deepseek-ai/dsh-host-idle-guard'
+      inject: [webServer]
+      config:
+        enabled: !!js process.env.DSH_IDLE_GUARD_ENABLED === '1'
+        stateFile: !!js process.env.DSH_IDLE_STATE_FILE ?? '/var/lib/dsh-phase2/idle-state.json'
+        intervalMs: 30000
+        # This Web composition deliberately has no PTY service. If a future
+        # profile adds terminal support, it must override this to `required`.
+        ptyMode: absent
+
     # Web glue owned by this bundle: resolves the built frontend dist (an
     # assembly fact of dsh-web-app, never user config), mounts the
     # frontend-static fallback owner, registers the web-surface prompt
