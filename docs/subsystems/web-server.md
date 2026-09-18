@@ -52,6 +52,20 @@ interface Config {
 
 A request whose handling throws (a malformed %-escape hitting `decodeURIComponent`, a client dropping mid-body) is logged as a warning and answered 400 — or the socket destroyed when headers are already out — never a process exit. Disposal pairs `close()` with `closeAllConnections()` because a handler may hold its response open (SSE) and such connections never end on their own; without the force-close, teardown would hang. The package never prints: the URL line belongs to the shell. Per-package operational detail, including the dev-mode bundle watch pipeline, stays in the [README](../../packages/host/webserver/README.md).
 
+Host lifecycle policies read one redacted seam: `recordActivity()` moves only a last-activity timestamp, and `activitySnapshot()` returns that timestamp with live HTTP-handler and upgraded-socket counts — no request data, credentials, or route names. The optional [`dsh-host-idle-guard`](../../packages/host/idle-guard/README.md) combines it with job and PTY counts before any lifecycle action.
+
+```ts type-equiv
+/** Current transport activity used by host lifecycle policies. */
+interface WebActivitySnapshot {
+  /** Most recent accepted application activity, or the server-start baseline. */
+  readonly lastActivityAt: number
+  /** HTTP handlers that have not returned yet. */
+  readonly activeRequests: number
+  /** Upgraded sockets still owned by the webserver. */
+  readonly activeWebSockets: number
+}
+```
+
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
 <a id="cordis-surface"></a>
@@ -67,6 +81,18 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 The browser HTTP carrier service. Activation listens immediately. Route registration order does not affect requests because configured named routes must be distinct, and the fallback handler answers anything not yet claimed during startup with 404 until its owner registers. A listen failure rejects initialization, and the boot process reports the failed fiber.
 
 ```ts cordis-catalog
+/**
+ * Record accepted application activity without exposing request contents.
+ * @param at - Optional timestamp for the accepted activity event.
+ */
+recordActivity(at: number = Date.now()): void
+
+/**
+ * Return redacted transport facts for host lifecycle policies.
+ * @returns current request, WebSocket, and latest-activity facts.
+ */
+activitySnapshot(): WebActivitySnapshot
+
 /**
  * Register a named route. Duplicate (kind, path) throws — route patterns are
  * a composition-level contract, so a collision is a misconfiguration.

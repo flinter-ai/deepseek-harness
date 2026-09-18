@@ -1094,6 +1094,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'fresh snapshots.',
       },
       {
+        signature: 'abstract activeCount(): number',
+        description: 'Return all process-wide live jobs, independent of caller ownership.',
+        parameters: [],
+        returns: 'the number of non-terminal jobs.',
+      },
+      {
         signature: 'abstract get(id: JobId, caller?: Agent): JobSnapshot',
         description: 'Return a non-consuming snapshot without changing its read cursor or notice state. Throws for an unknown or foreign job.',
         parameters: [{ name: 'id', description: 'job to look up.' }, { name: 'caller', description: 'reading agent checked against the owner.' }],
@@ -2480,6 +2486,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'true across the entire spawn-to-close interval, with no publication gap.',
       },
       {
+        signature: 'activeCount(): number',
+        description: 'Count published sessions and in-flight spawns across every owner.',
+        parameters: [],
+        returns: 'the number of live terminal resources.',
+      },
+      {
         signature: 'startSend(owner: Agent, id: TerminalSessionId, request: TerminalSendRequest): TerminalSendOperation',
         description: 'Start one exclusive interactive send.',
         parameters: [{ name: 'owner', description: 'exact session owner.' }, { name: 'id', description: 'target PTY identity.' }, { name: 'request', description: 'explicit text, submit behavior, and cancellation.' }],
@@ -2803,6 +2815,17 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     summary: 'The browser HTTP carrier service.',
     description: 'The browser HTTP carrier service. Activation listens immediately. Route registration order does not affect requests because configured named routes must be distinct, and the fallback handler answers anything not yet claimed during startup with 404 until its owner registers. A listen failure rejects initialization, and the boot process reports the failed fiber.',
     methods: [
+      {
+        signature: 'recordActivity(at: number = Date.now()): void',
+        description: 'Record accepted application activity without exposing request contents.',
+        parameters: [{ name: 'at', description: 'Optional timestamp for the accepted activity event.' }],
+      },
+      {
+        signature: 'activitySnapshot(): WebActivitySnapshot',
+        description: 'Return redacted transport facts for host lifecycle policies.',
+        parameters: [],
+        returns: 'current request, WebSocket, and latest-activity facts.',
+      },
       {
         signature: 'register(route: WebRoute): () => void',
         description: 'Register a named route. Duplicate (kind, path) throws — route patterns are a composition-level contract, so a collision is a misconfiguration.',
@@ -6197,6 +6220,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'VerifiedWebhookDelivery',
     declaration: 'export interface VerifiedWebhookDelivery<K extends string = string> {\n    readonly kind: K;\n    readonly source: WebhookSourceId;\n    readonly deliveryId: WebhookDeliveryId;\n    readonly event: WebhookEventOf<K>;\n    readonly receivedAt: number;\n}',
+  },
+  {
+    name: 'WebActivitySnapshot',
+    declaration: 'export interface WebActivitySnapshot {\n    readonly lastActivityAt: number;\n    readonly activeRequests: number;\n    readonly activeWebSockets: number;\n}',
   },
   {
     name: 'WebBootBatch',

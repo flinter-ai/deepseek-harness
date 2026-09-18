@@ -1,0 +1,11 @@
+[Unit]
+Description=Periodic DSH Web idle-stop check
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=5min
+AccuracySec=1min
+Unit=dsh-idle-stop.service
+
+[Install]
+WantedBy=timers.target

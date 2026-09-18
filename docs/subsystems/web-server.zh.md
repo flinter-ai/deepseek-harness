@@ -52,6 +52,20 @@ interface Config {
 
 处理过程中抛出异常的请求（畸形的 % 转义撞上 `decodeURIComponent`、客户端在请求体中途断开）会记录为警告并应答 400（响应头已发出时则销毁 socket），绝不导致进程退出。dispose（资源释放）把 `close()` 与 `closeAllConnections()` 配对使用，因为处理器可能像 SSE（Server-Sent Events）那样保持响应打开，而这类连接永远不会自行结束；没有强制关闭，拆卸就会挂起。该包从不打印输出：URL 行归 shell 所有。逐包运维细节（含开发模式的 bundle 监视流水线）留在 [README](../../packages/host/webserver/README.zh.md) 中。
 
+宿主生命周期策略只读取一条脱敏接口：`recordActivity()` 仅更新最近活动时间戳，`activitySnapshot()` 返回该时间戳与活动 HTTP handler、活动 upgrade socket 数量——不含请求数据、凭据或 route 名称。可选的 [`dsh-host-idle-guard`](../../packages/host/idle-guard/README.zh.md) 会把它与 job、PTY 数量合并后再执行生命周期操作。
+
+```ts type-equiv
+/** Current transport activity used by host lifecycle policies. */
+interface WebActivitySnapshot {
+  /** Most recent accepted application activity, or the server-start baseline. */
+  readonly lastActivityAt: number
+  /** HTTP handlers that have not returned yet. */
+  readonly activeRequests: number
+  /** Upgraded sockets still owned by the webserver. */
+  readonly activeWebSockets: number
+}
+```
+
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
 <a id="cordis-surface"></a>
@@ -67,6 +81,18 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 The browser HTTP carrier service. Activation listens immediately. Route registration order does not affect requests because configured named routes must be distinct, and the fallback handler answers anything not yet claimed during startup with 404 until its owner registers. A listen failure rejects initialization, and the boot process reports the failed fiber.
 
 ```ts cordis-catalog
+/**
+ * Record accepted application activity without exposing request contents.
+ * @param at - Optional timestamp for the accepted activity event.
+ */
+recordActivity(at: number = Date.now()): void
+
+/**
+ * Return redacted transport facts for host lifecycle policies.
+ * @returns current request, WebSocket, and latest-activity facts.
+ */
+activitySnapshot(): WebActivitySnapshot
+
 /**
  * Register a named route. Duplicate (kind, path) throws — route patterns are
  * a composition-level contract, so a collision is a misconfiguration.

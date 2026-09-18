@@ -590,6 +590,7 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   PresetOption: 'permission-presets.md',
   PresetSpec: 'permission-presets.md',
   InvariantInstaller: 'invariants.md',
+  WebActivitySnapshot: 'web-server.md',
   WebRoute: 'web-server.md',
   IndexInjection: 'web-server.md',
   StorageBackend: 'storage.md',
