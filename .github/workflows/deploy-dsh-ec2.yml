@@ -1,18 +1,9 @@
 name: Deploy DSH Web to EC2
 
+# Manual-only: flinter-orca-dsh is deprecated and pending retirement. This
+# workflow remains solely for controlled migration/recovery operations during
+# the retirement window; it must never deploy automatically on push again.
 on:
-  push:
-    branches: [master]
-    paths:
-      - '.github/workflows/deploy-dsh-ec2.yml'
-      - 'apps/cli/**'
-      - 'deploy/dsh-ec2/**'
-      - 'packages/**'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
-      - 'package.json'
-      - 'tsconfig*.json'
-      - 'vendor/**'
   workflow_dispatch:
     inputs:
       ref:
