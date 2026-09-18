@@ -322,6 +322,26 @@ export interface Config {
 
 Source: [`packages/api/settings-controller/src/index.ts:41`](../packages/api/settings-controller/src/index.ts)
 
+<a id="deepseek-aidsh-api-source-controller"></a>
+
+## `@deepseek-ai/dsh-api-source-controller`
+
+Requires: `storageDomain` · `sessionController`
+
+```ts config-catalog
+/** Deployment limits for browser-provided source material. */
+export interface Config {
+  /** Maximum number of files accepted in one draft. */
+  readonly maxFiles?: number
+  /** Maximum number of bytes accepted in one file. */
+  readonly maxFileBytes?: number
+  /** Maximum total bytes accepted in one draft. */
+  readonly maxTotalBytes?: number
+}
+```
+
+Source: [`packages/api/source-controller/src/index.ts:50`](../packages/api/source-controller/src/index.ts)
+
 <a id="deepseek-aidsh-attachment-local"></a>
 
 ## `@deepseek-ai/dsh-attachment-local`
@@ -923,6 +943,36 @@ export interface Config {
 ```
 
 Source: [`packages/host/frontend-static/src/index.ts:30`](../packages/host/frontend-static/src/index.ts)
+
+<a id="deepseek-aidsh-host-source-publisher-github"></a>
+
+## `@deepseek-ai/dsh-host-source-publisher-github`
+
+```ts config-catalog
+/** Optional Web composition row. Missing repository identity leaves publishing unavailable. */
+export interface Config {
+  /** Enable GitHub publication for this composition. */
+  readonly enabled?: boolean
+  /** Repository root containing the source checkout. */
+  readonly repositoryRoot?: string
+  /** Worktree root used for publication operations. */
+  readonly worktreeRoot?: string
+  /** GitHub repository owner. */
+  readonly owner?: string
+  /** GitHub repository name. */
+  readonly repo?: string
+  /** Target branch for pull requests. */
+  readonly baseBranch?: string
+  /** Git remote name. */
+  readonly remote?: string
+  /** Prefix for generated publication branches. */
+  readonly branchPrefix?: string
+  /** Environment variable containing the token. */
+  readonly tokenEnv?: string
+}
+```
+
+Source: [`packages/host/source-publisher-github/src/index.ts:65`](../packages/host/source-publisher-github/src/index.ts)
 
 <a id="deepseek-aidsh-host-webserver"></a>
 
@@ -3531,6 +3581,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-client-ui-settings-plugins` ([`packages/client/ui-settings-plugins/src/index.ts`](../packages/client/ui-settings-plugins/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-sidebar` ([`packages/client/ui-sidebar/src/index.ts`](../packages/client/ui-sidebar/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-skill` ([`packages/client/ui-skill/src/index.ts`](../packages/client/ui-skill/src/index.ts))
+- `@deepseek-ai/dsh-client-ui-source-editor` ([`packages/client/ui-source-editor/src/index.ts`](../packages/client/ui-source-editor/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-subagent` ([`packages/client/ui-subagent/src/index.ts`](../packages/client/ui-subagent/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-theme` ([`packages/client/ui-theme/src/index.ts`](../packages/client/ui-theme/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-tool` ([`packages/client/ui-tool/src/index.ts`](../packages/client/ui-tool/src/index.ts))
@@ -3629,6 +3680,7 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 - `@deepseek-ai/dsh-session-snapshot` ([`packages/test-support/session-snapshot/src/index.ts`](../packages/test-support/session-snapshot/src/index.ts))
 - `@deepseek-ai/dsh-session-telemetry` ([`packages/session/session-telemetry/src/index.ts`](../packages/session/session-telemetry/src/index.ts))
 - `@deepseek-ai/dsh-session-title-llm` ([`packages/session/session-title-llm/src/index.ts`](../packages/session/session-title-llm/src/index.ts))
+- `@deepseek-ai/dsh-source-draft-model` ([`packages/core/source-draft-model/src/index.ts`](../packages/core/source-draft-model/src/index.ts))
 - `@deepseek-ai/dsh-subagent-in-process-driver` ([`packages/subagent/subagent-in-process-driver/src/index.ts`](../packages/subagent/subagent-in-process-driver/src/index.ts))
 - `@deepseek-ai/dsh-timeout` ([`packages/util/timeout/src/index.ts`](../packages/util/timeout/src/index.ts))
 - `@deepseek-ai/dsh-typert-generator` ([`packages/typert/generator/src/index.ts`](../packages/typert/generator/src/index.ts))

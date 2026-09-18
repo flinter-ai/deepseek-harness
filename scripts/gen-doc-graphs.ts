@@ -99,6 +99,24 @@ const GROUP_ORDER = [
 
 const SERVICE_ROLES: ServiceRole[] = [
   {
+    key: 'flinterPacketEvidence',
+    pkg: 'dsh-packet-evidence',
+    title: 'Canonical packet evidence service',
+    mode: 'seam',
+    implementations: ['dsh-packet-evidence'],
+    consumers: [],
+    note: 'Provides bounded packet descriptions and evidence retrieval to model-facing tools.',
+  },
+  {
+    key: 'sourceController',
+    pkg: 'source-controller',
+    title: 'Durable source draft controller',
+    mode: 'seam',
+    implementations: ['source-controller'],
+    consumers: ['source-editor'],
+    note: 'Owns durable browser source drafts, optimistic revision fences, and the optional publication seam.',
+  },
+  {
     key: 'attachments',
     pkg: 'attachment',
     title: 'Durable binary attachment storage',

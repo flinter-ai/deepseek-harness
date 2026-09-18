@@ -75,40 +75,48 @@ export interface SourceDraftPublishValue {
   readonly pullRequestUrl?: string
 }
 
+/** Successful source-draft operation result. */
 export interface SourceDraftSuccess<T> {
   readonly ok: true
   readonly value: T
 }
 
+/** Session identity was not found. */
 export interface SourceDraftSessionNotFound {
   readonly code: 'session-not-found'
   readonly sessionId: SessionId
 }
 
+/** Draft identity was not found. */
 export interface SourceDraftNotFound {
   readonly code: 'draft-not-found'
   readonly draftId: SourceDraftId
 }
 
+/** Draft revision did not match the expected fence. */
 export interface SourceDraftVersionConflict {
   readonly code: 'version-conflict'
   readonly current: SourceDraft | null
 }
 
+/** Draft request was rejected by validation. */
 export interface SourceDraftRejected {
   readonly code: 'source-rejected'
   readonly reason: string
 }
 
+/** No publisher is configured for publication. */
 export interface SourcePublisherUnavailable {
   readonly code: 'publisher-unavailable'
 }
 
+/** Publication failed at the provider boundary. */
 export interface SourcePublishFailed {
   readonly code: 'publish-failed'
   readonly message: string
 }
 
+/** All business failures returned by the source-draft service. */
 export type SourceDraftFailure =
   | SourceDraftSessionNotFound
   | SourceDraftNotFound
@@ -117,20 +125,28 @@ export type SourceDraftFailure =
   | SourcePublisherUnavailable
   | SourcePublishFailed
 
+/** Failed source-draft operation result. */
 export interface SourceDraftRejectedResult<E extends SourceDraftFailure = SourceDraftFailure> {
   readonly ok: false
   readonly error: E
 }
 
+/** Union of successful and failed source-draft results. */
 export type SourceDraftResult<T, E extends SourceDraftFailure = SourceDraftFailure> =
   | SourceDraftSuccess<T>
   | SourceDraftRejectedResult<E>
 
+/** Result of saving a draft. */
 export type SourceDraftSaveResult = SourceDraftResult<SourceDraft>
+/** Result of loading a draft. */
 export type SourceDraftGetResult = SourceDraftResult<SourceDraft>
+/** Result of listing drafts. */
 export type SourceDraftListResult = SourceDraftResult<{ readonly drafts: readonly SourceDraft[] }>
+/** Result of bootstrapping a draft. */
 export type SourceDraftBootstrapResult = SourceDraftResult<SourceDraftBootstrapValue>
+/** Result of deleting a draft. */
 export type SourceDraftDeleteResult = SourceDraftResult<{ readonly deleted: true }>
+/** Result of publishing a draft. */
 export type SourceDraftPublishResult = SourceDraftResult<SourceDraftPublishValue>
 
 /** Remote service consumed by the framework-neutral model. */
@@ -146,4 +162,5 @@ export interface SourceDraftRemote {
   ): Promise<RemoteResult<SourceDraftPublishResult>>
 }
 
+/** Failures observable by the framework-neutral model. */
 export type SourceDraftModelFailure = SourceDraftFailure | RemoteFailure
