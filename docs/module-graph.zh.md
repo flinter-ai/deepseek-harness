@@ -236,6 +236,7 @@ flowchart TD
     pkg_aws_worker_profile["aws-worker-profile"]
     pkg_decision_trace["decision-trace"]
     pkg_packet_evidence["packet-evidence"]
+    pkg_segmentation_decision_trace["segmentation-decision-trace"]
   end
   subgraph group_guard["packages/guard"]
     pkg_repeat_tool_reminder["repeat-tool-reminder"]
@@ -1085,6 +1086,9 @@ flowchart TD
   pkg_tool_cordis --> pkg_session
   pkg_tool_cordis --> pkg_system_prompt
   pkg_tool_cordis --> pkg_tools
+  pkg_segmentation_decision_trace --> pkg_decision_trace
+  pkg_segmentation_decision_trace --> pkg_invariants
+  pkg_segmentation_decision_trace --> pkg_tools
   pkg_tool_bash --> pkg_agent
   pkg_tool_bash --> pkg_invariants
   pkg_tool_bash --> pkg_jobs
@@ -1952,6 +1956,7 @@ flowchart TD
 | [`client-connection`](../packages/client/connection) | `client` | [`attachment`](../packages/attachment/attachment), [`brand`](../packages/util/brand), [`commands`](../packages/interaction/commands), [`credentials`](../packages/credentials/credentials), [`host-directory-picker`](../packages/host/directory-picker), [`host-webserver`](../packages/host/webserver), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`settings`](../packages/settings/settings), [`tool-todo`](../packages/todo/tool-todo) |
 | [`compaction-tool-result-pruner`](../packages/compaction/compaction-tool-result-pruner) | `compaction` | [`compaction`](../packages/compaction/compaction), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`token-meter`](../packages/llm/token-meter) |
 | [`tool-cordis`](../packages/extensions/tool-cordis) | `extensions` | [`agent`](../packages/core/agent), [`cordis-host-runner`](../packages/extensions/cordis-host-runner), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`scope`](../packages/core/scope), [`session`](../packages/core/session), [`system-prompt`](../packages/core/system-prompt), [`tools`](../packages/core/tools) |
+| [`segmentation-decision-trace`](../packages/flinter/dsh-segmentation-decision-trace) | `flinter` | [`decision-trace`](../packages/flinter/dsh-decision-trace), [`invariants`](../packages/runtime-diagnostics/invariants), [`tools`](../packages/core/tools) |
 | [`tool-bash`](../packages/shell/tool-bash) | `shell` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`jobs`](../packages/jobs/jobs), [`llm`](../packages/llm/llm), [`sandbox`](../packages/sandbox/sandbox), [`sandbox-policy`](../packages/sandbox/sandbox-policy), [`shell`](../packages/shell/shell), [`shell-env`](../packages/shell/shell-env), [`system-prompt`](../packages/core/system-prompt), [`tools`](../packages/core/tools), [`user-approval`](../packages/interaction/user-approval) |
 | [`tool-pwsh`](../packages/shell/tool-pwsh) | `shell` | [`agent`](../packages/core/agent), [`invariants`](../packages/runtime-diagnostics/invariants), [`jobs`](../packages/jobs/jobs), [`llm`](../packages/llm/llm), [`sandbox`](../packages/sandbox/sandbox), [`sandbox-policy`](../packages/sandbox/sandbox-policy), [`shell`](../packages/shell/shell), [`shell-env`](../packages/shell/shell-env), [`system-prompt`](../packages/core/system-prompt), [`tools`](../packages/core/tools), [`user-approval`](../packages/interaction/user-approval) |
 | [`webhook`](../packages/webhook/webhook) | `webhook` | [`agent`](../packages/core/agent), [`agent-default-model`](../packages/core/agent-default-model), [`agent-presets`](../packages/preset/agent-presets), [`brand`](../packages/util/brand), [`invariants`](../packages/runtime-diagnostics/invariants), [`llm`](../packages/llm/llm), [`permission-presets`](../packages/interaction/permission-presets), [`session`](../packages/core/session), [`session-title`](../packages/session/session-title), [`workspace`](../packages/workspace/workspace) |
