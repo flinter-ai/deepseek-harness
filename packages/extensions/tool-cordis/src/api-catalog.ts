@@ -845,6 +845,30 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'flinterDecisionTrace',
+    summary: 'Registry used by producer plugins to opt exact tool names into capture.',
+    description: 'Registry used by producer plugins to opt exact tool names into capture.',
+    methods: [
+      {
+        signature: 'register(toolName: string, adapter: DecisionTraceAdapter): () => void',
+        description: 'Register one exact tool-name adapter until the returned disposer runs.',
+        parameters: [{ name: 'toolName', description: 'exact DSH tool name owned by the producer.' }, { name: 'adapter', description: 'trusted same-process projection callbacks.' }],
+        returns: 'a disposer that removes this registration when it still owns the name.',
+      },
+      {
+        signature: 'adapter(toolName: string): DecisionTraceAdapter | undefined',
+        description: 'Find the adapter registered for one exact tool name.',
+        parameters: [{ name: 'toolName', description: 'exact DSH tool name.' }],
+        returns: 'its adapter, or undefined when capture is not enabled.',
+      },
+      {
+        signature: 'recordDiagnostic(code: DiagnosticCode): void',
+        description: 'Record one bounded internal failure code without thrown data.',
+        parameters: [{ name: 'code', description: 'closed diagnostic code selected by the capture observer.' }],
+      },
+    ],
+  },
+  {
     key: 'flinterPacketEvidence',
     summary: 'Protocol client; transport/runtime concerns are injected by the host.',
     description: 'Protocol client; transport/runtime concerns are injected by the host.',
@@ -3959,6 +3983,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type CredentialRef = Branded<\'CredentialRef\'>;',
   },
   {
+    name: 'DecisionRef',
+    declaration: 'export type DecisionRef = string;',
+  },
+  {
+    name: 'DecisionStatus',
+    declaration: 'export type DecisionStatus = \'success\' | \'rejection\' | \'abstention\' | \'unavailable-evidence\' | \'malformed-response\' | \'provider-error\' | \'timeout\' | \'exhaustion\' | \'partial-retention\' | \'export-conflict\' | \'replay\' | \'restart\' | \'cancelled\' | \'incomplete\' | \'unknown\';',
+  },
+  {
+    name: 'DecisionTraceAdapter',
+    declaration: 'export interface DecisionTraceAdapter {\n    readonly projectSelection: (exec: Readonly<ToolExecution>) => SelectionProjection;\n    readonly projectResult: (exec: Readonly<ToolExecution>, result: Readonly<ToolExecutionResult>) => ResultProjection;\n}',
+  },
+  {
     name: 'DeepSeekLlmApiExtensionMap',
     declaration: 'export interface DeepSeekLlmApiExtensionMap {\n}',
   },
@@ -4009,6 +4045,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'DirectoryRegistrationHandle',
     declaration: 'export interface DirectoryRegistrationHandle {\n    (): void;\n    replace(entries: readonly LlmConfigurableProvider[]): void;\n}',
+  },
+  {
+    name: 'Disposition',
+    declaration: 'export type Disposition = \'retained\' | \'discarded\' | \'abstained\' | \'unavailable\' | \'partial\' | \'unknown\';',
   },
   {
     name: 'Domain',
@@ -4799,6 +4839,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface RestoredSessionOptions {\n    readonly seed: SessionEvent[];\n    readonly meta: SessionHeader;\n    readonly seedSource: \'persistence\';\n}',
   },
   {
+    name: 'ResultProjection',
+    declaration: 'export interface ResultProjection {\n    readonly outcome: DecisionStatus;\n    readonly usage: number | null;\n    readonly disposition: Disposition;\n    readonly resultRefs: readonly DecisionRef[];\n    readonly evidenceRefs: readonly DecisionRef[];\n    readonly lineageStatus: \'known\' | \'unknown\';\n    readonly recordingReady: boolean;\n    readonly indexReady: boolean;\n}',
+  },
+  {
     name: 'ResumeAgentOptions',
     declaration: 'export interface ResumeAgentOptions {\n    readonly resumeSessionId: SessionId;\n    readonly agentOptions?: AgentOptions;\n    readonly signal?: AbortSignal;\n    readonly setup?: AgentSetup;\n}',
   },
@@ -4869,6 +4913,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SearchResultView',
     declaration: 'export type SearchResultView = SearchMatchesResultView | SearchPathsResultView;',
+  },
+  {
+    name: 'SelectionProjection',
+    declaration: 'export interface SelectionProjection {\n    readonly allowedActions: readonly DecisionRef[];\n    readonly chosenAction: DecisionRef;\n    readonly parameterRefs: readonly DecisionRef[];\n    readonly requestedEvidenceRefs: readonly DecisionRef[];\n    readonly fetchedEvidenceRefs: readonly DecisionRef[];\n    readonly displayedEvidenceRefs: readonly DecisionRef[];\n    readonly observedEvidenceRefs: readonly DecisionRef[];\n    readonly budgetBefore: number | null;\n    readonly candidateRefs: readonly DecisionRef[];\n    readonly lineageRefs: readonly DecisionRef[];\n    readonly sourceRef: DecisionRef;\n    readonly modelRef: DecisionRef;\n    readonly policyRevisionRef: DecisionRef;\n}',
   },
   {
     name: 'SendTeamMessageRequest',

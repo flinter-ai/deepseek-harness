@@ -108,6 +108,15 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Provides bounded packet descriptions and evidence retrieval to model-facing tools.',
   },
   {
+    key: 'flinterDecisionTrace',
+    pkg: 'dsh-decision-trace',
+    title: 'Bounded decision trace capture',
+    mode: 'seam',
+    implementations: ['dsh-decision-trace'],
+    consumers: [],
+    note: 'Producer plugins register exact tool-name adapters; the pre-execution and result observers project bounded decision facts into the durable session log without changing tool results.',
+  },
+  {
     key: 'sourceController',
     pkg: 'source-controller',
     title: 'Durable source draft controller',

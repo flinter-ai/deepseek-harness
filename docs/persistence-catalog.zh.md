@@ -400,6 +400,40 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 
 来源：[`packages/feedback/command-feedback/src/index.ts:62`](../packages/feedback/command-feedback/src/index.ts)
 
+### `flinter/*`
+
+<a id="flinterdecision-result--log-only"></a>
+
+#### `flinter/decision-result` — log-only
+
+```ts persistence-catalog
+/**
+ * Bounded result facts captured after one registered tool settles.
+ * Raw content, provider responses, credentials, and error text are excluded.
+ * @param data - stable call identity and the producer's validated allowlist projection.
+ * @dshScopeScan unsupported
+ */
+'flinter/decision-result': DecisionResultEvent
+```
+
+来源：[`packages/flinter/dsh-decision-trace/src/types.ts:120`](../packages/flinter/dsh-decision-trace/src/types.ts)
+
+<a id="flinterdecision-selection--log-only"></a>
+
+#### `flinter/decision-selection` — log-only
+
+```ts persistence-catalog
+/**
+ * Bounded selection facts captured before one registered tool executes.
+ * Raw arguments, prompts, content, credentials, and error text are excluded.
+ * @param data - stable call identity and the producer's validated allowlist projection.
+ * @dshScopeScan unsupported
+ */
+'flinter/decision-selection': DecisionSelectionEvent
+```
+
+来源：[`packages/flinter/dsh-decision-trace/src/types.ts:113`](../packages/flinter/dsh-decision-trace/src/types.ts)
+
 ### `goal/*`
 
 <a id="goalchange--log-only"></a>

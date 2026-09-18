@@ -9,6 +9,8 @@ A service can be a core spine service, a swappable capability seam, or a bundle/
 flowchart LR
   pkg_dsh_packet_evidence["dsh-packet-evidence"]
   svc_flinterPacketEvidence["ctx.flinterPacketEvidence<br/>Canonical packet evidence service"]
+  pkg_dsh_decision_trace["dsh-decision-trace"]
+  svc_flinterDecisionTrace["ctx.flinterDecisionTrace<br/>Bounded decision trace capture"]
   pkg_source_controller["source-controller"]
   svc_sourceController["ctx.sourceController<br/>Durable source draft controller"]
   pkg_source_editor["source-editor"]
@@ -251,6 +253,7 @@ flowchart LR
   pkg_credentials --> svc_credentials
   pkg_credentials_local --> svc_credentials
   pkg_deepseek_llm_api_extensions --> svc_deepseekLlmApiExtensions
+  pkg_dsh_decision_trace --> svc_flinterDecisionTrace
   pkg_dsh_packet_evidence --> svc_flinterPacketEvidence
   pkg_e2b --> svc_e2b
   pkg_experimental_agent_team --> svc_agentTeams
@@ -472,6 +475,7 @@ flowchart LR
 | ctx key | Role | Owner | Implementations | Direct consumers | Companion plugins | Note |
 | --- | --- | --- | --- | --- | --- | --- |
 | `ctx.flinterPacketEvidence` | `seam` | `dsh-packet-evidence` | `dsh-packet-evidence` | - | - | Provides bounded packet descriptions and evidence retrieval to model-facing tools. |
+| `ctx.flinterDecisionTrace` | `seam` | `dsh-decision-trace` | `dsh-decision-trace` | - | - | Producer plugins register exact tool-name adapters; the pre-execution and result observers project bounded decision facts into the durable session log without changing tool results. |
 | `ctx.sourceController` | `seam` | `source-controller` | `source-controller` | `source-editor` | - | Owns durable browser source drafts, optimistic revision fences, and the optional publication seam. |
 | `ctx.attachments` | `seam` | [`attachment`](../packages/attachment/attachment) | [`attachment-local`](../packages/attachment/attachment-local) | [`api-session-controller`](../packages/api/session-controller), [`tool-fs`](../packages/fs/tool-fs), [`llm-pi-ai`](../packages/llm/llm-pi-ai), [`llm-deepseek`](../packages/llm/llm-deepseek) | - | The host commits accepted images before session events; provider adapters resolve authorized durable references into provider-native content. |
 | `ctx.llm` | `seam` | [`llm`](../packages/llm/llm) | [`llm-deepseek`](../packages/llm/llm-deepseek), [`llm-pi-ai`](../packages/llm/llm-pi-ai), [`llm-replay`](../packages/test-support/llm-replay) | [`agent-loop`](../packages/core/agent-loop), [`compaction-basic`](../packages/compaction/compaction-basic) | - | Adapters register provider implementations; the loop and compaction call the provider-neutral stream service. |

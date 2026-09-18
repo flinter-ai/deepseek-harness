@@ -30,6 +30,8 @@ export const KNOWN_SESSION_EVENT_TYPES: ReadonlySet<string> = new Set([
   'compaction/start',
   'compaction/summary',
   'feedback/record',
+  'flinter/decision-result',
+  'flinter/decision-selection',
   'goal/change',
   'hook/invoked',
   'hook/result',

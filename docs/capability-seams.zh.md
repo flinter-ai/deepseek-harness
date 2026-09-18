@@ -11,6 +11,8 @@
 flowchart LR
   pkg_dsh_packet_evidence["dsh-packet-evidence"]
   svc_flinterPacketEvidence["ctx.flinterPacketEvidence<br/>Canonical packet evidence service"]
+  pkg_dsh_decision_trace["dsh-decision-trace"]
+  svc_flinterDecisionTrace["ctx.flinterDecisionTrace<br/>Bounded decision trace capture"]
   pkg_source_controller["source-controller"]
   svc_sourceController["ctx.sourceController<br/>Durable source draft controller"]
   pkg_source_editor["source-editor"]
@@ -253,6 +255,7 @@ flowchart LR
   pkg_credentials --> svc_credentials
   pkg_credentials_local --> svc_credentials
   pkg_deepseek_llm_api_extensions --> svc_deepseekLlmApiExtensions
+  pkg_dsh_decision_trace --> svc_flinterDecisionTrace
   pkg_dsh_packet_evidence --> svc_flinterPacketEvidence
   pkg_e2b --> svc_e2b
   pkg_experimental_agent_team --> svc_agentTeams
@@ -474,6 +477,7 @@ flowchart LR
 | ctx 键 | 角色 | 所属包 | 实现 | 直接消费方 | 配套插件 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- |
 | `ctx.flinterPacketEvidence` | `seam` | `dsh-packet-evidence` | `dsh-packet-evidence` | - | - | 为面向模型的工具提供有界 packet 描述与证据读取。 |
+| `ctx.flinterDecisionTrace` | `seam` | `dsh-decision-trace` | `dsh-decision-trace` | - | - | 生产者插件按准确的工具名注册适配器；执行前与结果观察器把有界决策事实投影到持久会话日志，且不改变工具结果。 |
 | `ctx.sourceController` | `seam` | `source-controller` | `source-controller` | `source-editor` | - | 管理持久化浏览器源码草稿、乐观 revision fence 和可选发布 seam。 |
 | `ctx.attachments` | `seam` | [`attachment`](../packages/attachment/attachment) | [`attachment-local`](../packages/attachment/attachment-local) | [`api-session-controller`](../packages/api/session-controller), [`tool-fs`](../packages/fs/tool-fs), [`llm-pi-ai`](../packages/llm/llm-pi-ai), [`llm-deepseek`](../packages/llm/llm-deepseek) | - | 宿主会在会话事件之前提交已接受的图片；提供方适配器将已授权的持久引用解析为提供方原生内容。 |
 | `ctx.llm` | `seam` | [`llm`](../packages/llm/llm) | [`llm-deepseek`](../packages/llm/llm-deepseek), [`llm-pi-ai`](../packages/llm/llm-pi-ai), [`llm-replay`](../packages/test-support/llm-replay) | [`agent-loop`](../packages/core/agent-loop), [`compaction-basic`](../packages/compaction/compaction-basic) | - | 适配器注册提供方实现；agent loop（智能体循环）与压缩功能调用提供方无关的流服务。 |

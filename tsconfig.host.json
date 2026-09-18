@@ -230,6 +230,7 @@
     { "path": "./packages/llm/llm-pi-ai" },
     { "path": "./packages/flinter/dsh-alpha-profile" },
     { "path": "./packages/flinter/dsh-aws-worker-profile" },
+    { "path": "./packages/flinter/dsh-decision-trace" },
     { "path": "./packages/flinter/dsh-packet-evidence" },
     { "path": "./packages/llm/llm-workbuddy" },
     { "path": "./packages/shell/bash-local" },

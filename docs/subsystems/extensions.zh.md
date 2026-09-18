@@ -256,6 +256,37 @@ Types: [Agent](core.zh.md)
 
 Source: [`packages/extensions/cordis-host-runner/src/index.ts`](../../packages/extensions/cordis-host-runner/src/index.ts)
 
+<a id="ctxflinterdecisiontrace--decisiontraceservice"></a>
+
+### `ctx.flinterDecisionTrace` — `DecisionTraceService`
+
+Registry used by producer plugins to opt exact tool names into capture.
+
+```ts cordis-catalog
+/**
+ * Register one exact tool-name adapter until the returned disposer runs.
+ * @param toolName - exact DSH tool name owned by the producer.
+ * @param adapter - trusted same-process projection callbacks.
+ * @returns a disposer that removes this registration when it still owns the name.
+ */
+register(toolName: string, adapter: DecisionTraceAdapter): () => void
+
+/**
+ * Find the adapter registered for one exact tool name.
+ * @param toolName - exact DSH tool name.
+ * @returns its adapter, or undefined when capture is not enabled.
+ */
+adapter(toolName: string): DecisionTraceAdapter | undefined
+
+/**
+ * Record one bounded internal failure code without thrown data.
+ * @param code - closed diagnostic code selected by the capture observer.
+ */
+recordDiagnostic(code: DiagnosticCode): void
+```
+
+Source: [`packages/flinter/dsh-decision-trace/src/index.ts`](../../packages/flinter/dsh-decision-trace/src/index.ts)
+
 <a id="ctxflinterpacketevidence--packetevidenceclient"></a>
 
 ### `ctx.flinterPacketEvidence` — `PacketEvidenceClient`
