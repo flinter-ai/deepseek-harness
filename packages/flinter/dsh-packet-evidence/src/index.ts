@@ -206,6 +206,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
 
 /** Plugin object accepted directly by `ctx.plugin(PacketEvidence, config)`. */
 export const inject = ['tools', 'systemPrompt', 'subprocess']
+/** Cordis plugin mounting the packet evidence service and tools. */
 const PacketEvidence = { name: 'packet-evidence', inject, Config, apply }
 
 export default PacketEvidence

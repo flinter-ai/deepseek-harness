@@ -1,14 +1,25 @@
-# DSH source controller
+---
+description: "Host and Client source-draft controller with explicit save, revision, and publication boundaries."
+kind: "package-reference"
+---
+# @deepseek-ai/dsh-api-source-controller
+
+English | [中文](README.zh.md)
+
+## Summary
 
 `@deepseek-ai/dsh-api-source-controller` is the shared Host/Client seam for browser source drafts. Sandpack and direct DSH Web use the same Remote API; the Host owns durable draft storage, revision fencing, path limits, and lifecycle checks.
 
+## Table of Contents
+
+- [Summary](#summary)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
 The Client package also exports `SourceDraftModel`, a React-free editor adapter. Feed it complete file snapshots from Sandpack or another editor, call `save()` explicitly, and subscribe to its immutable snapshot for `dirty`, `conflict`, `saved`, and `published` state. `publish()` refuses unsaved local files, so a UI cannot accidentally publish a stale buffer.
 
-`SourceDraftModel` is deliberately not the DSH memory plugin. Draft files and
-revision state stay in the `source_drafts` storage domain; they are not copied
-into an MCP memory server, the Session log, prompts, or model-facing tools.
-Use the optional memory MCP separately for project facts or decisions that
-should be recalled by the model.
+`SourceDraftModel` is deliberately not the DSH memory plugin. Draft files and revision state stay in the `source_drafts` storage domain; they are not copied into an MCP memory server, the Session log, prompts, or model-facing tools. Use the optional memory MCP separately for project facts or decisions that should be recalled by the model.
 
 ```ts
 const model = new SourceDraftModel(ctx.sourceDrafts, {
@@ -22,6 +33,7 @@ await model.save()
 await model.publish()
 ```
 
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Browser source drafts
@@ -41,3 +53,12 @@ Independent. Saving or publishing a browser source draft does not change the mod
 ## Known Limitations and Deferred Work
 
 - No Git/PR publisher is mounted by the default web bundle. `publish` therefore returns `publisher-unavailable` until an EC2 or other host deployment composes a dedicated publisher with its own worktree and credential policy. Secrets and repository metadata paths are rejected from browser drafts.
+
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

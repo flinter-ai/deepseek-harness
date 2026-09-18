@@ -2128,6 +2128,49 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'sourceController',
+    summary: 'Durable source-draft service shared by direct DSH Web and browser editors.',
+    description: 'Durable source-draft service shared by direct DSH Web and browser editors. It owns draft persistence and optimistic fencing; Git/PR side effects are delegated to an optional host publisher and otherwise fail closed.',
+    methods: [
+      {
+        signature: '@Remote(\'bootstrap\') async bootstrap(request: SourceDraftBootstrapRequest): Promise<SourceDraftBootstrapResult>',
+        description: 'Resolve the exact Git base used to create a new browser editor buffer.',
+        parameters: [{ name: 'request', description: 'Session identifying the project.' }],
+        returns: 'The repository base result.',
+      },
+      {
+        signature: '@Remote(\'list\') async list(request: SourceDraftListRequest): Promise<SourceDraftListResult>',
+        description: 'List drafts belonging to one persisted Session lifecycle.',
+        parameters: [{ name: 'request', description: 'Session identifying the owner.' }],
+        returns: 'The matching drafts.',
+      },
+      {
+        signature: '@Remote(\'get\') async get(request: SourceDraftGetRequest): Promise<SourceDraftGetResult>',
+        description: 'Load one draft only when its Session lifecycle still matches.',
+        parameters: [{ name: 'request', description: 'Session and draft identity.' }],
+        returns: 'The requested draft.',
+      },
+      {
+        signature: '@Remote(\'save\') save(request: SourceDraftSaveRequest): Promise<SourceDraftSaveResult>',
+        description: 'Save a complete, normalized source snapshot with optimistic fencing.',
+        parameters: [{ name: 'request', description: 'Draft snapshot and revision fence.' }],
+        returns: 'The saved draft result.',
+      },
+      {
+        signature: '@Remote(\'delete\') delete(request: SourceDraftDeleteRequest): Promise<SourceDraftDeleteResult>',
+        description: 'Delete one draft after an optional revision check.',
+        parameters: [{ name: 'request', description: 'Session, draft, and optional revision fence.' }],
+        returns: 'Deletion result.',
+      },
+      {
+        signature: '@Remote(\'publish\') publish(request: SourceDraftPublishRequest, signal: AbortSignal): Promise<SourceDraftPublishResult>',
+        description: 'Publish one exact saved revision through the optional host publisher.',
+        parameters: [{ name: 'request', description: 'Draft and revision to publish.' }, { name: 'signal', description: 'Cancellation signal.' }],
+        returns: 'Publication result.',
+      },
+    ],
+  },
+  {
     key: 'spillStore',
     summary: 'Abstract spill storage service.',
     description: 'Abstract spill storage service. Subclass, implement saveText, and load the subclass as a plugin — it registers as `ctx.spillStore` (one implementation per context; loading a second throws, cordis\' standard duplicate-service behavior).\n\nSemantics every implementation must honor:\n\n- saveText persists the FULL `content` verbatim and returns an opaque locator, exact byte length, and model-facing retrieval guidance.\n- Storage is scoped by the request\'s SaveTextSpill.owner session; the backend chooses a private (not world-readable) location and a collision-free name derived from — never equal to — the caller\'s `suggestedName`.\n- `saveText` REJECTS on a real storage failure (permissions, ENOSPC, backend unavailable); the caller decides how to degrade (the spill policy treats a rejection as best-effort and keeps the inline result).',
@@ -5414,6 +5457,114 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SkillViewOptions',
     declaration: 'export interface SkillViewOptions extends SkillLookupOptions {\n    readonly scope?: ScopeKey | undefined;\n}',
+  },
+  {
+    name: 'SourceDraft',
+    declaration: 'export interface SourceDraft {\n    readonly draftId: SourceDraftId;\n    readonly sessionId: SessionId;\n    readonly baseSha: string;\n    readonly files: readonly SourceFile[];\n    readonly revision: number;\n    readonly createdAt: number;\n    readonly updatedAt: number;\n}',
+  },
+  {
+    name: 'SourceDraftBootstrapRequest',
+    declaration: 'export interface SourceDraftBootstrapRequest {\n    readonly sessionId: SessionId;\n}',
+  },
+  {
+    name: 'SourceDraftBootstrapResult',
+    declaration: 'export type SourceDraftBootstrapResult = SourceDraftResult<SourceDraftBootstrapValue>;',
+  },
+  {
+    name: 'SourceDraftBootstrapValue',
+    declaration: 'export interface SourceDraftBootstrapValue {\n    readonly baseSha: string;\n}',
+  },
+  {
+    name: 'SourceDraftDeleteRequest',
+    declaration: 'export interface SourceDraftDeleteRequest {\n    readonly sessionId: SessionId;\n    readonly draftId: SourceDraftId;\n    readonly expectedRevision?: number;\n}',
+  },
+  {
+    name: 'SourceDraftDeleteResult',
+    declaration: 'export type SourceDraftDeleteResult = SourceDraftResult<{\n    readonly deleted: true;\n}>;',
+  },
+  {
+    name: 'SourceDraftFailure',
+    declaration: 'export type SourceDraftFailure = SourceDraftSessionNotFound | SourceDraftNotFound | SourceDraftVersionConflict | SourceDraftRejected | SourcePublisherUnavailable | SourcePublishFailed;',
+  },
+  {
+    name: 'SourceDraftGetRequest',
+    declaration: 'export interface SourceDraftGetRequest {\n    readonly sessionId: SessionId;\n    readonly draftId: SourceDraftId;\n}',
+  },
+  {
+    name: 'SourceDraftGetResult',
+    declaration: 'export type SourceDraftGetResult = SourceDraftResult<SourceDraft>;',
+  },
+  {
+    name: 'SourceDraftId',
+    declaration: 'export type SourceDraftId = Branded<\'source-draft-id\'>;',
+  },
+  {
+    name: 'SourceDraftListRequest',
+    declaration: 'export interface SourceDraftListRequest {\n    readonly sessionId: SessionId;\n}',
+  },
+  {
+    name: 'SourceDraftListResult',
+    declaration: 'export type SourceDraftListResult = SourceDraftResult<{\n    readonly drafts: readonly SourceDraft[];\n}>;',
+  },
+  {
+    name: 'SourceDraftNotFound',
+    declaration: 'export interface SourceDraftNotFound {\n    readonly code: \'draft-not-found\';\n    readonly draftId: SourceDraftId;\n}',
+  },
+  {
+    name: 'SourceDraftPublishRequest',
+    declaration: 'export interface SourceDraftPublishRequest {\n    readonly sessionId: SessionId;\n    readonly draftId: SourceDraftId;\n    readonly expectedRevision: number;\n}',
+  },
+  {
+    name: 'SourceDraftPublishResult',
+    declaration: 'export type SourceDraftPublishResult = SourceDraftResult<SourceDraftPublishValue>;',
+  },
+  {
+    name: 'SourceDraftPublishValue',
+    declaration: 'export interface SourceDraftPublishValue {\n    readonly branch: string;\n    readonly commit: string;\n    readonly pullRequestUrl?: string;\n}',
+  },
+  {
+    name: 'SourceDraftRejected',
+    declaration: 'export interface SourceDraftRejected {\n    readonly code: \'source-rejected\';\n    readonly reason: string;\n}',
+  },
+  {
+    name: 'SourceDraftRejectedResult',
+    declaration: 'export interface SourceDraftRejectedResult<E extends SourceDraftFailure = SourceDraftFailure> {\n    readonly ok: false;\n    readonly error: E;\n}',
+  },
+  {
+    name: 'SourceDraftResult',
+    declaration: 'export type SourceDraftResult<T, E extends SourceDraftFailure = SourceDraftFailure> = SourceDraftSuccess<T> | SourceDraftRejectedResult<E>;',
+  },
+  {
+    name: 'SourceDraftSaveRequest',
+    declaration: 'export interface SourceDraftSaveRequest {\n    readonly draftId?: SourceDraftId;\n    readonly sessionId: SessionId;\n    readonly baseSha: string;\n    readonly files: readonly SourceFile[];\n    readonly expectedRevision?: number;\n}',
+  },
+  {
+    name: 'SourceDraftSaveResult',
+    declaration: 'export type SourceDraftSaveResult = SourceDraftResult<SourceDraft>;',
+  },
+  {
+    name: 'SourceDraftSessionNotFound',
+    declaration: 'export interface SourceDraftSessionNotFound {\n    readonly code: \'session-not-found\';\n    readonly sessionId: SessionId;\n}',
+  },
+  {
+    name: 'SourceDraftSuccess',
+    declaration: 'export interface SourceDraftSuccess<T> {\n    readonly ok: true;\n    readonly value: T;\n}',
+  },
+  {
+    name: 'SourceDraftVersionConflict',
+    declaration: 'export interface SourceDraftVersionConflict {\n    readonly code: \'version-conflict\';\n    readonly current: SourceDraft | null;\n}',
+  },
+  {
+    name: 'SourceFile',
+    declaration: 'export interface SourceFile {\n    readonly path: string;\n    readonly content: string;\n}',
+  },
+  {
+    name: 'SourcePublisherUnavailable',
+    declaration: 'export interface SourcePublisherUnavailable {\n    readonly code: \'publisher-unavailable\';\n}',
+  },
+  {
+    name: 'SourcePublishFailed',
+    declaration: 'export interface SourcePublishFailed {\n    readonly code: \'publish-failed\';\n    readonly message: string;\n}',
   },
   {
     name: 'SpawnTeammateRequest',

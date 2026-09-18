@@ -48,8 +48,11 @@ const DEFAULT_MAX_TOTAL_BYTES = 2 * 1024 * 1024
 
 /** Deployment limits for browser-provided source material. */
 export interface Config {
+  /** Maximum number of files accepted in one draft. */
   readonly maxFiles?: number
+  /** Maximum number of bytes accepted in one file. */
   readonly maxFileBytes?: number
+  /** Maximum total bytes accepted in one draft. */
   readonly maxTotalBytes?: number
 }
 
@@ -250,7 +253,10 @@ export class SourceController extends TypertRemoteService {
     this.table = domain.table('drafts')
   }
 
-  /** Resolve the exact Git base used to create a new browser editor buffer. */
+  /** Resolve the exact Git base used to create a new browser editor buffer.
+   * @param request - Session identifying the project.
+   * @returns The repository base result.
+   */
   @Remote('bootstrap')
   async bootstrap(request: SourceDraftBootstrapRequest): Promise<SourceDraftBootstrapResult> {
     const known = await this.inspectSession(request.sessionId)
@@ -269,7 +275,10 @@ export class SourceController extends TypertRemoteService {
     }
   }
 
-  /** List drafts belonging to one persisted Session lifecycle. */
+  /** List drafts belonging to one persisted Session lifecycle.
+   * @param request - Session identifying the owner.
+   * @returns The matching drafts.
+   */
   @Remote('list')
   async list(request: SourceDraftListRequest): Promise<SourceDraftListResult> {
     const known = await this.inspectSession(request.sessionId)
@@ -281,7 +290,10 @@ export class SourceController extends TypertRemoteService {
     return success({ drafts: Object.freeze(drafts) })
   }
 
-  /** Load one draft only when its Session lifecycle still matches. */
+  /** Load one draft only when its Session lifecycle still matches.
+   * @param request - Session and draft identity.
+   * @returns The requested draft.
+   */
   @Remote('get')
   async get(request: SourceDraftGetRequest): Promise<SourceDraftGetResult> {
     const known = await this.inspectSession(request.sessionId)
@@ -293,7 +305,10 @@ export class SourceController extends TypertRemoteService {
     return success(snapshotDraft(row))
   }
 
-  /** Save a complete, normalized source snapshot with optimistic fencing. */
+  /** Save a complete, normalized source snapshot with optimistic fencing.
+   * @param request - Draft snapshot and revision fence.
+   * @returns The saved draft result.
+   */
   @Remote('save')
   save(request: SourceDraftSaveRequest): Promise<SourceDraftSaveResult> {
     const files = normalizeFiles(request.files, {
@@ -354,7 +369,10 @@ export class SourceController extends TypertRemoteService {
     })
   }
 
-  /** Delete one draft after an optional revision check. */
+  /** Delete one draft after an optional revision check.
+   * @param request - Session, draft, and optional revision fence.
+   * @returns Deletion result.
+   */
   @Remote('delete')
   delete(request: SourceDraftDeleteRequest): Promise<SourceDraftDeleteResult> {
     if (request.expectedRevision !== undefined && !positiveSafeInteger(request.expectedRevision)) {
@@ -380,7 +398,11 @@ export class SourceController extends TypertRemoteService {
     })
   }
 
-  /** Publish one exact saved revision through the optional host publisher. */
+  /** Publish one exact saved revision through the optional host publisher.
+   * @param request - Draft and revision to publish.
+   * @param signal - Cancellation signal.
+   * @returns Publication result.
+   */
   @Remote('publish')
   publish(request: SourceDraftPublishRequest, signal: AbortSignal): Promise<SourceDraftPublishResult> {
     return this.enqueue(request.draftId, async () => {

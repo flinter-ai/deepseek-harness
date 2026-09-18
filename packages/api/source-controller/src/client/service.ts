@@ -16,18 +16,49 @@ import type {
   SourceDraftPublishResult,
   SourceDraftSaveRequest,
   SourceDraftSaveResult,
-} from '../types.ts'
+} from '@deepseek-ai/dsh-source-draft-model/types'
 
 /** Generated Host source namespace used by the browser facade. */
 export type SourceRemote = TypertClientRemote['source']
 
 /** Shared draft operations available to Sandpack and direct DSH Web clients. */
 export interface ISourceDrafts {
+  /**
+   * Load the editable file set and its current revision.
+   * @param request - Workspace selection.
+   * @returns Remote bootstrap result.
+   */
   bootstrap(request: SourceDraftBootstrapRequest): Promise<RemoteResult<SourceDraftBootstrapResult>>
+  /**
+   * List editable drafts for a workspace.
+   * @param request - Workspace selection.
+   * @returns Remote list result.
+   */
   list(request: SourceDraftListRequest): Promise<RemoteResult<SourceDraftListResult>>
+  /**
+   * Read one draft at its current revision.
+   * @param request - Draft identity.
+   * @returns Remote read result.
+   */
   get(request: SourceDraftGetRequest): Promise<RemoteResult<SourceDraftGetResult>>
+  /**
+   * Save one revision-fenced draft.
+   * @param request - Draft contents and expected revision.
+   * @returns Remote save result.
+   */
   save(request: SourceDraftSaveRequest): Promise<RemoteResult<SourceDraftSaveResult>>
+  /**
+   * Delete one revision-fenced draft.
+   * @param request - Draft identity and expected revision.
+   * @returns Remote delete result.
+   */
   delete(request: SourceDraftDeleteRequest): Promise<RemoteResult<SourceDraftDeleteResult>>
+  /**
+   * Publish a saved draft through the configured Host publisher.
+   * @param request - Publication request.
+   * @param signal - Optional cancellation signal.
+   * @returns Remote publication result.
+   */
   publish(
     request: SourceDraftPublishRequest,
     signal?: AbortSignal,
