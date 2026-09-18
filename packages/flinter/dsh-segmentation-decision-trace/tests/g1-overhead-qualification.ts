@@ -1,6 +1,7 @@
 /* oxlint-disable @stylistic/max-len */
 import { Context } from '@deepseek-ai/cordis'
 import * as decisionTrace from '@deepseek-ai/dsh-decision-trace'
+import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
@@ -39,7 +40,7 @@ async function arm(root: string, enabled: boolean, pair: number): Promise<{ ns: 
   ctx.tools.register(defineTool({ name: 'segment.qualify', description: 'deterministic scoring fixture', parameters: {}, output: { schema: { type: 'object', additionalProperties: false, properties: { output: { type: 'string', required: true }, digest: { type: 'string', required: true } } }, render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }] }, async execute() { return workload() } }))
   if (enabled) await ctx.plugin(decisionTrace); if (enabled) await ctx.plugin(segmentationTrace, { toolName: 'segment.qualify', source: { request: () => ({ allowedActions: ['segment'], chosenAction: 'segment', requestedEvidenceRefs: [], fetchedEvidenceRefs: [], displayedEvidenceRefs: [], budgetBefore: 1, candidateRefs: ['fixture'], lineageRefs: [], sourceRef: 'g1', modelRef: 'deterministic', policyRevisionRef: 'g1' }), result: () => ({ outcome: 'success', disposition: 'retained' }) } })
   const session = ctx.sessions.create(SessionId(`g1-overhead-${enabled ? 'on' : 'off'}-${pair}`), { meta: { cwd: process.cwd() } }); const start = process.hrtime.bigint(); const outputs: string[] = []
-  for (let call = 0; call < CALLS_PER_ARM; call++) { const result = await ctx.tools.execute({ signal: new AbortController().signal, callId: qualificationCallId(pair, call), name: 'segment.qualify', arguments: {}, agent: { id: session.id, session } as never }); if (result.isError) throw result.error; outputs.push(JSON.stringify(result.value)) }
+  for (let call = 0; call < CALLS_PER_ARM; call++) { const result = await ctx.tools.execute({ signal: new AbortController().signal, callId: ToolCallId(qualificationCallId(pair, call)), name: 'segment.qualify', arguments: {}, agent: { id: session.id, session } as never }); if (result.isError) throw result.error; outputs.push(JSON.stringify(result.value)) }
   const acknowledged = await ctx.sessions.flush(session); const ns = Number(process.hrtime.bigint() - start); const digest = createHash('sha256').update(JSON.stringify(outputs)).digest('hex'); const events = session.events.length; await ctx.fiber.dispose(); return { ns, outputs, digest, events, acknowledged }
 }
 async function requireFreshRoot(root: string): Promise<void> { try { await lstat(root); throw new TypeError('persistenceRoot must not already exist') } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error } }
