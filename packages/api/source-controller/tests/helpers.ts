@@ -13,7 +13,7 @@ import * as StorageJson from '@deepseek-ai/dsh-storage-json'
 import { ApiSessionNotFound } from '@deepseek-ai/dsh-api-session-controller'
 import SourceController, { type SourcePublisher } from '../src/index.ts'
 
-export interface SourceTestSession {
+interface SourceTestSession {
   readonly id: SessionId
   readonly meta: SessionHeader
 }

@@ -94,6 +94,7 @@ export interface PacketServiceTransport {
 
 /** Stable error type for service/process failures. */
 export class PacketEvidenceError extends Error {
+  /** Stable machine-readable packet evidence error code. */
   readonly code: string
 
   constructor(message: string, code = 'PACKET_EVIDENCE_ERROR') {

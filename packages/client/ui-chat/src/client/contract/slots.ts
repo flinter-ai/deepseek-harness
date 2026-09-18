@@ -1,7 +1,8 @@
 /** Chat-owned Slot declarations and composed component props. */
 import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type {
-  ConversationTurnDataMap, MessageImageLoader, MessageImagesOwnerProps, RenderMessageImages, TurnLocation,
+  CommandNode, CompactionSummaryNode, ConversationTurnDataMap, MessageImageLoader,
+  MessageImagesOwnerProps, RenderMessageImages, ToolCallBlock, TurnLocation,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {
   InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore, SlotHookFactory,
@@ -13,7 +14,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { createChatStore } from '../stores.ts'
 import type { ToolCallId, SelectionTarget } from './store.ts'
 import type { ChatNode, ChatNodeKind } from './chat-nodes.ts'
-import type { ChatSnapshot, CommandNode, CompactionSummaryNode, ToolCallBlock } from './snapshot.ts'
+import type { ChatSnapshot } from './snapshot.ts'
 import type { TurnProcessSpec } from './turn-process.ts'
 import type { TranscriptViewMode } from '../../chat-settings.ts'
 

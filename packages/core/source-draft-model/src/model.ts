@@ -92,6 +92,9 @@ export class SourceDraftModel implements SourceDraftModelSource {
     return () => { this.listeners.delete(listener) }
   }
 
+  /** Replace the working file snapshot and mark the model dirty.
+   * @param files - Files to edit.
+   */
   setFiles(files: readonly SourceFile[]): void {
     this.files = freezeFiles(files)
     this.generation += 1
@@ -100,6 +103,9 @@ export class SourceDraftModel implements SourceDraftModelSource {
     this.invalidate()
   }
 
+  /** Persist the current working snapshot.
+   * @returns The save result.
+   */
   save(): Promise<SourceDraftCallResult<SourceDraft>> {
     return this.enqueue(async () => {
       const generation = this.generation
@@ -131,6 +137,10 @@ export class SourceDraftModel implements SourceDraftModelSource {
     })
   }
 
+  /** Load a persisted draft.
+   * @param draftId - Draft identity.
+   * @returns The load result.
+   */
   load(draftId: SourceDraftId): Promise<SourceDraftCallResult<SourceDraft>> {
     return this.enqueue(async () => {
       const generation = this.generation
@@ -144,6 +154,10 @@ export class SourceDraftModel implements SourceDraftModelSource {
     })
   }
 
+  /** Publish the current saved draft.
+   * @param signal - Optional cancellation signal.
+   * @returns The publish result.
+   */
   publish(signal?: AbortSignal): Promise<SourceDraftCallResult<SourceDraftPublishValue>> {
     return this.enqueue(async () => {
       const generation = this.generation
@@ -181,6 +195,9 @@ export class SourceDraftModel implements SourceDraftModelSource {
     })
   }
 
+  /** Delete the current saved draft.
+   * @returns The deletion result.
+   */
   delete(): Promise<SourceDraftCallResult<{ readonly deleted: true }>> {
     return this.enqueue(async () => {
       const generation = this.generation

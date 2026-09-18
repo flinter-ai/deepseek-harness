@@ -9,6 +9,11 @@
 
 ```mermaid
 flowchart LR
+  pkg_dsh_packet_evidence["dsh-packet-evidence"]
+  svc_flinterPacketEvidence["ctx.flinterPacketEvidence<br/>Canonical packet evidence service"]
+  pkg_source_controller["source-controller"]
+  svc_sourceController["ctx.sourceController<br/>Durable source draft controller"]
+  pkg_source_editor["source-editor"]
   pkg_attachment["attachment"]
   svc_attachments["ctx.attachments<br/>Durable binary attachment storage"]
   pkg_attachment_local["attachment-local"]
@@ -248,6 +253,7 @@ flowchart LR
   pkg_credentials --> svc_credentials
   pkg_credentials_local --> svc_credentials
   pkg_deepseek_llm_api_extensions --> svc_deepseekLlmApiExtensions
+  pkg_dsh_packet_evidence --> svc_flinterPacketEvidence
   pkg_e2b --> svc_e2b
   pkg_experimental_agent_team --> svc_agentTeams
   pkg_file_reference --> svc_fileReferences
@@ -301,6 +307,7 @@ flowchart LR
   pkg_skill --> svc_skills
   pkg_skill_badge --> svc_skills
   pkg_skill_filesystem --> svc_skills
+  pkg_source_controller --> svc_sourceController
   pkg_spill --> svc_spillStore
   pkg_spill_local --> svc_spillStore
   pkg_storage --> svc_storage
@@ -415,6 +422,7 @@ flowchart LR
   svc_shellEnv --> pkg_tool_bash
   svc_shellEnv --> pkg_tool_pwsh
   svc_skills --> pkg_tool_skill
+  svc_sourceController --> pkg_source_editor
   svc_spillStore --> pkg_spill_policy
   svc_storage --> pkg_storage_domain
   svc_storageDomain --> pkg_message_feedback
@@ -465,6 +473,8 @@ flowchart LR
 
 | ctx 键 | 角色 | 所属包 | 实现 | 直接消费方 | 配套插件 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- |
+| `ctx.flinterPacketEvidence` | `seam` | `dsh-packet-evidence` | `dsh-packet-evidence` | - | - | 为面向模型的工具提供有界 packet 描述与证据读取。 |
+| `ctx.sourceController` | `seam` | `source-controller` | `source-controller` | `source-editor` | - | 管理持久化浏览器源码草稿、乐观 revision fence 和可选发布 seam。 |
 | `ctx.attachments` | `seam` | [`attachment`](../packages/attachment/attachment) | [`attachment-local`](../packages/attachment/attachment-local) | [`api-session-controller`](../packages/api/session-controller), [`tool-fs`](../packages/fs/tool-fs), [`llm-pi-ai`](../packages/llm/llm-pi-ai), [`llm-deepseek`](../packages/llm/llm-deepseek) | - | 宿主会在会话事件之前提交已接受的图片；提供方适配器将已授权的持久引用解析为提供方原生内容。 |
 | `ctx.llm` | `seam` | [`llm`](../packages/llm/llm) | [`llm-deepseek`](../packages/llm/llm-deepseek), [`llm-pi-ai`](../packages/llm/llm-pi-ai), [`llm-replay`](../packages/test-support/llm-replay) | [`agent-loop`](../packages/core/agent-loop), [`compaction-basic`](../packages/compaction/compaction-basic) | - | 适配器注册提供方实现；agent loop（智能体循环）与压缩功能调用提供方无关的流服务。 |
 | `ctx.deepseekLlmApiExtensions` | `seam` | [`deepseek-llm-api-extensions`](../packages/llm/deepseek-llm-api-extensions) | [`session-log-deepseek`](../packages/session/session-log-deepseek), [`plugin-package-inventory-deepseek`](../packages/llm/plugin-package-inventory-deepseek) | [`llm-deepseek`](../packages/llm/llm-deepseek) | - | 插件准备彼此独立的顶层字段；官方适配器会合并这些字段，并在 HTTP 接受后提交其交付状态。 |
