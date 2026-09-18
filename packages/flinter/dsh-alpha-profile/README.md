@@ -2,7 +2,6 @@
 description: "FLINTER's Phase 1 provider/profile, worker-launch, and attempt-safety seam over the pinned DeepSeek Harness alpha."
 kind: "package-reference"
 ---
-
 # @deepseek-ai/dsh-alpha-profile
 
 English | [中文](README.zh.md)
@@ -43,50 +42,20 @@ The local `tod` launcher remains the source-checkout convenience wrapper. The AW
 
 ## One worker contract, selectable compute
 
-`DSH_COMPUTE_BACKEND` selects `codesandbox`, `ec2`, or `local`; an unset value
-defaults to `codesandbox`. The local launcher stamps that default explicitly,
-while the EC2 public-web systemd overlay stamps `ec2` explicitly so an old
-host cannot be mislabeled during a gradual migration. The selected backend
-does not change the DSH session or JSONL persistence root: storage remains the
-durable authority and compute is replaceable.
+`DSH_COMPUTE_BACKEND` selects `codesandbox`, `ec2`, or `local`; an unset value defaults to `codesandbox`. The local launcher stamps that default explicitly, while the EC2 public-web systemd overlay stamps `ec2` explicitly so an old host cannot be mislabeled during a gradual migration. The selected backend does not change the DSH session or JSONL persistence root: storage remains the durable authority and compute is replaceable.
 
-`readDshComputeAdmissionPolicy()` defaults to one active worker, a 30-minute
-wall-time limit, a five-minute idle limit, and a five-minute CodeSandbox
-hibernation timeout. `DshComputeAdmission` additionally allows only one active
-attempt per session, so a replacement must be physically and logically fenced
-before it acquires a new lease.
+`readDshComputeAdmissionPolicy()` defaults to one active worker, a 30-minute wall-time limit, a five-minute idle limit, and a five-minute CodeSandbox hibernation timeout. `DshComputeAdmission` additionally allows only one active attempt per session, so a replacement must be physically and logically fenced before it acquires a new lease.
 
-`CodeSandboxSdkRuntime` is the official `@codesandbox/sdk` implementation of
-the CodeSandbox runtime seam. A host constructs it with a secret-store-backed
-`apiToken` or `CSB_API_KEY`, then passes it to `CodeSandboxComputeBackend`:
+`CodeSandboxSdkRuntime` is the official `@codesandbox/sdk` implementation of the CodeSandbox runtime seam. A host constructs it with a secret-store-backed `apiToken` or `CSB_API_KEY`, then passes it to `CodeSandboxComputeBackend`:
 
-```ts
-const runtime = new CodeSandboxSdkRuntime({ apiToken: process.env.CSB_API_KEY })
-const backend = new CodeSandboxComputeBackend({ runtime, vmTier: 'pico' })
+```ts const runtime = new CodeSandboxSdkRuntime({ apiToken: process.env.CSB_API_KEY }) const backend = new CodeSandboxComputeBackend({ runtime, vmTier: 'pico' })
 ```
 
-The runtime creates private CodeSandbox sandboxes (CodeSandbox implements them
-with microVMs), maps the bounded tier/hibernation policy, connects with the
-SDK, runs a fixed shell-quoted transport that preserves literal argv values,
-and shuts the sandbox down after completion. The token and provider
-credentials are never forwarded to the sandbox environment. The
-official `csb` CLI is useful for listing, hibernating, shutting down, and
-managing preview/host-token resources; it complements the SDK but is not the
-command-execution adapter.
+The runtime creates private CodeSandbox sandboxes (CodeSandbox implements them with microVMs), maps the bounded tier/hibernation policy, connects with the SDK, runs a fixed shell-quoted transport that preserves literal argv values, and shuts the sandbox down after completion. The token and provider credentials are never forwarded to the sandbox environment. The official `csb` CLI is useful for listing, hibernating, shutting down, and managing preview/host-token resources; it complements the SDK but is not the command-execution adapter.
 
-For an exact DSH checkout, the host may also provide `workspaceSeed` containing
-a tracked-only source archive, its source SHA, and the archive SHA-256. The
-runtime writes that archive into the sandbox, verifies both hashes, and
-extracts it into `/project/sandbox` before the worker command runs. This is
-explicit sandbox seeding: `templateId` is only an optional CodeSandbox
-bootstrap/fork source, not a replacement for the GitHub source of truth or an
-AWS persistence layer.
+For an exact DSH checkout, the host may also provide `workspaceSeed` containing a tracked-only source archive, its source SHA, and the archive SHA-256. The runtime writes that archive into the sandbox, verifies both hashes, and extracts it into `/project/sandbox` before the worker command runs. This is explicit sandbox seeding: `templateId` is only an optional CodeSandbox bootstrap/fork source, not a replacement for the GitHub source of truth or an AWS persistence layer.
 
-The control plane or executor must still provide shared admission and durable
-fencing. `DshComputeAdmission` is process-local evidence and cannot by itself
-prove distributed capacity across multiple hosts. EC2 deployments set
-`DSH_COMPUTE_BACKEND=ec2` explicitly in the protected systemd drop-in, so the
-CodeSandbox default applies only to hosts that intentionally select it.
+The control plane or executor must still provide shared admission and durable fencing. `DshComputeAdmission` is process-local evidence and cannot by itself prove distributed capacity across multiple hosts. EC2 deployments set `DSH_COMPUTE_BACKEND=ec2` explicitly in the protected systemd drop-in, so the CodeSandbox default applies only to hosts that intentionally select it.
 
 ## Known Limitations and Deferred Work
 
@@ -112,8 +81,7 @@ The exact attempt and lifecycle contracts are exported from [src/attempt.ts](src
 <a id="dev-note"></a>
 ### Dev Note
 
-<details>
-<summary>Working context for maintainers — click to expand</summary>
+<details> <summary>Working context for maintainers — click to expand</summary>
 
 This Dev Note is working context for maintainers: open questions and deferred directions. It is explicitly non-authoritative; shipped behavior and limits live in the sections above and the package code. The acceptance suite for attempt and lifecycle safety is [tests/attempt.spec.ts](tests/attempt.spec.ts) and [tests/lifecycle.spec.ts](tests/lifecycle.spec.ts).
 

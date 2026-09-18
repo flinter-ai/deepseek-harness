@@ -44,6 +44,8 @@ export interface PacketToolHandlers {
  * Create the named handlers backing the model tools. Each handler only
  * translates model arguments and forwards the DSH execution signal; all
  * evidence semantics remain in the client and the canonical service.
+ * @param client - Canonical packet evidence client.
+ * @returns Tool handlers bound to the client.
  */
 export function createPacketToolHandlers(client: PacketEvidenceClient): PacketToolHandlers {
   return {
@@ -62,7 +64,11 @@ export function createPacketToolHandlers(client: PacketEvidenceClient): PacketTo
   }
 }
 
-/** Register the model-facing packet tools; evidence semantics stay in Search-R1. */
+/** Register the model-facing packet tools; evidence semantics stay in Search-R1.
+ * @param ctx - Cordis context receiving the tools.
+ * @param client - Canonical packet evidence client.
+ * @param config - Resolved tool configuration.
+ */
 export function registerPacketTools(ctx: Context, client: PacketEvidenceClient, config: ResolvedConfig): void {
   const describeName = `${config.toolPrefix}packet_describe`
   const evidenceName = `${config.toolPrefix}evidence_get`

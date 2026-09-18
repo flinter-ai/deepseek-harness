@@ -314,6 +314,53 @@ publish(topic: string, payload: InspectorJsonValue, monotonicMs?: number): void
 
 Source: [`packages/experimental/inspector/src/index.ts`](../../packages/experimental/inspector/src/index.ts)
 
+<a id="ctxsourcecontroller--sourcecontroller"></a>
+
+### `ctx.sourceController` — `SourceController`
+
+Durable source-draft service shared by direct DSH Web and browser editors. It owns draft persistence and optimistic fencing; Git/PR side effects are delegated to an optional host publisher and otherwise fail closed.
+
+```ts cordis-catalog
+/** Resolve the exact Git base used to create a new browser editor buffer.
+ * @param request - Session identifying the project.
+ * @returns The repository base result.
+ */
+@Remote('bootstrap') async bootstrap(request: SourceDraftBootstrapRequest): Promise<SourceDraftBootstrapResult>
+
+/** List drafts belonging to one persisted Session lifecycle.
+ * @param request - Session identifying the owner.
+ * @returns The matching drafts.
+ */
+@Remote('list') async list(request: SourceDraftListRequest): Promise<SourceDraftListResult>
+
+/** Load one draft only when its Session lifecycle still matches.
+ * @param request - Session and draft identity.
+ * @returns The requested draft.
+ */
+@Remote('get') async get(request: SourceDraftGetRequest): Promise<SourceDraftGetResult>
+
+/** Save a complete, normalized source snapshot with optimistic fencing.
+ * @param request - Draft snapshot and revision fence.
+ * @returns The saved draft result.
+ */
+@Remote('save') save(request: SourceDraftSaveRequest): Promise<SourceDraftSaveResult>
+
+/** Delete one draft after an optional revision check.
+ * @param request - Session, draft, and optional revision fence.
+ * @returns Deletion result.
+ */
+@Remote('delete') delete(request: SourceDraftDeleteRequest): Promise<SourceDraftDeleteResult>
+
+/** Publish one exact saved revision through the optional host publisher.
+ * @param request - Draft and revision to publish.
+ * @param signal - Cancellation signal.
+ * @returns Publication result.
+ */
+@Remote('publish') publish(request: SourceDraftPublishRequest, signal: AbortSignal): Promise<SourceDraftPublishResult>
+```
+
+Source: [`packages/api/source-controller/src/index.ts`](../../packages/api/source-controller/src/index.ts)
+
 <a id="cordis-events"></a>
 
 ### `cordis/*` events

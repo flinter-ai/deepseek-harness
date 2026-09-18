@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-12-platform-neutral-compute-backends.md
-2026-09-12-platform-neutral-compute-backends.md: fc1cae8312e1eb9ac56eef726909565aa1dcc815
-2026-09-12-platform-neutral-compute-backends.zh.md: d9fa7669745317c2aee88f6957fcc882971bf62f
+2026-09-12-platform-neutral-compute-backends.md: e24e264f36883ee07201de54c58a6c0986e94b47
+2026-09-12-platform-neutral-compute-backends.zh.md: 068da46c2b817c01e74de282a5ff6781781f2241

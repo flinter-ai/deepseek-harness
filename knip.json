@@ -679,6 +679,19 @@
         "tests/**/*.tsx"
       ]
     },
+    "packages/client/ui-source-editor": {
+      "project": [
+        "src/**/*.{ts,tsx}"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/dsh-client-ui-primitives"
+      ]
+    },
+    "packages/core/source-draft-model": {
+      "project": [
+        "src/**/*.ts"
+      ]
+    },
     "apps/web": {
       "entry": [
         "tests/**/*.e2e.ts",
