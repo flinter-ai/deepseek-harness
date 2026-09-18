@@ -42,13 +42,7 @@ jobs:
           no_output_timeout: 30m
       - run:
           name: Run deterministic flinter package tests
-          command: |
-            packet_spec="packages/flinter/dsh-packet-evidence/tests/index.spec.ts"
-            if [ -f "$packet_spec" ]; then
-              pnpm exec vitest run "$packet_spec"
-            else
-              pnpm exec vitest run packages/flinter --passWithNoTests
-            fi
+          command: pnpm exec vitest run packages/flinter --passWithNoTests
           no_output_timeout: 15m
 
   deep-coverage:
