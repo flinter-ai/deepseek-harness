@@ -13,6 +13,7 @@ export * from './worker.ts'
 export * from './attempt.ts'
 export * from './lifecycle.ts'
 export * from './compute.ts'
+export * from './runta.ts'
 export * from './codesandbox-sdk.ts'
 
 /** Environment-variable references used by the supported FLINTER routes. */

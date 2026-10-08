@@ -11,7 +11,7 @@ import {
 
 describe('platform-neutral compute contract', () => {
   it('defaults to one bounded CodeSandbox worker and accepts explicit platform policy', () => {
-    expect(DSH_COMPUTE_BACKENDS).toEqual(['codesandbox', 'ec2', 'local'])
+    expect(DSH_COMPUTE_BACKENDS).toEqual(['codesandbox', 'ec2', 'local', 'runta'])
     expect(readDshComputeAdmissionPolicy()).toEqual(DEFAULT_DSH_COMPUTE_ADMISSION_POLICY)
     expect(readDshComputeAdmissionPolicy({
       [DSH_COMPUTE_ENV.backend]: 'ec2',

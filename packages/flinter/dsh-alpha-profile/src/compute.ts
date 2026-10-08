@@ -9,7 +9,7 @@
 import { isAbsolute } from 'node:path'
 
 /** Compute substrates supported by the FLINTER worker contract. */
-export const DSH_COMPUTE_BACKENDS = ['codesandbox', 'ec2', 'local'] as const
+export const DSH_COMPUTE_BACKENDS = ['codesandbox', 'ec2', 'local', 'runta'] as const
 export type DshComputeBackend = (typeof DSH_COMPUTE_BACKENDS)[number]
 
 /** New workers default to the bounded CodeSandbox substrate. */

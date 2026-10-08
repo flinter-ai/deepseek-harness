@@ -56,6 +56,21 @@ Web 的 systemd overlay 会显式写入 `ec2`，这样渐进迁移期间不会�
 还会限制每个 session 同时只有一个 attempt，因此 replacement 必须先完成
 物理与逻辑 fencing，才能取得新的 lease。
 
+### Profile 默认值与浏览器表面
+
+机器计算平台选择器与 DSH Web 浏览器表面是两个独立的配置轴。以下映射是
+canonical setup：
+
+| Profile 或表面 | 配置 | 含义 |
+| --- | --- | --- |
+| 本地 `tod` worker | `DSH_COMPUTE_BACKEND=codesandbox` | CodeSandbox SDK microVM 计算，会受 CodeSandbox VM 容量限制。 |
+| AWS `aws-worker` / EC2 Web | `DSH_COMPUTE_BACKEND=ec2` | 计算留在 EC2 主机上，并由 systemd 显式写入。 |
+| DSH Web 浏览器 sandbox | `Sandpack` | 仅浏览器内的预览/交互，不是 DSH compute backend，也不会接收 provider key。 |
+
+不要使用 `DSH_COMPUTE_BACKEND=sandbox`：这个字面值不是支持的 backend。
+Sandpack 必须作为选定 DSH 主机之上的浏览器表面，不能静默把 EC2 部署切换
+为 CodeSandbox VM 计算。
+
 `CodeSandboxSdkRuntime` 是 CodeSandbox runtime seam 的官方
 `@codesandbox/sdk` 实现。宿主从 secret store 提供 `apiToken` 或
 `CSB_API_KEY`，再把它交给 `CodeSandboxComputeBackend`：

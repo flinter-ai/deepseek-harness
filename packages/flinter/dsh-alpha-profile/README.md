@@ -56,6 +56,21 @@ hibernation timeout. `DshComputeAdmission` additionally allows only one active
 attempt per session, so a replacement must be physically and logically fenced
 before it acquires a new lease.
 
+### Profile defaults and browser surface
+
+The machine compute selector and the DSH Web browser surface are separate
+configuration axes. Keep this mapping as the canonical setup:
+
+| Profile or surface | Configuration | Meaning |
+| --- | --- | --- |
+| Local `tod` worker | `DSH_COMPUTE_BACKEND=codesandbox` | CodeSandbox SDK microVM compute; it is subject to CodeSandbox VM capacity. |
+| AWS `aws-worker` / EC2 web | `DSH_COMPUTE_BACKEND=ec2` | Compute stays on the EC2 host and is stamped explicitly by systemd. |
+| DSH Web browser sandbox | `Sandpack` | Browser-only preview/interaction; it is not a DSH compute backend and does not receive provider keys. |
+
+Do not use `DSH_COMPUTE_BACKEND=sandbox`: that literal is not a supported
+backend. Sandpack must remain a browser surface layered over the selected DSH
+host; it must not silently change an EC2 deployment to CodeSandbox VM compute.
+
 `CodeSandboxSdkRuntime` is the official `@codesandbox/sdk` implementation of
 the CodeSandbox runtime seam. A host constructs it with a secret-store-backed
 `apiToken` or `CSB_API_KEY`, then passes it to `CodeSandboxComputeBackend`:
