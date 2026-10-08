@@ -7,7 +7,8 @@ describe('Runta compute adapter', () => {
     let inspected = 0
     const command = { waitUntilComplete: vi.fn(async () => 'done'), stop: vi.fn(async () => undefined) }
     const runtime = {
-      inspect: vi.fn(async () => ({ state: states[Math.min(inspected++, states.length - 1)] })),
+      // Math.min bounds the index to 0..2, so the lookup is always defined.
+      inspect: vi.fn(async () => ({ state: states[Math.min(inspected++, states.length - 1)]! })),
       wake: vi.fn(async () => undefined),
       exec: vi.fn(async () => command),
       stop: vi.fn(async () => undefined),
