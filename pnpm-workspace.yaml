@@ -50,6 +50,12 @@ allowBuilds:
   # The Python runtime deploy includes the reviewed workspace postinstall that
   # restores the executable bit on node-pty's macOS spawn helper.
   '@deepseek-ai/dsh-subprocess-local@file:packages/subprocess/subprocess-local': true
+  # es5-ext is pulled in transitively and ships a no-op postinstall (an upstream
+  # donation notice) wrapped in try/catch. It is not a native build and does
+  # nothing we need, so deny it explicitly like the other no-op lifecycle
+  # scripts above. Leaving it unlisted makes `pnpm install` fail outright with
+  # ERR_PNPM_IGNORED_BUILDS under the strict build-script policy.
+  es5-ext: false
 
 minimumReleaseAgeExclude:
   # Fresh pi-ai releases carry the model catalog updates that are the whole
