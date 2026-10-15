@@ -36,6 +36,7 @@ let dist: string | undefined
 beforeEach(() => {
   vi.stubEnv('SSH_CONNECTION', '')
   vi.stubEnv('SSH_TTY', '')
+  vi.stubEnv('DSH_WEB_PUBLIC_URL', '')
 })
 
 afterEach(() => {
@@ -213,6 +214,59 @@ describe('web-app runtime glue', () => {
     apply(ctx, new Config({ openBrowser: false, printUrl: true, surfaceContext: true, trustedHosts: [] }))
     await new Promise(resolve => setTimeout(resolve, 0))
     expect(log).toHaveBeenCalledWith('dsh web: http://127.0.0.1:4567/?token=test-token')
+    await ctx.fiber.dispose()
+  })
+
+  it('prints and hands off the public origin while the local URL stays loopback', async () => {
+    vi.stubEnv('DSH_WEB_PUBLIC_URL', 'https://dsh-web.example.com/')
+    stageDist()
+    const ctx = new Context()
+    ctx.provide('webServer', fakeHttpServer().server)
+    provideConnection(ctx)
+    const contributions: BashContribution[] = []
+    ctx.provide('shellEnv', {
+      register: (contribution: BashContribution) => {
+        contributions.push(contribution)
+        return () => {}
+      },
+    } as never)
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const openBrowser = vi.fn(async () => {})
+    internals.openBrowser = openBrowser
+    apply(ctx, new Config({ openBrowser: true, printUrl: true, surfaceContext: true, trustedHosts: [] }))
+    await ctx.plugin(SystemPrompt, { persona: '' })
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(log).toHaveBeenCalledWith('dsh web: https://dsh-web.example.com/?token=test-token')
+    expect(openBrowser).toHaveBeenCalledWith('https://dsh-web.example.com/?token=test-token')
+    const webRuntime = contributions.find(contribution => contribution.name === 'web-runtime')
+    expect(webRuntime?.resolve()).toEqual({ DSH_WEB_URL: 'http://127.0.0.1:4567' })
+    const assembly = await ctx.systemPrompt.assemble()
+    expect(assembly.sections.find(entry => entry.name === 'app:web-surface')?.text)
+      .toContain('http://127.0.0.1:4567')
+    await ctx.fiber.dispose()
+  })
+
+  it.each([
+    ['unparseable', 'not a url'],
+    ['non-http(s) scheme', 'ftp://dsh-web.example.com'],
+    ['credentials', 'https://user:secret@dsh-web.example.com'],
+    ['a path', 'https://dsh-web.example.com/ui'],
+    ['a query', 'https://dsh-web.example.com/?key=value'],
+    ['a fragment', 'https://dsh-web.example.com/#top'],
+  ] as const)('rejects DSH_WEB_PUBLIC_URL carrying %s without echoing it', async (_label, value) => {
+    vi.stubEnv('DSH_WEB_PUBLIC_URL', value)
+    const ctx = new Context()
+    ctx.provide('webServer', fakeHttpServer().server)
+    let failure: unknown
+    try {
+      apply(ctx, new Config({ openBrowser: true, printUrl: true, surfaceContext: true, trustedHosts: [] }))
+    } catch (error) {
+      failure = error
+    }
+    expect(failure).toBeInstanceOf(Error)
+    const message = (failure as Error).message
+    expect(message).toBe('web-app: DSH_WEB_PUBLIC_URL must be an absolute http:// or https:// origin without credentials, path, query, or fragment')
+    expect(message).not.toContain(value)
     await ctx.fiber.dispose()
   })
 

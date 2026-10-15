@@ -76,6 +76,9 @@ export interface WebRuntimeValues {
 /** Environment variable naming the canonical local URL of this Web GUI. */
 const DSH_WEB_URL = 'DSH_WEB_URL' as const
 
+/** Environment variable naming the public origin the printed URL and browser handoff use instead of loopback. */
+const DSH_WEB_PUBLIC_URL = 'DSH_WEB_PUBLIC_URL' as const
+
 // Display-only mirror of the webserver schema's loopback host: the address the
 // local URL always prints. Not a source of truth — the schema is.
 const LOOPBACK_HOST = '127.0.0.1'
@@ -163,6 +166,33 @@ function localWebUrl(ctx: Context): string {
 }
 
 /**
+ * Resolve the public origin replacing the loopback base of the printed URL and
+ * browser handoff, or `undefined` to keep the local URL. Only the process
+ * layer may set it: a project `.env` origin would redirect the token-bearing
+ * line through workspace-writable content. Rejection restates the contract and
+ * never echoes the raw value, which may carry credentials.
+ * @param ctx - plugin context carrying the launch-environment snapshot.
+ * @returns the canonical `scheme://host[:port]` origin.
+ */
+function resolvePublicOrigin(ctx: Context): string | undefined {
+  const value = launchEnvironmentOf(ctx).getFrom(DSH_WEB_PUBLIC_URL, ['process'])?.value
+  if (value === undefined || value === '') return undefined
+  let url: URL | undefined
+  try {
+    url = new URL(value)
+  } catch {
+    url = undefined
+  }
+  if (url === undefined
+    || (url.protocol !== 'http:' && url.protocol !== 'https:')
+    || url.username !== '' || url.password !== ''
+    || url.pathname !== '/' || url.search !== '' || url.hash !== '') {
+    throw new Error(`web-app: ${DSH_WEB_PUBLIC_URL} must be an absolute http:// or https:// origin without credentials, path, query, or fragment`)
+  }
+  return url.origin
+}
+
+/**
  * Dist location is workspace knowledge of this bundle: anchored on the
  * frontend package manifest, not configured. Existence is a request-time
  * concern — the fallback owner reads files per request, so a composition
@@ -234,6 +264,7 @@ export const internals: {
  */
 export function apply(ctx: Context, config: Config): void {
   const runtime = resolveLanTrust(ctx.webServer.host, config.trustedHosts)
+  const publicOrigin = resolvePublicOrigin(ctx)
   // The loopback URL belongs to this host. Under SSH, the operator reaches it
   // through a local forwarding address that this process cannot derive.
   const handoffBrowser = config.openBrowser && !launchedThroughSsh(ctx)
@@ -268,8 +299,7 @@ export function apply(ctx: Context, config: Config): void {
       // hand-built tree without a Loader is already the complete tree.
       const announceReady = (): void => {
         if (ANNOUNCED_ROOTS.has(connectionCtx.root)) return
-        const webUrl = localWebUrl(connectionCtx)
-        const authenticatedUrl = connectionCtx.connection.authenticatedUrl(webUrl)
+        const authenticatedUrl = connectionCtx.connection.authenticatedUrl(publicOrigin ?? localWebUrl(connectionCtx))
         // Reuse the exact LAN snapshot provided to the /api trust fence.
         const lanCandidate = runtime.lanAddresses[0]
         const port = connectionCtx.webServer.port

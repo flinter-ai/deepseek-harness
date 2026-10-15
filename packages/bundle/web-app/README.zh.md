@@ -53,6 +53,10 @@ dsh --profile web --no-open --port 8080
 
 默认情况下 GUI 只接受本机的连接。绑定所有网络接口的部署也会允许 LAN 内的浏览器访问，此时打印的 URL 会附带一个 LAN 地址；`--trusted-host` 在两种情况下都能添加额外主机。Host 与 Origin 检查控制可达性，token 交换则认证每个 Host API 方法与 WebSocket stream。LAN 地址只在启动时采样一次，因此之后的网络变化不会被感知——重启 GUI 以重新公告。
 
+### 通过公共 URL 提供服务
+
+当隧道或反向代理位于 GUI 之前时，在进程环境中把 `DSH_WEB_PUBLIC_URL` 设为外部 origin（例如 `https://dsh-web.example.com`）：`dsh web:` 行与浏览器交接随即携带该 origin 与同一个启动 token。该值必须是绝对的 `http`/`https` origin，不含凭据、路径、query 或 fragment；无效值会以一条绝不回显该值的描述性错误终止启动。`DSH_WEB_URL` 仍报告本地 URL，且该公共 authority 仍需通过 Host 检查——当它不属于采样到的 LAN 地址时，用 `--trusted-host` 声明。
+
 ### 通过 SSH 运行
 
 通过 SSH 启动 `dsh --profile web` 时，URL 行仍会打印，但不会为你打开浏览器：本地转发地址由 SSH 客户端或编辑器持有。请在自己的机器上打开转发后的 URL；打印出的 URL 指向远端宿主机 loopback 端点。

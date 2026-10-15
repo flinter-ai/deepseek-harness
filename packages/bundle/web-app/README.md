@@ -53,6 +53,10 @@ The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-a
 
 By default the GUI accepts connections from this machine only. A deployment that binds all network interfaces also allows browsers from the LAN, and the printed URL then includes a LAN address; `--trusted-host` adds extra hosts in either case. Host and Origin checks control reachability, while the token exchange authenticates every Host API method and WebSocket stream. The LAN addresses are sampled once at startup, so a network change later is not picked up — restart the GUI to re-advertise.
 
+### Serving through a public URL
+
+When a tunnel or reverse proxy fronts the GUI, set `DSH_WEB_PUBLIC_URL` in the process environment to the external origin (for example `https://dsh-web.example.com`): the `dsh web:` line and the browser handoff then carry that origin with the same launch token. The value must be an absolute `http`/`https` origin without credentials, path, query, or fragment; an invalid value stops startup with a descriptive error that never echoes it. `DSH_WEB_URL` still reports the local URL, and the public authority still has to pass the Host check — declare it with `--trusted-host` when it is not a sampled LAN address.
+
 ### Running over SSH
 
 When you launch `dsh --profile web` over SSH, the URL line still prints but the browser is not opened for you: the SSH client or editor owns the local forwarding address. Open the forwarded URL on your machine yourself; the printed URL names the remote host's loopback endpoint.
