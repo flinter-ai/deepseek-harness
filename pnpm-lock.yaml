@@ -5427,6 +5427,9 @@ importers:
       '@deepseek-ai/dsh-credentials':
         specifier: workspace:^
         version: link:../../credentials/credentials
+      '@deepseek-ai/dsh-credentials-aws-secrets-manager':
+        specifier: workspace:^
+        version: link:../../credentials/dsh-credentials-aws-secrets-manager
       '@deepseek-ai/dsh-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants

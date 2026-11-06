@@ -38,6 +38,8 @@ Use the profile when a host needs FLINTER's provider settings or needs to launch
 
 `buildFlinterProfileComposition('tod')` and `buildFlinterProfileComposition('aws-worker')` describe the same `dsh-base` plus `dsh-headless` composition. The AWS variant changes only the `ctx.credentials` provider row and supplies public reference-to-secret-name mappings. It does not create a second DSH installation, agent loop, session codec, or provider catalog.
 
+The AWS mapping is keyed by credential references such as `ARK_PLAN_API_KEY`, while the values are deployment-owned Secrets Manager names such as `flinter/dsh-ark-agent-plan`.
+
 The local `tod` launcher remains the source-checkout convenience wrapper. The AWS worker profile is a thin, read-only overlay for a later deployment probe; it is not a deployment manifest and does not contain account or secret material.
 
 ## One worker contract, selectable compute

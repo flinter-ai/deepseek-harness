@@ -40,6 +40,8 @@ kind: "package-reference"
 
 `buildFlinterProfileComposition('tod')` 和 `buildFlinterProfileComposition('aws-worker')` 描述相同的 `dsh-base` 加 `dsh-headless` 组合。AWS 版本只替换 `ctx.credentials` provider 行，并提供公开的引用到 secret 名称映射。它不会创建第二套 DSH 安装、agent loop、Session codec 或 provider catalog。
 
+AWS 映射以 `ARK_PLAN_API_KEY` 等凭据引用为键，值是部署拥有的 Secrets Manager 名称，例如 `flinter/dsh-ark-agent-plan`。
+
 本地 `tod` launcher 仍是 source checkout 的便利封装。AWS worker profile 是后续部署 probe 使用的精简只读 overlay；它不是部署清单，也不包含账户或 secret 材料。
 
 ## 一个 worker 合约、可切换的计算平台
