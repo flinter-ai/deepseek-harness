@@ -11,7 +11,7 @@ English | [中文](README.zh.md)
 
 `@deepseek-ai/dsh-segmentation-decision-trace` mounts one `DecisionTraceAdapter` on `ctx.flinterDecisionTrace` under the exact name of an existing segmentation tool. The producer owns the normalized request/result records; this package validates them fail-closed against a bounded allowlist and projects them into the `SelectionProjection`/`ResultProjection` capture contract. It never registers a tool, changes tool behavior or policy, adds model-visible content, calls a provider, indexes data, or writes a reasoning bank.
 
-This package is a source/fixture adapter only. No live TowerH or segmentation producer, provider execution, restart/replay run, 10,000-episode run, overhead measurement, independent verifier, or Gate 1 receipt/PASS is claimed.
+Local deterministic fixtures exercise JSONL flush/reload, process crashes before and after persistence acknowledgment, lifecycle faults, and OFF/ON overhead reporting. These checks remain scoped to the fixture workload; live qualification is described under [Known Limitations and Deferred Work](#known-limitations-and-deferred-work).
 
 ## Table of Contents
 
@@ -117,7 +117,7 @@ The package does not change the model-visible prefix, so it has no direct KV-cac
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Fixture-scoped evidence** — deterministic fixtures prove package behavior only. No live TowerH or segmentation producer, provider execution, persistence restart/replay, 10,000-episode run, overhead measurement, independent verifier, or Gate 1 receipt/PASS is claimed; each remains a separate check.
+- **Fixture-scoped evidence** — the harnesses exercise local persistence recovery and report workload-specific overhead; a completed run does not imply a passing performance classification. The fold fixture covers 10,000 events forming 5,000 episodes. Live TowerH or segmentation producers, provider execution, 10,000-episode qualification, and an independent Gate 1 acceptance receipt remain separate checks.
 - **Producer-owned facts** — the package validates and projects the normalized records the producer supplies; it does not derive segmentation facts from raw executions, so an absent producer resolver means absent capture.
 - **No index or bank writer** — recording and indexing readiness are facts supplied by the producer; this package does not write an evidence index or reasoning bank.
 

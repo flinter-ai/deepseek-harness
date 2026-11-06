@@ -11,7 +11,7 @@ kind: "package-reference"
 
 `@deepseek-ai/dsh-segmentation-decision-trace` 按一个既有分割工具的准确名称在 `ctx.flinterDecisionTrace` 上挂载一个 `DecisionTraceAdapter`。规范化的请求/结果记录由生产者所有；此软件包按有界允许列表对记录做失败即拒绝的验证，并投影到 `SelectionProjection`/`ResultProjection` 捕获约定。它从不注册工具、不改变工具行为或策略、不加入模型可见内容、不调用提供方、不建立索引，也不写推理库。
 
-此软件包仅为源/fixture（测试前置数据）适配器。不声明任何真实 TowerH 或分割生产者、提供方执行、重启/回放运行、一万次 episode（决策片段）运行、开销测量、独立验证器或 Gate 1 回执/PASS。
+本地确定性 fixture（测试前置数据）验证 JSONL 刷盘/重载、持久化确认前后的进程崩溃、生命周期故障，以及 OFF/ON 开销报告。这些检查仅覆盖 fixture 工作负载；真实环境资格验证的范围见[已知限制与延期工作](#known-limitations-and-deferred-work)。
 
 ## 目录
 
@@ -117,7 +117,7 @@ async function mount(ctx: Context): Promise<void> {
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **证据仅限 fixture 范围**——确定性 fixture 只证明软件包行为。不声明任何真实 TowerH 或分割生产者、提供方执行、持久化重启/回放、一万次 episode 运行、开销测量、独立验证器或 Gate 1 回执/PASS；每一项仍需单独验证。
+- **证据仅限 fixture 范围**——测试程序验证本地持久化恢复并报告特定工作负载的开销；运行完成并不代表性能分类通过。折叠 fixture 覆盖 10,000 个事件组成的 5,000 个 episode（决策片段）。真实 TowerH 或分割生产者、提供方执行、一万次 episode 资格验证，以及独立 Gate 1 验收回执仍需单独检查。
 - **事实由生产者所有**——此软件包验证并投影生产者提供的规范化记录；它不从原始执行推导分割事实，因此缺少生产者解析器就意味着没有捕获。
 - **没有索引或推理库写入器**——记录和索引就绪状态由生产者提供；此软件包不写证据索引或推理库。
 
