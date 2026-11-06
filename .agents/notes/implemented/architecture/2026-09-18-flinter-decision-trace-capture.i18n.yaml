@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-18-flinter-decision-trace-capture.md
-2026-09-18-flinter-decision-trace-capture.md: 5156357bb5bc439630f456f9a47e1ca2db33e0ac
-2026-09-18-flinter-decision-trace-capture.zh.md: 4b3ae160a00fd2ed77ec297ed4c8175077580a14
+2026-09-18-flinter-decision-trace-capture.md: edaf1d733b9efad924d3bd535930a346d6428c37
+2026-09-18-flinter-decision-trace-capture.zh.md: 452d13e40db5b302bc52a08ce74c265d2f66009a
