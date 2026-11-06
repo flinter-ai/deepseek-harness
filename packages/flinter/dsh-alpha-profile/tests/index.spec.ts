@@ -1,4 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { Context } from '@deepseek-ai/cordis'
+import { credentialRef } from '@deepseek-ai/dsh-credentials'
+import AwsSecretsManagerCredentialProvider from '@deepseek-ai/dsh-credentials-aws-secrets-manager'
+import type { Config as AwsSecretsManagerConfig } from '@deepseek-ai/dsh-credentials-aws-secrets-manager'
+import { GetSecretValueCommand } from '@aws-sdk/client-secrets-manager'
 import {
   bindFreshSession,
   buildFlinterProviderSettings,
@@ -13,6 +18,20 @@ import {
   PI_AI_DEFAULTS,
 } from '../src/index.ts'
 import { SessionId } from '@deepseek-ai/dsh-session'
+
+const mockSend = vi.fn()
+
+vi.mock('@aws-sdk/client-secrets-manager', () => ({
+  SecretsManagerClient: class MockSecretsManagerClient {
+    send = mockSend
+    destroy = vi.fn()
+  },
+  GetSecretValueCommand: vi.fn(),
+  DescribeSecretCommand: vi.fn(),
+  CreateSecretCommand: vi.fn(),
+  PutSecretValueCommand: vi.fn(),
+  DeleteSecretCommand: vi.fn(),
+}))
 
 const endpoints = {
   arkAgentPlan: 'http://127.0.0.1:4101/v1',
@@ -107,12 +126,41 @@ describe('FLINTER alpha provider/profile layer', () => {
           config: {
             secretFormat: 'json',
             allowWrites: false,
-            secretNames: FLINTER_AWS_SECRET_NAMES,
+            secretNames: {
+              [FLINTER_CREDENTIAL_REFS.arkAgentPlan]: FLINTER_AWS_SECRET_NAMES.arkAgentPlan,
+              [FLINTER_CREDENTIAL_REFS.modelflare]: FLINTER_AWS_SECRET_NAMES.modelflare,
+              [FLINTER_CREDENTIAL_REFS.gmiServing]: FLINTER_AWS_SECRET_NAMES.gmiServing,
+              [FLINTER_CREDENTIAL_REFS.deepseekOfficial]: FLINTER_AWS_SECRET_NAMES.deepseekOfficial,
+            },
           },
         }],
       },
     ])
     expect(JSON.stringify(aws)).not.toMatch(/(?:api[_-]?key|secret|token)\s*[:=]\s*[^,}]+/i)
+  })
+
+  it.each([
+    ['arkAgentPlan', FLINTER_CREDENTIAL_REFS.arkAgentPlan, FLINTER_AWS_SECRET_NAMES.arkAgentPlan],
+    ['modelflare', FLINTER_CREDENTIAL_REFS.modelflare, FLINTER_AWS_SECRET_NAMES.modelflare],
+    ['gmiServing', FLINTER_CREDENTIAL_REFS.gmiServing, FLINTER_AWS_SECRET_NAMES.gmiServing],
+    ['deepseekOfficial', FLINTER_CREDENTIAL_REFS.deepseekOfficial, FLINTER_AWS_SECRET_NAMES.deepseekOfficial],
+  ] as const)('maps %s profile reference to its AWS secret name at provider request time', async (_route, reference, secretName) => {
+    const aws = buildFlinterProfileComposition('aws-worker')
+    const patch = aws.patches[1]
+    expect(patch).toBeDefined()
+    if (patch === undefined || !('insert' in patch)) throw new Error('AWS credentials patch is missing')
+    const config: AwsSecretsManagerConfig = patch.insert[0].config
+    mockSend.mockReset()
+    vi.mocked(GetSecretValueCommand).mockClear()
+    mockSend.mockResolvedValue({ SecretString: JSON.stringify({ [reference]: 'fixture-value' }) })
+
+    const provider = new AwsSecretsManagerCredentialProvider(new Context(), config)
+    await expect(provider.resolve(credentialRef(reference)))
+      .resolves.toEqual({ value: 'fixture-value', source: 'aws-secrets-manager' })
+    expect(vi.mocked(GetSecretValueCommand)).toHaveBeenCalledWith({
+      SecretId: secretName,
+    })
+    expect(mockSend).toHaveBeenCalledOnce()
   })
 
   it('consumes native events without dropping opaque plugin records', () => {

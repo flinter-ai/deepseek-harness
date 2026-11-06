@@ -31,6 +31,13 @@ export const FLINTER_AWS_SECRET_NAMES = Object.freeze({
   deepseekOfficial: 'flinter/dsh-deepseek-official',
 } as const)
 
+const FLINTER_AWS_SECRET_NAMES_BY_REFERENCE = Object.freeze({
+  [FLINTER_CREDENTIAL_REFS.arkAgentPlan]: FLINTER_AWS_SECRET_NAMES.arkAgentPlan,
+  [FLINTER_CREDENTIAL_REFS.modelflare]: FLINTER_AWS_SECRET_NAMES.modelflare,
+  [FLINTER_CREDENTIAL_REFS.gmiServing]: FLINTER_AWS_SECRET_NAMES.gmiServing,
+  [FLINTER_CREDENTIAL_REFS.deepseekOfficial]: FLINTER_AWS_SECRET_NAMES.deepseekOfficial,
+} as const)
+
 /** Values verified against the alpha's llm-pi-ai config schema. */
 export const PI_AI_DEFAULTS = Object.freeze({
   contextWindow: 262_144,
@@ -359,7 +366,7 @@ export function buildFlinterProfileComposition(
         id: 'credentials-aws-secrets-manager',
         name: '@deepseek-ai/dsh-credentials-aws-secrets-manager',
         config: Object.freeze({
-          secretNames: FLINTER_AWS_SECRET_NAMES,
+          secretNames: FLINTER_AWS_SECRET_NAMES_BY_REFERENCE,
           secretFormat: 'json',
           allowWrites: false,
         }),
